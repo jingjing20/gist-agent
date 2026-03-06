@@ -1,0 +1,68 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --bg-primary: #0f0f13;
+  --bg-secondary: #1a1a23;
+  --bg-sidebar: #13131a;
+  --bg-hover: #22222e;
+  --bg-active: #2a2a3a;
+  --bg-code: #1e1e2e;
+  --bg-code-header: #16161f;
+  --border: #2a2a3a;
+  --border-light: #1f1f2e;
+  --text-primary: #e4e4e7;
+  --text-secondary: #71717a;
+  --accent: #6366f1;
+  --accent-hover: #5558e6;
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font-family);
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#app {
+  height: 100%;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
+/* highlight.js theme overrides for dark mode */
+.hljs {
+  background: transparent !important;
+  color: #e4e4e7;
+}
+.hljs-keyword { color: #c792ea; }
+.hljs-string { color: #c3e88d; }
+.hljs-number { color: #f78c6c; }
+.hljs-built_in { color: #82aaff; }
+.hljs-title { color: #82aaff; }
+.hljs-comment { color: #546e7a; }

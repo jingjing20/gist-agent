@@ -1,0 +1,14 @@
+{
+	"name": "ai-data-analysis",
+	"version": "1.0.0",
+	"private": true,
+	"scripts": {
+		"dev:server": "pnpm --filter server dev",
+		"dev:web": "pnpm --filter web dev",
+		"dev": "concurrently \"pnpm dev:server\" \"pnpm dev:web\"",
+		"init-db": "pnpm --filter server init-db"
+	},
+	"devDependencies": {
+		"concurrently": "^9.1.2"
+	}
+}
