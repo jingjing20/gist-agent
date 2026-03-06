@@ -33,8 +33,6 @@
           </div>
         </div>
       </div>
-
-      <ChatInput />
     </template>
 
     <template v-else>
@@ -55,6 +53,8 @@
         </div>
       </div>
     </template>
+
+    <ChatInput />
   </div>
 </template>
 
@@ -67,6 +67,7 @@ import SqlBlock from './blocks/SqlBlock.vue';
 import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
 import AuthBlock from './blocks/AuthBlock.vue';
+import LogBlock from './blocks/LogBlock.vue';
 import type { MessageBlock } from '../types';
 
 const store = useChatStore();
@@ -79,6 +80,7 @@ const blockMap: Record<string, Component> = {
   text: MarkdownBlock,
   error: MarkdownBlock,
   need_auth: AuthBlock,
+  log: LogBlock,
 };
 
 function blockComponent(type: string): Component {
@@ -90,6 +92,12 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
     return {
       tables: block.tables,
       reason: block.reason,
+    };
+  }
+  if (block.type === 'log') {
+    return {
+      title: block.title,
+      content: block.content,
     };
   }
   return {

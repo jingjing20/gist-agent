@@ -70,6 +70,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	async function selectConversation(id: string) {
 		activeConversationId.value = id;
+		window.location.hash = `#/${id}`;
 		const conv = conversations.value.find((c) => c.id === id);
 		if (conv && conv.messages.length === 0) {
 			await fetchMessages(id);
@@ -78,6 +79,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	function startNewChat() {
 		activeConversationId.value = null;
+		window.location.hash = '';
 	}
 
 	async function sendMessage(content: string) {
@@ -100,6 +102,8 @@ export const useChatStore = defineStore('chat', () => {
 		// 第一条消息更新标题
 		if (conv.messages.length === 1) {
 			conv.title = content.slice(0, 30) + (content.length > 30 ? '...' : '');
+			// When first created, manually sync to hash since activeConversationId was already set
+			window.location.hash = `#/${conv.id}`;
 		}
 
 		// 占位助手消息
@@ -174,6 +178,7 @@ export const useChatStore = defineStore('chat', () => {
 							rowCount: event.rowCount,
 							tables: event.tables,
 							reason: event.reason,
+							title: event.title,
 						};
 						assistantMsg.blocks.push(block);
 					} catch {

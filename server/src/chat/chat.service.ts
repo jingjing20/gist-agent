@@ -57,9 +57,24 @@ ${schemaPrompt}
 5. 获取到数据后，直接用自然语言回答并总结分析结论，无需复述工具的调用过程。`;
 
 		const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-			{ role: 'system', content: systemPrompt },
-			{ role: 'user', content: message }
+			{ role: 'system', content: systemPrompt }
 		];
+
+		const history = await this.conversationService.getMessages(conversationId);
+		for (const msg of history) {
+			if (msg.role === 'user') {
+				messages.push({ role: 'user', content: msg.content });
+			} else if (msg.role === 'assistant') {
+				let text = msg.content || '';
+				if (!text && Array.isArray(msg.blocks)) {
+					const textBlocks = msg.blocks.filter((b: any) => b.type === 'text');
+					text = textBlocks.map((b: any) => b.content).join('\n');
+				}
+				if (text) {
+					messages.push({ role: 'assistant', content: text });
+				}
+			}
+		}
 
 		const tools: OpenAI.Chat.Completions.ChatCompletionTool[] = [
 			{
@@ -158,7 +173,6 @@ ${schemaPrompt}
 					} else {
 						blocks.push({ type: 'text', content });
 					}
-					messages.push({ role: 'assistant', content });
 				}
 
 				if (toolCalls.length > 0) {
@@ -178,7 +192,9 @@ ${schemaPrompt}
 						try { args = JSON.parse(argsStr); } catch { }
 						let toolResult = '';
 
-						this.sendSSE(res, { type: 'thinking', content: `正在调用工具 ${name}...` });
+						const callLogEvent = { type: 'log', title: `[工具调用] ${name}`, content: argsStr };
+						this.sendSSE(res, callLogEvent as SSEEvent);
+						blocks.push(callLogEvent);
 
 						if (name === 'check_table_permission') {
 							const result: Record<string, boolean> = {};
@@ -196,7 +212,6 @@ ${schemaPrompt}
 							const sqlEvent = { type: 'sql', content: args.sql };
 							this.sendSSE(res, sqlEvent as SSEEvent);
 							blocks.push(sqlEvent);
-							this.sendSSE(res, { type: 'thinking', content: '工具执行中：SQL 数据查询...' });
 
 							try {
 								const r = await this.sqlExecutor.execute(args.sql);
@@ -211,9 +226,16 @@ ${schemaPrompt}
 							toolResult = `工具 ${name} 不存在`;
 						}
 
+						const resultLogEvent = { type: 'log', title: `[工具返回] ${name}`, content: toolResult };
+						this.sendSSE(res, resultLogEvent as SSEEvent);
+						blocks.push(resultLogEvent);
+
 						messages.push({ role: 'tool', tool_call_id: tc.id, content: toolResult });
 					}
 				} else {
+					if (content) {
+						messages.push({ role: 'assistant', content });
+					}
 					isDone = true;
 				}
 			}
