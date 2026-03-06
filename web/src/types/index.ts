@@ -1,5 +1,17 @@
+export interface ChartSeries {
+	name: string;
+	data: number[];
+}
+
+export interface ChartData {
+	chartType: 'line' | 'bar' | 'pie' | 'scatter';
+	title: string;
+	xAxis?: string[];
+	series: ChartSeries[];
+}
+
 export interface SSEEvent {
-	type: 'thinking' | 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'need_auth' | 'log';
+	type: 'thinking' | 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'need_auth' | 'log' | 'chart';
 	content?: string;
 	columns?: string[];
 	rows?: Record<string, unknown>[];
@@ -7,6 +19,7 @@ export interface SSEEvent {
 	tables?: string[];
 	reason?: string;
 	title?: string;
+	chartData?: ChartData;
 }
 
 export interface MessageBlock {
@@ -18,6 +31,7 @@ export interface MessageBlock {
 	tables?: string[];
 	reason?: string;
 	title?: string;
+	chartData?: ChartData;
 }
 
 export interface ChatMessage {

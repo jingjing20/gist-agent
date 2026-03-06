@@ -179,6 +179,7 @@ export const useChatStore = defineStore('chat', () => {
 							tables: event.tables,
 							reason: event.reason,
 							title: event.title,
+							chartData: event.chartData,
 						};
 						assistantMsg.blocks.push(block);
 					} catch {

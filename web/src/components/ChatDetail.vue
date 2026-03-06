@@ -68,6 +68,7 @@ import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
 import AuthBlock from './blocks/AuthBlock.vue';
 import LogBlock from './blocks/LogBlock.vue';
+import ChartBlock from './blocks/ChartBlock.vue';
 import type { MessageBlock } from '../types';
 
 const store = useChatStore();
@@ -81,6 +82,7 @@ const blockMap: Record<string, Component> = {
   error: MarkdownBlock,
   need_auth: AuthBlock,
   log: LogBlock,
+  chart: ChartBlock,
 };
 
 function blockComponent(type: string): Component {
@@ -98,6 +100,11 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
     return {
       title: block.title,
       content: block.content,
+    };
+  }
+  if (block.type === 'chart') {
+    return {
+      chartData: block.chartData,
     };
   }
   return {

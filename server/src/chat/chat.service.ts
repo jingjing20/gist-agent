@@ -54,7 +54,8 @@ ${schemaPrompt}
 2. 调用 check_table_permission 检查所需表的访问权限。
 3. 如果被拒绝权限，必须立即调用 request_table_permissions 终止分析并向用户申请权限，不要进行多余的解释。
 4. 如果有权限，编写并调用 execute_sql_query 获取数据。
-5. 获取到数据后，直接用自然语言回答并总结分析结论，无需复述工具的调用过程。`;
+5. 获取到数据后，直接用自然语言回答并总结分析结论，无需复述工具的调用过程。
+6. 如果数据适合可视化展示（趋势、对比、分布、排名等），请调用 generate_chart 生成图表。你只需决定图表类型和传入数据，样式由前端处理。`;
 
 		const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
 			{ role: 'system', content: systemPrompt }
@@ -121,6 +122,49 @@ ${schemaPrompt}
 							sql: { type: 'string', description: '安全的只读 MySQL 查询语句' }
 						},
 						required: ['sql']
+					}
+				}
+			},
+			{
+				type: 'function',
+				function: {
+					name: 'generate_chart',
+					description: '当查询结果适合可视化时，调用此工具生成图表。你只需提供图表类型、标题和数据，样式由前端统一处理。',
+					parameters: {
+						type: 'object',
+						properties: {
+							chartType: {
+								type: 'string',
+								enum: ['line', 'bar', 'pie', 'scatter'],
+								description: '图表类型：line 折线图 / bar 柱状图 / pie 饼图 / scatter 散点图'
+							},
+							title: {
+								type: 'string',
+								description: '图表标题'
+							},
+							xAxis: {
+								type: 'array',
+								items: { type: 'string' },
+								description: 'X 轴分类标签（饼图不需要）'
+							},
+							series: {
+								type: 'array',
+								description: '数据系列',
+								items: {
+									type: 'object',
+									properties: {
+										name: { type: 'string', description: '系列名称' },
+										data: {
+											type: 'array',
+											items: { type: 'number' },
+											description: '数值数组，与 xAxis 一一对应；饼图时每项对应一个扇区的值'
+										}
+									},
+									required: ['name', 'data']
+								}
+							}
+						},
+						required: ['chartType', 'title', 'series']
 					}
 				}
 			}
@@ -222,6 +266,17 @@ ${schemaPrompt}
 							} catch (e: any) {
 								toolResult = `SQL 执行出错: ${e.message}`;
 							}
+						} else if (name === 'generate_chart') {
+							const chartData = {
+								chartType: args.chartType,
+								title: args.title,
+								xAxis: args.xAxis,
+								series: args.series,
+							};
+							const chartEvent = { type: 'chart', chartData };
+							this.sendSSE(res, chartEvent as SSEEvent);
+							blocks.push(chartEvent);
+							toolResult = '图表已成功渲染到用户界面。';
 						} else {
 							toolResult = `工具 ${name} 不存在`;
 						}
