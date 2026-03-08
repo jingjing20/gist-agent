@@ -259,10 +259,25 @@ ${schemaPrompt}
 
 							try {
 								const r = await this.sqlExecutor.execute(args.sql);
+
+								if (r.finalSql !== args.sql) {
+									const fixLogEvent = { type: 'log', title: '[防腐层自动修复]', content: `检测到语法错误已由内部子模型修复。\n修复前：${args.sql}\n\n修复后：${r.finalSql}` };
+									this.sendSSE(res, fixLogEvent as SSEEvent);
+									blocks.push(fixLogEvent);
+								}
+
 								const tableEvent = { type: 'table', columns: r.columns, rows: r.rows, rowCount: r.rowCount };
 								this.sendSSE(res, tableEvent as SSEEvent);
 								blocks.push(tableEvent);
-								toolResult = JSON.stringify(r.rows.slice(0, 50));
+
+								if (r.finalSql !== args.sql) {
+									toolResult = JSON.stringify({
+										SystemMessage: `注意：由于你写的原始 SQL 存在特定语法错误，已被系统防腐代理自动拦截修复！最终成功执行的 SQL 为: ${r.finalSql}。请在最终结论中以此为准。`,
+										data: r.rows.slice(0, 50)
+									});
+								} else {
+									toolResult = JSON.stringify(r.rows.slice(0, 50));
+								}
 							} catch (e: any) {
 								toolResult = `SQL 执行出错: ${e.message}`;
 							}
