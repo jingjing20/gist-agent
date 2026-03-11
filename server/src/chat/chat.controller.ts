@@ -1,6 +1,8 @@
 import { Controller, Post, Body, Res, HttpCode } from '@nestjs/common';
 import { Response } from 'express';
 import { ChatService } from './chat.service';
+import { CurrentUser } from '../auth/user.decorator';
+import type { User } from '../auth/auth.service';
 
 @Controller('chat')
 export class ChatController {
@@ -9,10 +11,11 @@ export class ChatController {
 	@Post()
 	@HttpCode(200)
 	async chat(
-		@Body() body: { message: string; conversationId: string },
+		@CurrentUser() user: User,
+		@Body() body: { message: string; conversationId: string; datasourceId?: number },
 		@Res() res: Response,
 	) {
-		const { message, conversationId } = body;
+		const { message, conversationId, datasourceId } = body;
 
 		if (!message?.trim()) {
 			res.status(400).json({ error: '消息不能为空' });
@@ -29,7 +32,7 @@ export class ChatController {
 		res.setHeader('Connection', 'keep-alive');
 		res.flushHeaders();
 
-		await this.chatService.handleChat(res, message, conversationId);
+		await this.chatService.handleChat(res, user.id, message, conversationId, datasourceId ?? null);
 		res.end();
 	}
 }

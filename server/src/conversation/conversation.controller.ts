@@ -1,27 +1,29 @@
 import { Controller, Get, Post, Delete, Param, Body } from '@nestjs/common';
 import { ConversationService } from './conversation.service';
+import { CurrentUser } from '../auth/user.decorator';
+import type { User } from '../auth/auth.service';
 
 @Controller('conversations')
 export class ConversationController {
 	constructor(private readonly service: ConversationService) { }
 
 	@Get()
-	findAll() {
-		return this.service.findAll();
+	findAll(@CurrentUser() user: User) {
+		return this.service.findAll(user.id);
 	}
 
 	@Post()
-	create(@Body() body: { title?: string }) {
-		return this.service.create(body.title);
+	create(@CurrentUser() user: User, @Body() body: { title?: string }) {
+		return this.service.create(user.id, body.title);
 	}
 
 	@Delete(':id')
-	remove(@Param('id') id: string) {
-		return this.service.remove(id);
+	remove(@CurrentUser() user: User, @Param('id') id: string) {
+		return this.service.remove(id, user.id);
 	}
 
 	@Get(':id/messages')
-	getMessages(@Param('id') id: string) {
-		return this.service.getMessages(id);
+	getMessages(@CurrentUser() user: User, @Param('id') id: string) {
+		return this.service.getMessages(id, user.id);
 	}
 }

@@ -66,7 +66,6 @@ import ThinkingBlock from './blocks/ThinkingBlock.vue';
 import SqlBlock from './blocks/SqlBlock.vue';
 import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
-import AuthBlock from './blocks/AuthBlock.vue';
 import LogBlock from './blocks/LogBlock.vue';
 import ChartBlock from './blocks/ChartBlock.vue';
 import type { MessageBlock } from '../types';
@@ -80,7 +79,6 @@ const blockMap: Record<string, Component> = {
   table: TableBlock,
   text: MarkdownBlock,
   error: MarkdownBlock,
-  need_auth: AuthBlock,
   log: LogBlock,
   chart: ChartBlock,
 };
@@ -90,12 +88,6 @@ function blockComponent(type: string): Component {
 }
 
 function blockProps(block: MessageBlock): Record<string, unknown> {
-  if (block.type === 'need_auth') {
-    return {
-      tables: block.tables,
-      reason: block.reason,
-    };
-  }
   if (block.type === 'log') {
     return {
       title: block.title,
@@ -155,7 +147,7 @@ watch(
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
   background: var(--bg-primary);
 }

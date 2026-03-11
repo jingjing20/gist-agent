@@ -48,7 +48,7 @@ onMounted(() => {
 .sidebar {
   width: 260px;
   min-width: 260px;
-  height: 100vh;
+  height: 100%;
   background: var(--bg-sidebar);
   border-right: 1px solid var(--border);
   display: flex;

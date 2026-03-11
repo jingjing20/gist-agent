@@ -1,5 +1,19 @@
 <template>
   <div class="chat-input-wrapper">
+    <!-- 数据源选择器 -->
+    <div class="ds-selector-row">
+      <select
+        id="datasource-select"
+        v-model="selectedDatasourceId"
+        class="ds-select"
+        @change="chatStore.activeDatasourceId = selectedDatasourceId"
+      >
+        <option v-for="ds in dsStore.list" :key="ds.id" :value="ds.id">
+          {{ ds.name }}{{ ds.is_local ? ' (默认)' : '' }}
+        </option>
+      </select>
+    </div>
+
     <div class="input-container">
       <textarea
         ref="textareaRef"
@@ -12,7 +26,7 @@
       />
       <button
         class="send-btn"
-        :disabled="!inputText.trim() || store.isLoading"
+        :disabled="!inputText.trim() || chatStore.isLoading"
         @click="handleSubmit"
       >
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
@@ -24,12 +38,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick } from 'vue';
+import { ref, nextTick, onMounted, watch } from 'vue';
 import { useChatStore } from '../stores/chat';
+import { useDataSourceStore } from '../stores/datasource';
 
-const store = useChatStore();
+const chatStore = useChatStore();
+const dsStore = useDataSourceStore();
+
 const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement>();
+const selectedDatasourceId = ref<number | null>(null);
+
+onMounted(async () => {
+  if (!dsStore.list.length) {
+    await dsStore.fetchAll();
+  }
+  // 默认选中本地默认库
+  const local = dsStore.list.find(d => d.is_local);
+  if (local) {
+    selectedDatasourceId.value = local.id;
+    chatStore.activeDatasourceId = local.id;
+  }
+});
+
+// 当数据源列表变化时（上传文件后），同步默认选中
+watch(() => dsStore.list.length, () => {
+  if (!selectedDatasourceId.value) {
+    const local = dsStore.list.find(d => d.is_local);
+    if (local) {
+      selectedDatasourceId.value = local.id;
+      chatStore.activeDatasourceId = local.id;
+    }
+  }
+});
 
 function autoResize() {
   const el = textareaRef.value;
@@ -41,20 +82,47 @@ function autoResize() {
 function handleSubmit(e?: Event) {
   e?.preventDefault();
   const text = inputText.value.trim();
-  if (!text || store.isLoading) return;
+  if (!text || chatStore.isLoading) return;
   inputText.value = '';
   nextTick(() => {
     if (textareaRef.value) textareaRef.value.style.height = 'auto';
   });
-  store.sendMessage(text);
+  chatStore.sendMessage(text);
 }
 </script>
 
 <style scoped>
 .chat-input-wrapper {
-  padding: 16px 24px 24px;
+  padding: 10px 24px 24px;
   border-top: 1px solid var(--border);
   background: var(--bg-primary);
+}
+
+.ds-selector-row {
+  max-width: 800px;
+  margin: 0 auto 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ds-select {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+  padding: 5px 10px;
+  border-radius: 7px;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.ds-select:hover,
+.ds-select:focus {
+  border-color: var(--accent);
+  color: var(--text-primary);
 }
 
 .input-container {

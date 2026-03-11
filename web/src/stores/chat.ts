@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import type { Conversation, ChatMessage, MessageBlock, SSEEvent } from '../types';
-
-const API_BASE = '/api';
+import { apiFetch } from '../api';
 
 export const useChatStore = defineStore('chat', () => {
+	const router = useRouter();
 	const conversations = ref<Conversation[]>([]);
 	const activeConversationId = ref<string | null>(null);
+	const activeDatasourceId = ref<number | null>(null);
 	const isLoading = ref(false);
 
 	const activeConversation = computed(() =>
@@ -14,7 +16,7 @@ export const useChatStore = defineStore('chat', () => {
 	);
 
 	async function fetchConversations() {
-		const res = await fetch(`${API_BASE}/conversations`);
+		const res = await apiFetch('/conversations');
 		const data = await res.json();
 		conversations.value = data.map((c: any) => ({
 			id: c.id,
@@ -26,7 +28,7 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	async function fetchMessages(conversationId: string) {
-		const res = await fetch(`${API_BASE}/conversations/${conversationId}/messages`);
+		const res = await apiFetch(`/conversations/${conversationId}/messages`);
 		const data = await res.json();
 		const conv = conversations.value.find((c) => c.id === conversationId);
 		if (!conv) return;
@@ -41,9 +43,8 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	async function createConversation(): Promise<Conversation> {
-		const res = await fetch(`${API_BASE}/conversations`, {
+		const res = await apiFetch('/conversations', {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ title: '新对话' }),
 		});
 		const data = await res.json();
@@ -60,7 +61,7 @@ export const useChatStore = defineStore('chat', () => {
 	}
 
 	async function deleteConversation(id: string) {
-		await fetch(`${API_BASE}/conversations/${id}`, { method: 'DELETE' });
+		await apiFetch(`/conversations/${id}`, { method: 'DELETE' });
 		const idx = conversations.value.findIndex((c) => c.id === id);
 		if (idx !== -1) conversations.value.splice(idx, 1);
 		if (activeConversationId.value === id) {
@@ -70,7 +71,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	async function selectConversation(id: string) {
 		activeConversationId.value = id;
-		window.location.hash = `#/${id}`;
+		router.replace(`/${id}`);
 		const conv = conversations.value.find((c) => c.id === id);
 		if (conv && conv.messages.length === 0) {
 			await fetchMessages(id);
@@ -79,7 +80,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	function startNewChat() {
 		activeConversationId.value = null;
-		window.location.hash = '';
+		router.replace('/');
 	}
 
 	async function sendMessage(content: string) {
@@ -102,8 +103,7 @@ export const useChatStore = defineStore('chat', () => {
 		// 第一条消息更新标题
 		if (conv.messages.length === 1) {
 			conv.title = content.slice(0, 30) + (content.length > 30 ? '...' : '');
-			// When first created, manually sync to hash since activeConversationId was already set
-			window.location.hash = `#/${conv.id}`;
+			router.replace(`/${conv.id}`);
 		}
 
 		// 占位助手消息
@@ -119,10 +119,13 @@ export const useChatStore = defineStore('chat', () => {
 		isLoading.value = true;
 
 		try {
-			const response = await fetch(`${API_BASE}/chat`, {
+			const response = await apiFetch('/chat', {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ message: content, conversationId: conv.id }),
+				body: JSON.stringify({
+					message: content,
+					conversationId: conv.id,
+					datasourceId: activeDatasourceId.value,
+				}),
 			});
 
 			if (!response.ok || !response.body) {
@@ -200,6 +203,7 @@ export const useChatStore = defineStore('chat', () => {
 	return {
 		conversations,
 		activeConversationId,
+		activeDatasourceId,
 		isLoading,
 		activeConversation,
 		fetchConversations,

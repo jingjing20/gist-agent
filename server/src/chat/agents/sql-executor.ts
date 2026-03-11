@@ -21,22 +21,34 @@ export class SqlExecutorAgent {
 		private readonly llm: LlmService,
 	) { }
 
+	private async queryWithTimeout<T>(
+		sql: string,
+		datasourceId?: number | null,
+		timeoutMs = 15000
+	): Promise<T> {
+		return Promise.race([
+			this.db.query<T extends RowDataPacket[] ? T : any>(sql, [], datasourceId),
+			new Promise<T>((_, reject) =>
+				setTimeout(() => reject(new Error(`查询超时（> ${timeoutMs / 1000}s），已自动熔断拦截`)), timeoutMs)
+			)
+		]);
+	}
+
+	private readonly FORBIDDEN_KEYWORDS = [
+		'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER',
+		'CREATE', 'TRUNCATE', 'GRANT', 'REVOKE', 'REPLACE',
+		'SET', 'CALL', 'LOCK', 'UNLOCK',
+	];
+
 	validate(sql: string): void {
-		const normalized = sql.trim().toUpperCase();
-
-		if (!normalized.startsWith('SELECT')) {
-			throw new Error('只允许执行 SELECT 查询');
-		}
-
-		const forbidden = [
-			'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER',
-			'CREATE', 'TRUNCATE', 'GRANT', 'REVOKE',
-		];
-		for (const keyword of forbidden) {
+		for (const keyword of this.FORBIDDEN_KEYWORDS) {
 			const pattern = new RegExp(`\\b${keyword}\\b`, 'i');
 			if (pattern.test(sql)) {
 				throw new Error(`SQL 包含禁止的操作: ${keyword}`);
 			}
+		}
+		if (/\bLOAD\s+DATA\b/i.test(sql)) {
+			throw new Error('SQL 包含禁止的操作: LOAD DATA');
 		}
 	}
 
@@ -46,6 +58,11 @@ export class SqlExecutorAgent {
 			return `${sql.replace(/;\s*$/, '')} LIMIT ${MAX_ROWS}`;
 		}
 		return sql;
+	}
+
+	private isSelectLike(sql: string): boolean {
+		const normalized = sql.trim().toUpperCase();
+		return normalized.startsWith('SELECT') || normalized.startsWith('WITH ');
 	}
 
 	private isSyntaxError(error: any): boolean {
@@ -81,7 +98,7 @@ export class SqlExecutorAgent {
 		return cleanSql;
 	}
 
-	async execute(sql: string): Promise<QueryResult> {
+	async execute(sql: string, datasourceId?: number | null): Promise<QueryResult> {
 		const maxRetries = 2;
 		let currentSql = sql;
 		let attempt = 0;
@@ -89,13 +106,13 @@ export class SqlExecutorAgent {
 		while (attempt <= maxRetries) {
 			try {
 				this.validate(currentSql);
-				const safeSql = this.ensureLimit(currentSql);
+				const safeSql = this.isSelectLike(currentSql) ? this.ensureLimit(currentSql) : currentSql;
 
-				const rows = await this.db.query<RowDataPacket[]>(safeSql);
+				const rows = await this.queryWithTimeout<RowDataPacket[]>(safeSql, datasourceId, 15000);
 				const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
 
 				return {
-					finalSql: currentSql,
+					finalSql: safeSql,
 					columns,
 					rows: rows as Record<string, unknown>[],
 					rowCount: rows.length,
