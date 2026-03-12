@@ -3,7 +3,7 @@
     <div class="ds-header">
       <h2>数据源</h2>
       <div class="ds-actions">
-        <button class="btn btn-primary" @click="showCreate = true">+ 添加数据库</button>
+        <button class="btn btn-primary" @click="showModeChooser = true">+ 新建数据源</button>
       </div>
     </div>
 
@@ -23,7 +23,7 @@
             </div>
           </div>
           <div class="ds-card-right">
-            <button class="btn btn-secondary btn-sm" @click="openUpload(ds)">上传文件</button>
+            <button v-if="!ds.is_local" class="btn btn-secondary btn-sm" @click="openUpload(ds)">上传文件</button>
             <template v-if="!ds.is_local">
               <button
                 v-if="isCreator(ds)"
@@ -37,64 +37,142 @@
           </div>
         </div>
         <div v-if="expandedDs === ds.id" class="ds-tables">
-          <div v-if="tablesLoading" class="ds-tables-hint">加载中...</div>
-          <div v-else-if="!tables.length" class="ds-tables-hint">暂无上传的表</div>
-          <div v-else class="ds-table-list">
-            <div v-for="t in tables" :key="t.id" class="ds-table-item">
-              <span class="ds-table-name">{{ t.display_name }}</span>
-              <span class="ds-table-meta">{{ t.table_name }}</span>
-              <button class="btn btn-danger-ghost btn-xs" @click="handleDeleteTable(ds.id, t.id)">删除</button>
+          <template v-if="ds.is_local">
+            <div class="ds-table-list">
+              <div v-for="pt in PRESET_TABLES" :key="pt.tableName" class="ds-table-item ds-table-item--preset">
+                <span class="ds-table-name">{{ pt.displayName }}</span>
+                <span class="ds-table-meta">{{ pt.tableName }}</span>
+              </div>
             </div>
-          </div>
+          </template>
+          <template v-else>
+            <div v-if="tablesLoading" class="ds-tables-hint">加载中...</div>
+            <div v-else-if="!tables.length" class="ds-tables-hint">暂无上传的表</div>
+            <div v-else class="ds-table-list">
+              <div v-for="t in tables" :key="t.id" class="ds-table-item">
+                <span class="ds-table-name">{{ t.display_name }}</span>
+                <span class="ds-table-meta">{{ t.table_name }}</span>
+                <button class="btn btn-danger-ghost btn-xs" @click="handleDeleteTable(ds.id, t.id)">删除</button>
+              </div>
+            </div>
+          </template>
         </div>
-        <button class="ds-expand-btn" @click="toggleExpand(ds.id)">
-          {{ expandedDs === ds.id ? '收起' : '查看上传的表' }}
+        <button class="ds-expand-btn" @click="toggleExpand(ds)">
+          {{ expandedDs === ds.id ? '收起' : (ds.is_local ? '查看示例表' : '查看上传的表') }}
         </button>
       </div>
     </div>
 
-    <!-- 添加数据库弹窗 -->
+    <!-- 新建数据源：选择模式 -->
+    <div v-if="showModeChooser" class="modal-overlay" @click.self="showModeChooser = false">
+      <div class="modal mode-chooser">
+        <h3>新建数据源</h3>
+        <p class="mode-desc">选择数据来源方式</p>
+        <div class="mode-options">
+          <button class="mode-option" @click="showModeChooser = false; showCreate = true">
+            <div class="mode-icon">&#128268;</div>
+            <div class="mode-label">配置数据库连接</div>
+            <div class="mode-sub">连接已有的 MySQL 数据库</div>
+          </button>
+          <button class="mode-option" @click="showModeChooser = false; showCreateByFile = true">
+            <div class="mode-icon">&#128196;</div>
+            <div class="mode-label">上传文件新建</div>
+            <div class="mode-sub">上传 CSV / XLSX 自动建表</div>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 上传文件新建数据源弹窗 -->
+    <div v-if="showCreateByFile" class="modal-overlay" @click.self="closeCreateByFile">
+      <div class="modal">
+        <h3>上传文件新建数据源</h3>
+        <div class="form-row">
+          <label>数据源名称</label>
+          <input v-model="createFileForm.name" placeholder="例如：2024年销售数据" required />
+        </div>
+        <div class="form-row">
+          <label>表名</label>
+          <input v-model="createFileForm.displayName" placeholder="例如：销售明细" required />
+        </div>
+        <div
+          class="upload-zone"
+          :class="{ 'drag-over': createFileDragOver }"
+          @dragover.prevent="createFileDragOver = true"
+          @dragleave="createFileDragOver = false"
+          @drop.prevent="handleCreateFileDrop"
+          @click="createFileInputRef?.click()"
+        >
+          <input ref="createFileInputRef" type="file" accept=".csv,.xlsx,.xls" hidden @change="handleCreateFileChange" />
+          <div v-if="createFileForm.file">
+            <div class="upload-filename">{{ createFileForm.file.name }}</div>
+            <div class="upload-hint">{{ (createFileForm.file.size / 1024).toFixed(1) }} KB</div>
+          </div>
+          <div v-else>
+            <div class="upload-icon">+</div>
+            <div class="upload-hint">点击或拖拽 CSV / XLSX / XLS 文件至此</div>
+          </div>
+        </div>
+        <div v-if="createFileError" class="form-error">{{ createFileError }}</div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-ghost" @click="closeCreateByFile">取消</button>
+          <button
+            class="btn btn-primary"
+            :disabled="!createFileForm.name || !createFileForm.displayName || !createFileForm.file || createFileSubmitting"
+            @click="handleCreateByFile"
+          >
+            {{ createFileSubmitting ? '创建中...' : '创建数据源' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 配置数据库连接弹窗 -->
     <div v-if="showCreate" class="modal-overlay" @click.self="showCreate = false">
       <div class="modal">
         <h3>添加 MySQL 数据源</h3>
         <form @submit.prevent="handleCreate">
           <div class="form-row">
             <label>名称</label>
-            <input v-model="form.name" placeholder="我的线上库" required />
+            <input v-model="form.name" placeholder="我的线上库" required @input="connectionTested = false" />
           </div>
           <div class="form-row two-col">
             <div>
               <label>Host</label>
-              <input v-model="form.host" placeholder="127.0.0.1" required />
+              <input v-model="form.host" placeholder="127.0.0.1" required @input="connectionTested = false" />
             </div>
             <div>
               <label>Port</label>
-              <input v-model.number="form.port" type="number" placeholder="3306" required />
+              <input v-model.number="form.port" type="number" placeholder="3306" required @input="connectionTested = false" />
             </div>
           </div>
           <div class="form-row two-col">
             <div>
               <label>用户名</label>
-              <input v-model="form.user" placeholder="root" required />
+              <input v-model="form.user" placeholder="root" required @input="connectionTested = false" />
             </div>
             <div>
               <label>密码</label>
-              <input v-model="form.password" type="password" placeholder="••••••" />
+              <input v-model="form.password" type="password" placeholder="••••••" @input="connectionTested = false" />
             </div>
           </div>
           <div class="form-row">
             <label>数据库名</label>
-            <input v-model="form.database_name" placeholder="my_database" required />
+            <input v-model="form.database_name" placeholder="my_database" required @input="connectionTested = false" />
           </div>
           <div class="form-row">
             <label>备注（可选）</label>
             <input v-model="form.description" placeholder="用途描述" />
           </div>
+          <div v-if="connectionTested" class="form-success">连接成功，可新建数据源</div>
           <div v-if="formError" class="form-error">{{ formError }}</div>
           <div class="modal-footer">
             <button type="button" class="btn btn-ghost" @click="showCreate = false">取消</button>
-            <button type="submit" class="btn btn-primary" :disabled="submitting">
-              {{ submitting ? '连接中...' : '保存并测试连接' }}
+            <button type="button" class="btn btn-secondary" :disabled="!canTestConnection || testingConnection" @click="handleTestConnection">
+              {{ testingConnection ? '测试中...' : '测试连接' }}
+            </button>
+            <button type="submit" class="btn btn-primary" :disabled="!connectionTested || submitting">
+              {{ submitting ? '创建中...' : '新建数据源' }}
             </button>
           </div>
         </form>
@@ -205,7 +283,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive } from 'vue';
+import { ref, onMounted, reactive, watch } from 'vue';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
 import { apiFetch } from '../api';
@@ -286,9 +364,59 @@ async function handleRevoke(userId: number) {
   }
 }
 
+// --- 新建数据源：模式选择 ---
+const showModeChooser = ref(false);
+
+// --- 上传文件新建数据源 ---
+const showCreateByFile = ref(false);
+const createFileSubmitting = ref(false);
+const createFileError = ref('');
+const createFileDragOver = ref(false);
+const createFileInputRef = ref<HTMLInputElement | null>(null);
+const createFileForm = reactive<{ name: string; displayName: string; file: File | null }>({
+  name: '',
+  displayName: '',
+  file: null,
+});
+
+function closeCreateByFile() {
+  showCreateByFile.value = false;
+  createFileError.value = '';
+  createFileDragOver.value = false;
+  Object.assign(createFileForm, { name: '', displayName: '', file: null });
+}
+
+function handleCreateFileChange(e: Event) {
+  const files = (e.target as HTMLInputElement).files;
+  if (files?.[0]) createFileForm.file = files[0];
+}
+
+function handleCreateFileDrop(e: DragEvent) {
+  createFileDragOver.value = false;
+  const files = e.dataTransfer?.files;
+  if (files?.[0]) createFileForm.file = files[0];
+}
+
+async function handleCreateByFile() {
+  if (!createFileForm.name || !createFileForm.displayName || !createFileForm.file) return;
+  createFileError.value = '';
+  createFileSubmitting.value = true;
+  try {
+    const ds = await store.create({ name: createFileForm.name });
+    await store.uploadTable(ds.id, createFileForm.file, createFileForm.displayName);
+    closeCreateByFile();
+  } catch (e: any) {
+    createFileError.value = e.message;
+  } finally {
+    createFileSubmitting.value = false;
+  }
+}
+
 // --- 添加数据库 ---
 const showCreate = ref(false);
 const submitting = ref(false);
+const testingConnection = ref(false);
+const connectionTested = ref(false);
 const formError = ref('');
 const form = reactive({
   name: '',
@@ -300,13 +428,45 @@ const form = reactive({
   description: '',
 });
 
+const canTestConnection = () =>
+  !!form.name?.trim() && !!form.host?.trim() && form.port != null && !!form.user?.trim() && !!form.database_name?.trim();
+
+function resetCreateForm() {
+  connectionTested.value = false;
+  formError.value = '';
+  Object.assign(form, { name: '', host: '127.0.0.1', port: 3306, user: 'root', password: '', database_name: '', description: '' });
+}
+
+watch(showCreate, (v) => { if (v) resetCreateForm(); });
+
+async function handleTestConnection() {
+  if (!canTestConnection()) return;
+  formError.value = '';
+  testingConnection.value = true;
+  try {
+    await store.testConnection({
+      host: form.host,
+      port: form.port,
+      user: form.user,
+      password: form.password,
+      database_name: form.database_name,
+    });
+    connectionTested.value = true;
+  } catch (e: any) {
+    formError.value = e.message;
+  } finally {
+    testingConnection.value = false;
+  }
+}
+
 async function handleCreate() {
+  if (!connectionTested.value) return;
   formError.value = '';
   submitting.value = true;
   try {
     await store.create({ ...form });
     showCreate.value = false;
-    Object.assign(form, { name: '', host: '127.0.0.1', port: 3306, user: 'root', password: '', database_name: '', description: '' });
+    resetCreateForm();
   } catch (e: any) {
     formError.value = e.message;
   } finally {
@@ -375,19 +535,31 @@ async function handleUpload() {
 }
 
 // --- 展开/收起表列表 ---
-import type { UploadedTable } from '../stores/datasource';
+import type { DataSource, UploadedTable } from '../stores/datasource';
+
+const PRESET_TABLES = [
+  { tableName: 'platform_info', displayName: '平台信息' },
+  { tableName: 'daily_active_stats', displayName: '日活统计' },
+  { tableName: 'user_behavior_log', displayName: '用户行为日志' },
+];
+
 const expandedDs = ref<number | null>(null);
 const tables = ref<UploadedTable[]>([]);
 const tablesLoading = ref(false);
 
-async function toggleExpand(dsId: number) {
-  if (expandedDs.value === dsId) {
+async function toggleExpand(ds: DataSource) {
+  if (expandedDs.value === ds.id) {
     expandedDs.value = null;
     tables.value = [];
     return;
   }
-  expandedDs.value = dsId;
-  await loadTables(dsId);
+  expandedDs.value = ds.id;
+  if (ds.is_local) {
+    tables.value = [];
+    tablesLoading.value = false;
+  } else {
+    await loadTables(ds.id);
+  }
 }
 
 async function loadTables(dsId: number) {
@@ -636,6 +808,12 @@ async function handleDeleteTable(dsId: number, tableId: number) {
   border-color: var(--accent);
 }
 
+.form-success {
+  font-size: 12px;
+  color: #22c55e;
+  margin-bottom: 12px;
+}
+
 .form-error {
   font-size: 12px;
   color: #f87171;
@@ -790,5 +968,57 @@ async function handleDeleteTable(dsId: number, tableId: number) {
   color: var(--text-secondary);
   font-size: 11px;
   flex: 1;
+}
+
+/* 模式选择弹窗 */
+.mode-chooser {
+  width: 440px;
+}
+
+.mode-desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 20px;
+}
+
+.mode-options {
+  display: flex;
+  gap: 12px;
+}
+
+.mode-option {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.mode-option:hover {
+  border-color: var(--accent);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.mode-icon {
+  font-size: 28px;
+}
+
+.mode-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.mode-sub {
+  font-size: 12px;
+  color: var(--text-secondary);
+  text-align: center;
 }
 </style>

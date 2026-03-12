@@ -2,7 +2,7 @@ import { Injectable, OnModuleDestroy, OnModuleInit, Logger } from '@nestjs/commo
 import mysql, { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 
 export interface DataSourceConfig {
-	id: number;
+	id?: number;
 	host: string;
 	port: number;
 	user: string;
@@ -85,7 +85,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 		}
 
 		const row = list[0] as any;
-		if (row.is_local) {
+		if (row.is_local || !row.host) {
 			return this.localPool;
 		}
 

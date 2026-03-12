@@ -69,19 +69,27 @@ export class DataSourceService {
 
 	async create(userId: number, body: {
 		name: string;
-		host: string;
-		port: number;
-		user: string;
-		password: string;
-		database_name: string;
+		host?: string;
+		port?: number;
+		user?: string;
+		password?: string;
+		database_name?: string;
 		description?: string;
 	}): Promise<DataSource> {
-		await this.db.testConnection(body as unknown as DataSourceConfig);
+		if (body.host) {
+			await this.db.testConnection({
+				host: body.host,
+				port: body.port!,
+				user: body.user!,
+				password: body.password ?? '',
+				database_name: body.database_name!,
+			});
+		}
 
 		const result = await this.db.execute(
 			`INSERT INTO data_source (name, host, port, user, password, database_name, created_by, description)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			[body.name, body.host, body.port, body.user, body.password, body.database_name, userId, body.description ?? null],
+			[body.name, body.host ?? null, body.port ?? null, body.user ?? null, body.password ?? null, body.database_name ?? null, userId, body.description ?? null],
 		);
 		await this.db.execute(
 			'INSERT INTO datasource_permission (datasource_id, user_id, granted_by) VALUES (?, ?, ?)',
@@ -103,6 +111,10 @@ export class DataSourceService {
 		await this.db.execute('DELETE FROM data_source WHERE id = ?', [id]);
 	}
 
+	async testConnection(config: DataSourceConfig): Promise<void> {
+		await this.db.testConnection(config);
+	}
+
 	async testById(id: number, userId: number): Promise<void> {
 		await this.findOne(id, userId);
 		const rows = await this.db.query<RowDataPacket[]>(
@@ -119,6 +131,13 @@ export class DataSourceService {
 		columns: Array<{ name: string; type: string }>,
 		rows: Array<Record<string, unknown>>,
 	): Promise<UploadedTable> {
+		const dsRows = await this.db.query<RowDataPacket[]>(
+			'SELECT is_local FROM data_source WHERE id = ?',
+			[datasourceId],
+		);
+		if (!dsRows.length) throw new NotFoundException(`数据源 id=${datasourceId} 不存在`);
+		if ((dsRows[0] as any).is_local === 1) throw new ForbiddenException('公共默认数据源不支持上传文件');
+
 		const ok = await this.canAccess(datasourceId, userId);
 		if (!ok) throw new ForbiddenException('无权访问此数据源');
 

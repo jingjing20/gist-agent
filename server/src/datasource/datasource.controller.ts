@@ -116,6 +116,21 @@ export class DataSourceController {
 		return { ok: true };
 	}
 
+	@Post('test-connection')
+	async testConnection(@CurrentUser() _user: User, @Body() body: {
+		host: string;
+		port: number;
+		user: string;
+		password: string;
+		database_name: string;
+	}) {
+		if (!body.host || body.port == null || !body.user || !body.database_name) {
+			throw new BadRequestException('请填写完整的连接信息');
+		}
+		await this.datasourceService.testConnection(body);
+		return { ok: true };
+	}
+
 	@Get(':id')
 	findOne(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
 		return this.datasourceService.findOne(id, user.id);
@@ -124,13 +139,14 @@ export class DataSourceController {
 	@Post()
 	create(@CurrentUser() user: User, @Body() body: {
 		name: string;
-		host: string;
-		port: number;
-		user: string;
-		password: string;
-		database_name: string;
+		host?: string;
+		port?: number;
+		user?: string;
+		password?: string;
+		database_name?: string;
 		description?: string;
 	}) {
+		if (!body.name?.trim()) throw new BadRequestException('请提供数据源名称');
 		return this.datasourceService.create(user.id, body);
 	}
 

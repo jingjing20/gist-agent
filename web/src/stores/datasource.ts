@@ -42,13 +42,30 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		}
 	}
 
-	async function create(body: {
-		name: string;
+	async function testConnection(config: {
 		host: string;
 		port: number;
 		user: string;
 		password: string;
 		database_name: string;
+	}): Promise<void> {
+		const res = await apiFetch('/datasources/test-connection', {
+			method: 'POST',
+			body: JSON.stringify(config),
+		});
+		if (!res.ok) {
+			const err = await res.json();
+			throw new Error(err.message || '连接失败');
+		}
+	}
+
+	async function create(body: {
+		name: string;
+		host?: string;
+		port?: number;
+		user?: string;
+		password?: string;
+		database_name?: string;
 		description?: string;
 	}): Promise<DataSource> {
 		const res = await apiFetch('/datasources', {
@@ -130,5 +147,5 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		}
 	}
 
-	return { list, loading, error, fetchAll, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable };
+	return { list, loading, error, fetchAll, testConnection, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable };
 });

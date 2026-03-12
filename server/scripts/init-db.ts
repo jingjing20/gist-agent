@@ -80,17 +80,6 @@ async function initDB() {
     ) COMMENT='数据源权限';
   `);
 
-	// 迁移：为已有 data_source 表添加 created_by（若不存在）
-	try {
-		const [cols] = await conn.query<any[]>(
-			"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'data_source' AND COLUMN_NAME = 'created_by'",
-			[DB_NAME],
-		);
-		if (!cols?.length) {
-			await conn.query('ALTER TABLE data_source ADD COLUMN created_by INT NULL COMMENT "创建人" AFTER is_local');
-		}
-	} catch { /* ignore */ }
-
 	// 插入本地默认数据源（幂等：只在不存在时插入）
 	await conn.query(`
     INSERT INTO data_source (name, host, port, user, password, database_name, is_local, description)
