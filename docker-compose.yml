@@ -39,7 +39,7 @@ services:
       dockerfile: web/Dockerfile
     restart: unless-stopped
     ports:
-      - "80:80"
+    - "127.0.0.1:8080:80"   # 关键：只在本机 8080 暴露
     depends_on:
       - server
 
