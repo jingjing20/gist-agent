@@ -8,7 +8,7 @@ import { SchemaService } from '../database/schema.service';
 import OpenAI from 'openai';
 
 export interface SSEEvent {
-	type: 'thinking' | 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'log' | 'chart';
+	type: 'thinking' | 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading';
 	[key: string]: unknown;
 }
 
@@ -51,16 +51,22 @@ export class ChatService {
 		const today = new Date().toISOString().split('T')[0];
 		const schemaPrompt = await this.schemaService.getDatabaseSchemaPrompt(datasourceId ?? null, userId);
 
-		const systemPrompt = `你是一个高级的数据分析智能体。当前日期：${today}
-你有以下可用的数据库表：
+		const systemPrompt = `你是一个高级数据分析智能体。当前日期：${today}
+可用数据库表：
 ${schemaPrompt}
 
-你可以通过调用工具来完成用户的数据分析请求。
-执行步骤：
-1. 分析需求，确定需要的表和字段。
-2. 编写 SELECT 语句，调用 execute_sql_query 获取数据。
-3. 用自然语言回答并总结分析结论。
-4. 若数据适合可视化（趋势、对比、分布、排名等），调用 generate_chart 生成图表。`;
+## 工作流程（严格按顺序执行，不可跳步）
+
+1. **理解需求** — 分析用户问题，确定所需的表和字段。
+2. **查询数据** — 编写 SELECT 语句，调用 execute_sql_query。
+3. **可视化判断** — 必须调用 analyze_result 判断查询结果是否需要图表可视化。
+4. **生成图表** — 仅当 analyze_result 中 needsChart=true 时，调用 generate_chart 提供完整数据。
+5. **文字总结** — 最后用自然语言直接回答用户问题，给出清晰的分析结论。
+
+## 规则
+- 查询数据后必须先调 analyze_result，再决定是否调 generate_chart。禁止跳过 analyze_result 直接生成图表。
+- 文字总结必须在所有工具调用完成后再输出，不要在工具调用过程中输出。
+- generate_chart 的数据必须严格来自 execute_sql_query 的查询结果，不得编造数据。`;
 
 		const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
 			{ role: 'system', content: systemPrompt }
@@ -100,19 +106,45 @@ ${schemaPrompt}
 			{
 				type: 'function',
 				function: {
+					name: 'analyze_result',
+					description: '查询数据后必须调用此工具，判断是否需要图表可视化。必须在 execute_sql_query 之后、generate_chart 之前调用。不要在此工具中放分析结论，结论在所有工具调用完成后以文字形式输出。',
+					parameters: {
+						type: 'object',
+						properties: {
+							needsChart: {
+								type: 'boolean',
+								description: '数据是否适合可视化。趋势/时序/对比/排名/分布 → true；简单数值/是否判断 → false'
+							},
+							chartType: {
+								type: 'string',
+								enum: ['line', 'bar', 'pie', 'scatter'],
+								description: '图表类型（needsChart=true 时必填）：line 趋势时序 / bar 对比排名 / pie 占比分布 / scatter 相关性'
+							},
+							chartTitle: {
+								type: 'string',
+								description: '图表标题（needsChart=true 时必填）'
+							}
+						},
+						required: ['needsChart']
+					}
+				}
+			},
+			{
+				type: 'function',
+				function: {
 					name: 'generate_chart',
-					description: '当查询结果适合可视化时，调用此工具生成图表。你只需提供图表类型、标题和数据，样式由前端统一处理。',
+					description: '仅在 analyze_result 返回 needsChart=true 后调用。提供完整的图表数据，样式由前端统一处理。',
 					parameters: {
 						type: 'object',
 						properties: {
 							chartType: {
 								type: 'string',
 								enum: ['line', 'bar', 'pie', 'scatter'],
-								description: '图表类型：line 折线图 / bar 柱状图 / pie 饼图 / scatter 散点图'
+								description: '图表类型，与 analyze_result 中声明的一致'
 							},
 							title: {
 								type: 'string',
-								description: '图表标题'
+								description: '图表标题，与 analyze_result 中声明的一致'
 							},
 							xAxis: {
 								type: 'array',
@@ -240,6 +272,13 @@ ${schemaPrompt}
 								}
 							} catch (e: any) {
 								toolResult = `SQL 执行出错: ${e.message}`;
+							}
+						} else if (name === 'analyze_result') {
+							if (args.needsChart) {
+								this.sendSSE(res, { type: 'chart_loading' } as SSEEvent);
+								toolResult = `图表区域已就绪，请立即调用 generate_chart 提供完整数据（chartType: "${args.chartType}", title: "${args.chartTitle}"）。图表生成完成后再输出文字总结。`;
+							} else {
+								toolResult = '无需图表。请直接输出文字分析总结。';
 							}
 						} else if (name === 'generate_chart') {
 							const chartData = {

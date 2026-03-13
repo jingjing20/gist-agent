@@ -1,11 +1,18 @@
 <template>
   <div class="chart-block">
-    <div ref="chartRef" class="chart-container"></div>
+    <div v-if="!chartData" class="chart-skeleton">
+      <div class="skeleton-title"></div>
+      <div class="skeleton-body">
+        <div class="skeleton-bar" v-for="n in 5" :key="n" :style="{ height: barHeights[n - 1] }"></div>
+      </div>
+      <div class="skeleton-axis"></div>
+    </div>
+    <div v-else ref="chartRef" class="chart-container"></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import * as echarts from 'echarts/core';
 import { BarChart, LineChart, PieChart, ScatterChart } from 'echarts/charts';
 import {
@@ -30,6 +37,7 @@ const props = defineProps<{
 }>();
 
 const chartRef = ref<HTMLElement>();
+const barHeights = ['60%', '85%', '45%', '70%', '55%'];
 let chart: echarts.ECharts | null = null;
 
 function buildOption(data: ChartData): Record<string, unknown> {
@@ -142,7 +150,9 @@ onMounted(() => {
   window.addEventListener('resize', handleResize);
 });
 
-watch(() => props.chartData, renderChart, { deep: true });
+watch(() => props.chartData, () => {
+  nextTick(renderChart);
+}, { deep: true });
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize);
@@ -164,5 +174,57 @@ onUnmounted(() => {
 .chart-container {
   width: 100%;
   height: 380px;
+}
+
+.chart-skeleton {
+  width: 100%;
+  height: 380px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px 40px 20px;
+  box-sizing: border-box;
+}
+
+.skeleton-title {
+  width: 140px;
+  height: 14px;
+  border-radius: 4px;
+  background: rgba(99, 102, 241, 0.12);
+  animation: shimmer 1.8s infinite ease-in-out;
+  margin-bottom: 24px;
+}
+
+.skeleton-body {
+  flex: 1;
+  width: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 24px;
+  padding-bottom: 8px;
+}
+
+.skeleton-bar {
+  width: 36px;
+  border-radius: 4px 4px 0 0;
+  background: rgba(99, 102, 241, 0.10);
+  animation: shimmer 1.8s infinite ease-in-out;
+}
+
+.skeleton-bar:nth-child(2) { animation-delay: 0.15s; }
+.skeleton-bar:nth-child(3) { animation-delay: 0.3s; }
+.skeleton-bar:nth-child(4) { animation-delay: 0.45s; }
+.skeleton-bar:nth-child(5) { animation-delay: 0.6s; }
+
+.skeleton-axis {
+  width: 100%;
+  height: 1px;
+  background: rgba(99, 102, 241, 0.12);
+}
+
+@keyframes shimmer {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
 }
 </style>

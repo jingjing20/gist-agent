@@ -26,8 +26,10 @@
                 :is="blockComponent(block.type)"
                 v-bind="blockProps(block)"
               />
-              <div v-if="msg.blocks.length === 0 && store.isLoading" class="waiting">
-                等待响应中...
+              <div v-if="store.isLoading && isLastAssistantMsg(msg)" class="streaming-indicator">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
               </div>
             </template>
           </div>
@@ -68,7 +70,7 @@ import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
 import LogBlock from './blocks/LogBlock.vue';
 import ChartBlock from './blocks/ChartBlock.vue';
-import type { MessageBlock } from '../types';
+import type { MessageBlock, ChatMessage } from '../types';
 
 const store = useChatStore();
 const messageListRef = ref<HTMLElement>();
@@ -105,6 +107,15 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
     rows: block.rows,
     rowCount: block.rowCount,
   };
+}
+
+function isLastAssistantMsg(msg: ChatMessage): boolean {
+  const msgs = store.activeConversation?.messages;
+  if (!msgs) return false;
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'assistant') return msgs[i].id === msg.id;
+  }
+  return false;
 }
 
 const exampleQueries = [
@@ -217,10 +228,26 @@ watch(
   display: inline-block;
 }
 
-.waiting {
-  color: var(--text-secondary);
-  font-size: 13px;
-  font-style: italic;
+.streaming-indicator {
+  display: flex;
+  gap: 4px;
+  padding: 10px 0;
+}
+
+.streaming-indicator .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: streaming-pulse 1.4s infinite ease-in-out;
+}
+
+.streaming-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
+.streaming-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes streaming-pulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.1); }
 }
 
 .empty-state {

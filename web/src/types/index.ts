@@ -11,7 +11,7 @@ export interface ChartData {
 }
 
 export interface SSEEvent {
-	type: 'thinking' | 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'need_auth' | 'log' | 'chart';
+	type: 'thinking' | 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'need_auth' | 'log' | 'chart' | 'chart_loading';
 	content?: string;
 	columns?: string[];
 	rows?: Record<string, unknown>[];

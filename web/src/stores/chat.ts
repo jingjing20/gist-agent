@@ -173,6 +173,23 @@ export const useChatStore = defineStore('chat', () => {
 							continue;
 						}
 
+						if (event.type === 'chart_loading') {
+							assistantMsg.blocks.push({ type: 'chart' });
+							continue;
+						}
+
+						if (event.type === 'chart') {
+							const placeholder = [...assistantMsg.blocks].reverse().find(
+								(b) => b.type === 'chart' && !b.chartData,
+							);
+							if (placeholder) {
+								placeholder.chartData = event.chartData;
+							} else {
+								assistantMsg.blocks.push({ type: 'chart', chartData: event.chartData });
+							}
+							continue;
+						}
+
 						const block: MessageBlock = {
 							type: event.type,
 							content: event.content,
@@ -196,6 +213,9 @@ export const useChatStore = defineStore('chat', () => {
 			const errorMsg = err instanceof Error ? err.message : '请求失败';
 			assistantMsg.blocks.push({ type: 'error', content: errorMsg });
 		} finally {
+			assistantMsg.blocks = assistantMsg.blocks.filter(
+				(b) => !(b.type === 'chart' && !b.chartData),
+			);
 			isLoading.value = false;
 		}
 	}
