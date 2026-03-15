@@ -74,7 +74,9 @@ function syncRouteToConversation() {
   if (route.path === '/datasource') return;
   const convId = route.params.convId as string | undefined;
   if (convId && convId !== 'login' && convId !== 'register') {
-    chatStore.selectConversation(convId);
+    if (chatStore.activeConversationId !== convId) {
+      chatStore.selectConversation(convId);
+    }
   } else if (!convId && chatStore.activeConversationId) {
     chatStore.startNewChat();
   }
