@@ -16,6 +16,7 @@ export interface Message {
 	role: 'user' | 'assistant';
 	content: string;
 	blocks: unknown[];
+	llm_messages: unknown[];
 	created_at: string;
 }
 
@@ -54,10 +55,19 @@ export class ConversationService implements OnModuleInit {
         role ENUM('user', 'assistant') NOT NULL,
         content TEXT,
         blocks JSON,
+        llm_messages JSON,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (conversation_id) REFERENCES conversation(id) ON DELETE CASCADE
       )
     ` as any);
+		try {
+			const [cols] = await this.db.query<any[]>(
+				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'message' AND COLUMN_NAME = 'llm_messages'",
+			);
+			if (!cols?.length) {
+				await this.db.execute('ALTER TABLE message ADD COLUMN llm_messages JSON NULL AFTER blocks');
+			}
+		} catch { /* ignore */ }
 	}
 
 	async findAll(userId: number): Promise<Conversation[]> {
@@ -109,6 +119,7 @@ export class ConversationService implements OnModuleInit {
 		return rows.map((row) => ({
 			...row,
 			blocks: typeof row.blocks === 'string' ? JSON.parse(row.blocks) : (row.blocks || []),
+			llm_messages: typeof row.llm_messages === 'string' ? JSON.parse(row.llm_messages) : (row.llm_messages || []),
 		})) as unknown as Message[];
 	}
 
@@ -117,11 +128,12 @@ export class ConversationService implements OnModuleInit {
 		role: 'user' | 'assistant',
 		content: string,
 		blocks: unknown[],
+		llmMessages: unknown[] = [],
 	): Promise<Message> {
 		const id = uuidv4();
 		await this.db.execute(
-			'INSERT INTO message (id, conversation_id, role, content, blocks) VALUES (?, ?, ?, ?, ?)',
-			[id, conversationId, role, content, JSON.stringify(blocks)],
+			'INSERT INTO message (id, conversation_id, role, content, blocks, llm_messages) VALUES (?, ?, ?, ?, ?, ?)',
+			[id, conversationId, role, content, JSON.stringify(blocks), JSON.stringify(llmMessages)],
 		);
 
 		// 更新对话的 updated_at
@@ -138,6 +150,7 @@ export class ConversationService implements OnModuleInit {
 		return {
 			...msg,
 			blocks: typeof msg.blocks === 'string' ? JSON.parse(msg.blocks) : (msg.blocks || []),
+			llm_messages: typeof msg.llm_messages === 'string' ? JSON.parse(msg.llm_messages) : (msg.llm_messages || []),
 		} as unknown as Message;
 	}
 }

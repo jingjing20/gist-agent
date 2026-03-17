@@ -7,6 +7,7 @@ const MAX_ROWS = 1000;
 
 export interface QueryResult {
 	finalSql: string;
+	wasFixed: boolean;
 	columns: string[];
 	rows: Record<string, unknown>[];
 	rowCount: number;
@@ -113,6 +114,7 @@ export class SqlExecutorAgent {
 
 				return {
 					finalSql: safeSql,
+					wasFixed: currentSql !== sql,
 					columns,
 					rows: rows as Record<string, unknown>[],
 					rowCount: rows.length,

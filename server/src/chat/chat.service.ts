@@ -8,7 +8,7 @@ import { SchemaService } from '../database/schema.service';
 import OpenAI from 'openai';
 
 export interface SSEEvent {
-	type: 'thinking' | 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading';
+	type: 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading';
 	[key: string]: unknown;
 }
 
@@ -72,18 +72,31 @@ ${schemaPrompt}
 			{ role: 'system', content: systemPrompt }
 		];
 
+		const FULL_HISTORY_TURNS = 3;
+
 		const history = await this.conversationService.getMessages(conversationId, userId);
+		const assistantMsgs = history.filter((m) => m.role === 'assistant');
+		const fullTurnCutoff = assistantMsgs.length - FULL_HISTORY_TURNS;
+
+		let assistantIndex = 0;
 		for (const msg of history) {
 			if (msg.role === 'user') {
 				messages.push({ role: 'user', content: msg.content });
 			} else if (msg.role === 'assistant') {
-				let text = msg.content || '';
-				if (!text && Array.isArray(msg.blocks)) {
-					const textBlocks = msg.blocks.filter((b: any) => b.type === 'text');
-					text = textBlocks.map((b: any) => b.content).join('\n');
-				}
-				if (text) {
-					messages.push({ role: 'assistant', content: text });
+				const isRecent = assistantIndex >= fullTurnCutoff;
+				assistantIndex++;
+
+				if (isRecent && Array.isArray(msg.llm_messages) && msg.llm_messages.length > 0) {
+					messages.push(...(msg.llm_messages as OpenAI.Chat.Completions.ChatCompletionMessageParam[]));
+				} else {
+					let text = msg.content || '';
+					if (!text && Array.isArray(msg.blocks)) {
+						const textBlocks = (msg.blocks as any[]).filter((b) => b.type === 'text');
+						text = textBlocks.map((b) => b.content).join('\n');
+					}
+					if (text) {
+						messages.push({ role: 'assistant', content: text });
+					}
 				}
 			}
 		}
@@ -149,7 +162,7 @@ ${schemaPrompt}
 							xAxis: {
 								type: 'array',
 								items: { type: 'string' },
-								description: 'X 轴分类标签（饼图不需要）'
+								description: '各数据点的标签；bar/line/scatter 为 X 轴分类，饼图为各扇区名称（必填，与 series[0].data 一一对应）'
 							},
 							series: {
 								type: 'array',
@@ -161,7 +174,7 @@ ${schemaPrompt}
 										data: {
 											type: 'array',
 											items: { type: 'number' },
-											description: '数值数组，与 xAxis 一一对应；饼图时每项对应一个扇区的值'
+											description: '数值数组，与 xAxis 一一对应'
 										}
 									},
 									required: ['name', 'data']
@@ -173,10 +186,9 @@ ${schemaPrompt}
 				}
 			}
 		];
-
+		const turnMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 		try {
 			let isDone = false;
-			this.sendSSE(res, { type: 'thinking', content: '正在分析需求并规划可用工具...' });
 
 			while (!isDone) {
 				const stream = await this.llm.client.chat.completions.create({
@@ -232,6 +244,7 @@ ${schemaPrompt}
 					};
 					if (content) assistantMsg.content = content;
 					messages.push(assistantMsg);
+					turnMessages.push(assistantMsg);
 
 					for (const tc of validToolCalls) {
 						const name = tc.function.name;
@@ -252,7 +265,7 @@ ${schemaPrompt}
 							try {
 								const r = await this.sqlExecutor.execute(args.sql, datasourceId);
 
-								if (r.finalSql !== args.sql) {
+								if (r.wasFixed) {
 									const fixLogEvent = { type: 'log', title: '[防腐层自动修复]', content: `检测到语法错误已由内部子模型修复。\n修复前：${args.sql}\n\n修复后：${r.finalSql}` };
 									this.sendSSE(res, fixLogEvent as SSEEvent);
 									blocks.push(fixLogEvent);
@@ -262,7 +275,7 @@ ${schemaPrompt}
 								this.sendSSE(res, tableEvent as SSEEvent);
 								blocks.push(tableEvent);
 
-								if (r.finalSql !== args.sql) {
+								if (r.wasFixed) {
 									toolResult = JSON.stringify({
 										SystemMessage: `注意：由于你写的原始 SQL 存在特定语法错误，已被系统防腐代理自动拦截修复！最终成功执行的 SQL 为: ${r.finalSql}。请在最终结论中以此为准。`,
 										data: r.rows.slice(0, 50)
@@ -299,11 +312,15 @@ ${schemaPrompt}
 						this.sendSSE(res, resultLogEvent as SSEEvent);
 						blocks.push(resultLogEvent);
 
-						messages.push({ role: 'tool', tool_call_id: tc.id, content: toolResult });
+						const toolMsg: OpenAI.Chat.Completions.ChatCompletionMessageParam = { role: 'tool', tool_call_id: tc.id, content: toolResult };
+						messages.push(toolMsg);
+						turnMessages.push(toolMsg);
 					}
 				} else {
 					if (content) {
-						messages.push({ role: 'assistant', content });
+						const finalMsg: OpenAI.Chat.Completions.ChatCompletionMessageParam = { role: 'assistant', content };
+						messages.push(finalMsg);
+						turnMessages.push(finalMsg);
 					}
 					isDone = true;
 				}
@@ -316,6 +333,6 @@ ${schemaPrompt}
 			blocks.push(errorEvent);
 		}
 
-		await this.conversationService.addMessage(conversationId, 'assistant', '', blocks);
+		await this.conversationService.addMessage(conversationId, 'assistant', '', blocks, turnMessages);
 	}
 }
