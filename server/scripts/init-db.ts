@@ -80,6 +80,19 @@ async function initDB() {
     ) COMMENT='数据源权限';
   `);
 
+	// datasource_suggestions 表：LLM 生成的推荐问题缓存（按数据源+用户缓存）
+	await conn.query(`
+    CREATE TABLE IF NOT EXISTS datasource_suggestions (
+      datasource_id INT NOT NULL,
+      user_id INT NOT NULL,
+      questions JSON NOT NULL COMMENT '推荐问题列表',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY (datasource_id, user_id),
+      FOREIGN KEY (datasource_id) REFERENCES data_source(id) ON DELETE CASCADE,
+      FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+    ) COMMENT='数据源推荐问题缓存';
+  `);
+
 	// 插入本地默认数据源（幂等：只在不存在时插入）
 	await conn.query(`
     INSERT INTO data_source (name, host, port, user, password, database_name, is_local, description)

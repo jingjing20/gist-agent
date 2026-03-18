@@ -39,19 +39,33 @@
 
     <template v-else>
       <div class="empty-state">
-        <div class="empty-icon">?</div>
+        <div class="empty-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <polyline points="3,18 7,11 12,14 17,6 21,9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="3" cy="18" r="1.8" fill="white"/>
+            <circle cx="7" cy="11" r="1.8" fill="white"/>
+            <circle cx="12" cy="14" r="1.8" fill="white"/>
+            <circle cx="17" cy="6" r="1.8" fill="white"/>
+            <circle cx="21" cy="9" r="1.8" fill="white"/>
+          </svg>
+        </div>
         <h2>数据分析 Agent</h2>
         <p>选择一个对话或新建对话开始分析</p>
         <div class="example-queries">
           <div class="example-title">试试这样问:</div>
-          <button
-            v-for="q in exampleQueries"
-            :key="q"
-            class="example-btn"
-            @click="handleExample(q)"
-          >
-            {{ q }}
-          </button>
+          <template v-if="suggestionsLoading">
+            <div v-for="i in 3" :key="i" class="example-btn example-skeleton" />
+          </template>
+          <template v-else>
+            <button
+              v-for="q in exampleQueries"
+              :key="q"
+              class="example-btn"
+              @click="handleExample(q)"
+            >
+              {{ q }}
+            </button>
+          </template>
         </div>
       </div>
     </template>
@@ -61,8 +75,9 @@
 </template>
 
 <script setup lang="ts">
-import { watch, nextTick, ref, type Component } from 'vue';
+import { watch, nextTick, ref, computed, type Component } from 'vue';
 import { useChatStore } from '../stores/chat';
+import { useDataSourceStore } from '../stores/datasource';
 import ChatInput from './ChatInput.vue';
 import ThinkingBlock from './blocks/ThinkingBlock.vue';
 import SqlBlock from './blocks/SqlBlock.vue';
@@ -73,6 +88,7 @@ import ChartBlock from './blocks/ChartBlock.vue';
 import type { MessageBlock, ChatMessage } from '../types';
 
 const store = useChatStore();
+const dsStore = useDataSourceStore();
 const messageListRef = ref<HTMLElement>();
 
 const blockMap: Record<string, Component> = {
@@ -118,12 +134,30 @@ function isLastAssistantMsg(msg: ChatMessage): boolean {
   return false;
 }
 
-const exampleQueries = [
+const DEFAULT_QUERIES = [
   '帮我分析下近一月天河平台的日活趋势',
   '对比三个平台最近一周的新增用户数',
   '近 7 天用户行为类型分布是怎样的',
-  '哪个平台的用户平均使用时长最长',
 ];
+
+const suggestionsLoading = computed(() => {
+  const id = store.activeDatasourceId;
+  return id != null && !!dsStore.suggestionsLoading[id];
+});
+
+const exampleQueries = computed(() => {
+  const id = store.activeDatasourceId;
+  if (id != null && dsStore.suggestionsCache[id]?.length) {
+    return dsStore.suggestionsCache[id];
+  }
+  return DEFAULT_QUERIES;
+});
+
+watch(
+  () => store.activeDatasourceId,
+  (id) => { if (id != null) dsStore.fetchSuggestions(id); },
+  { immediate: true },
+);
 
 async function handleExample(query: string) {
   store.startNewChat();
@@ -316,5 +350,25 @@ watch(
 .example-btn:hover {
   background: var(--bg-hover);
   border-color: var(--accent);
+}
+
+.example-skeleton {
+  height: 40px;
+  cursor: default;
+  border-color: transparent;
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-hover) 50%, var(--bg-secondary) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s infinite;
+}
+
+.example-skeleton:hover {
+  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-hover) 50%, var(--bg-secondary) 75%);
+  background-size: 200% 100%;
+  border-color: transparent;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 </style>

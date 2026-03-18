@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DataSourceService } from './datasource.service';
+import { SuggestionService } from './suggestion.service';
 import { CurrentUser } from '../auth/user.decorator';
 import type { User } from '../auth/auth.service';
 import csvParser = require('csv-parser');
@@ -12,13 +13,33 @@ import * as XLSX from 'xlsx';
 
 const MAX_FILE_ROWS = 50_000;
 
-function inferMysqlType(values: unknown[]): string {
-	const sample = values.find(v => v !== null && v !== undefined && v !== '');
-	if (sample === undefined) return 'TEXT';
-	if (typeof sample === 'number' || (!isNaN(Number(sample)) && String(sample).trim() !== '')) {
-		return String(sample).includes('.') ? 'DOUBLE' : 'BIGINT';
+function normalizeValue(v: unknown): unknown {
+	if (v === null || v === undefined) return null;
+	if (typeof v === 'number') return isNaN(v) ? null : v;
+	if (typeof v === 'string') {
+		const s = v.replace(/[\u200B\uFEFF\u00A0]/g, ' ').trim();
+		return s === '' ? null : s;
 	}
-	return 'TEXT';
+	return v;
+}
+
+function isNumeric(v: unknown): boolean {
+	if (typeof v === 'number') return true;
+	return !isNaN(Number(v));
+}
+
+function inferMysqlType(values: unknown[]): string {
+	const nonNull = values.filter(v => v !== null);
+	if (nonNull.length === 0) return 'TEXT';
+	if (!nonNull.every(isNumeric)) return 'TEXT';
+	const hasDecimal = nonNull.some(v => !Number.isInteger(typeof v === 'number' ? v : Number(v)));
+	return hasDecimal ? 'DOUBLE' : 'BIGINT';
+}
+
+function coerce(value: unknown, type: string): unknown {
+	if (value === null) return null;
+	if (type === 'TEXT') return value;
+	return typeof value === 'number' ? value : Number(value);
 }
 
 function ensureUniqueColumnNames(rawNames: string[]): string[] {
@@ -35,7 +56,10 @@ function ensureUniqueColumnNames(rawNames: string[]): string[] {
 
 @Controller('datasources')
 export class DataSourceController {
-	constructor(private readonly datasourceService: DataSourceService) { }
+	constructor(
+		private readonly datasourceService: DataSourceService,
+		private readonly suggestionService: SuggestionService,
+	) { }
 
 	@Get()
 	findAll(@CurrentUser() user: User) {
@@ -92,19 +116,29 @@ export class DataSourceController {
 		if (!rawRows.length) throw new BadRequestException('文件内容为空');
 
 		const colNames = Object.keys(rawRows[0]);
+		const normalizedRows = rawRows.map(row => {
+			const out: Record<string, unknown> = {};
+			for (const key of colNames) out[key] = normalizeValue(row[key]);
+			return out;
+		});
+
 		const uniqueNames = ensureUniqueColumnNames(colNames);
 		const columns = colNames.map((colName, i) => ({
 			name: uniqueNames[i],
-			type: inferMysqlType(rawRows.map(r => r[colName])),
+			type: inferMysqlType(normalizedRows.map(r => r[colName])),
 		}));
 
-		const cleanRows = rawRows.map(row => {
+		const cleanRows = normalizedRows.map(row => {
 			const cleaned: Record<string, unknown> = {};
-			colNames.forEach((orig, i) => { cleaned[columns[i].name] = row[orig]; });
+			colNames.forEach((orig, i) => {
+				cleaned[columns[i].name] = coerce(row[orig], columns[i].type);
+			});
 			return cleaned;
 		});
 
-		return this.datasourceService.uploadTable(datasourceId, user.id, displayName.trim(), columns, cleanRows);
+		const result = await this.datasourceService.uploadTable(datasourceId, user.id, displayName.trim(), columns, cleanRows);
+		this.suggestionService.invalidateAndRegenerate(datasourceId, user.id);
+		return result;
 	}
 
 	@Delete(':id/tables/:tableId')
@@ -131,13 +165,19 @@ export class DataSourceController {
 		return { ok: true };
 	}
 
+	@Get(':id/suggestions')
+	async getSuggestions(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
+		const questions = await this.suggestionService.getSuggestions(id, user.id);
+		return { questions };
+	}
+
 	@Get(':id')
 	findOne(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
 		return this.datasourceService.findOne(id, user.id);
 	}
 
 	@Post()
-	create(@CurrentUser() user: User, @Body() body: {
+	async create(@CurrentUser() user: User, @Body() body: {
 		name: string;
 		host?: string;
 		port?: number;
@@ -147,7 +187,9 @@ export class DataSourceController {
 		description?: string;
 	}) {
 		if (!body.name?.trim()) throw new BadRequestException('请提供数据源名称');
-		return this.datasourceService.create(user.id, body);
+		const created = await this.datasourceService.create(user.id, body);
+		this.suggestionService.triggerAsync(created.id, user.id);
+		return created;
 	}
 
 	@Delete(':id')

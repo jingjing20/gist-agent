@@ -1,7 +1,6 @@
 <template>
   <aside class="sidebar">
     <div class="sidebar-header">
-      <h1 class="logo">Data Agent</h1>
       <button class="new-chat-btn" @click="store.startNewChat()">
         <span class="icon">+</span>
         新建对话

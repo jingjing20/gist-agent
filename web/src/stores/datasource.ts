@@ -28,6 +28,8 @@ export const useDataSourceStore = defineStore('datasource', () => {
 	const list = ref<DataSource[]>([]);
 	const loading = ref(false);
 	const error = ref<string | null>(null);
+	const suggestionsCache = ref<Record<number, string[]>>({});
+	const suggestionsLoading = ref<Record<number, boolean>>({});
 
 	async function fetchAll() {
 		loading.value = true;
@@ -147,5 +149,19 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		}
 	}
 
-	return { list, loading, error, fetchAll, testConnection, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable };
+	async function fetchSuggestions(datasourceId: number): Promise<void> {
+		if (suggestionsCache.value[datasourceId] || suggestionsLoading.value[datasourceId]) return;
+		suggestionsLoading.value[datasourceId] = true;
+		try {
+			const res = await apiFetch(`/datasources/${datasourceId}/suggestions`);
+			const data = await res.json();
+			suggestionsCache.value[datasourceId] = data.questions;
+		} catch {
+			// 静默失败，前端回退到默认问题
+		} finally {
+			suggestionsLoading.value[datasourceId] = false;
+		}
+	}
+
+	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, testConnection, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions };
 });
