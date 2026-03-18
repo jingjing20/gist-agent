@@ -107,6 +107,15 @@ export class DataSourceService {
 		const row = rows[0] as any;
 		if (row.is_local) throw new BadRequestException('默认本地库不可删除');
 		if (row.created_by !== userId) throw new ForbiddenException('仅创建人可删除');
+
+		const tableRows = await this.db.query<RowDataPacket[]>(
+			'SELECT table_name FROM uploaded_table WHERE datasource_id = ?',
+			[id],
+		);
+		for (const t of tableRows) {
+			await this.db.execute(`DROP TABLE IF EXISTS \`${(t as any).table_name}\``);
+		}
+
 		await this.db.releasePool(id);
 		await this.db.execute('DELETE FROM data_source WHERE id = ?', [id]);
 	}

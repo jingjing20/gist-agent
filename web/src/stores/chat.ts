@@ -10,6 +10,7 @@ export const useChatStore = defineStore('chat', () => {
 	const activeConversationId = ref<string | null>(null);
 	const activeDatasourceId = ref<number | null>(null);
 	const isLoading = ref(false);
+	let abortController: AbortController | null = null;
 
 	const activeConversation = computed(() =>
 		conversations.value.find((c) => c.id === activeConversationId.value),
@@ -117,6 +118,7 @@ export const useChatStore = defineStore('chat', () => {
 		const assistantMsg = conv.messages[conv.messages.length - 1];
 
 		isLoading.value = true;
+		abortController = new AbortController();
 
 		try {
 			const response = await apiFetch('/chat', {
@@ -126,6 +128,7 @@ export const useChatStore = defineStore('chat', () => {
 					conversationId: conv.id,
 					datasourceId: activeDatasourceId.value,
 				}),
+				signal: abortController.signal,
 			});
 
 			if (!response.ok || !response.body) {
@@ -210,14 +213,23 @@ export const useChatStore = defineStore('chat', () => {
 
 			conv.updatedAt = Date.now();
 		} catch (err) {
-			const errorMsg = err instanceof Error ? err.message : '请求失败';
-			assistantMsg.blocks.push({ type: 'error', content: errorMsg });
+			if (err instanceof DOMException && err.name === 'AbortError') {
+				assistantMsg.blocks.push({ type: 'text', content: '*[已终止]*' });
+			} else {
+				const errorMsg = err instanceof Error ? err.message : '请求失败';
+				assistantMsg.blocks.push({ type: 'error', content: errorMsg });
+			}
 		} finally {
+			abortController = null;
 			assistantMsg.blocks = assistantMsg.blocks.filter(
 				(b) => !(b.type === 'chart' && !b.chartData),
 			);
 			isLoading.value = false;
 		}
+	}
+
+	function abortStream() {
+		abortController?.abort();
 	}
 
 	return {
@@ -233,5 +245,6 @@ export const useChatStore = defineStore('chat', () => {
 		selectConversation,
 		startNewChat,
 		sendMessage,
+		abortStream,
 	};
 });

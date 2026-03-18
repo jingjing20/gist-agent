@@ -13,9 +13,11 @@ import * as XLSX from 'xlsx';
 
 const MAX_FILE_ROWS = 50_000;
 
+const NUMERIC_RE = /^-?(\d+\.?\d*|\d*\.\d+)$/;
+
 function normalizeValue(v: unknown): unknown {
 	if (v === null || v === undefined) return null;
-	if (typeof v === 'number') return isNaN(v) ? null : v;
+	if (typeof v === 'number') return isFinite(v) ? v : null;
 	if (typeof v === 'string') {
 		const s = v.replace(/[\u200B\uFEFF\u00A0]/g, ' ').trim();
 		return s === '' ? null : s;
@@ -24,22 +26,27 @@ function normalizeValue(v: unknown): unknown {
 }
 
 function isNumeric(v: unknown): boolean {
-	if (typeof v === 'number') return true;
-	return !isNaN(Number(v));
+	if (typeof v === 'number') return isFinite(v);
+	if (typeof v === 'string') return NUMERIC_RE.test(v);
+	return false;
 }
 
 function inferMysqlType(values: unknown[]): string {
 	const nonNull = values.filter(v => v !== null);
 	if (nonNull.length === 0) return 'TEXT';
 	if (!nonNull.every(isNumeric)) return 'TEXT';
-	const hasDecimal = nonNull.some(v => !Number.isInteger(typeof v === 'number' ? v : Number(v)));
+	const hasDecimal = nonNull.some(v =>
+		typeof v === 'number' ? !Number.isInteger(v) : String(v).includes('.'),
+	);
 	return hasDecimal ? 'DOUBLE' : 'BIGINT';
 }
 
 function coerce(value: unknown, type: string): unknown {
 	if (value === null) return null;
 	if (type === 'TEXT') return value;
-	return typeof value === 'number' ? value : Number(value);
+	if (typeof value === 'number') return value;
+	const n = parseFloat(value as string);
+	return isFinite(n) ? n : null;
 }
 
 function ensureUniqueColumnNames(rawNames: string[]): string[] {
@@ -105,7 +112,7 @@ export class DataSourceController {
 		} else if (ext === 'xlsx' || ext === 'xls') {
 			const workbook = XLSX.read(file.buffer, { type: 'buffer' });
 			const sheet = workbook.Sheets[workbook.SheetNames[0]];
-			rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null }) as Record<string, unknown>[];
+			rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true }) as Record<string, unknown>[];
 			if (rawRows.length > MAX_FILE_ROWS) {
 				throw new BadRequestException(`文件行数超过上限 ${MAX_FILE_ROWS} 行，请分批上传或裁剪后重试`);
 			}
