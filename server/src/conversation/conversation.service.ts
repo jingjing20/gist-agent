@@ -57,7 +57,8 @@ export class ConversationService implements OnModuleInit {
         blocks JSON,
         llm_messages JSON,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (conversation_id) REFERENCES conversation(id) ON DELETE CASCADE
+        FOREIGN KEY (conversation_id) REFERENCES conversation(id) ON DELETE CASCADE,
+        INDEX idx_conv_time (conversation_id, created_at)
       )
     ` as any);
 		try {
@@ -66,6 +67,15 @@ export class ConversationService implements OnModuleInit {
 			);
 			if (!cols?.length) {
 				await this.db.execute('ALTER TABLE message ADD COLUMN llm_messages JSON NULL AFTER blocks');
+			}
+		} catch { /* ignore */ }
+
+		try {
+			const [indexes] = await this.db.query<any[]>(
+				"SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'message' AND INDEX_NAME = 'idx_conv_time'",
+			);
+			if (!indexes?.length) {
+				await this.db.execute('ALTER TABLE message ADD INDEX idx_conv_time (conversation_id, created_at)');
 			}
 		} catch { /* ignore */ }
 	}
