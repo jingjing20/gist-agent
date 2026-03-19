@@ -156,16 +156,6 @@ export const useChatStore = defineStore('chat', () => {
 						const event: SSEEvent = JSON.parse(jsonStr);
 						if (event.type === 'done') break;
 
-						if (event.type === 'sql_chunk') {
-							const lastBlock = assistantMsg.blocks[assistantMsg.blocks.length - 1];
-							if (lastBlock?.type === 'sql') {
-								lastBlock.content = (lastBlock.content || '') + (event.content || '');
-							} else {
-								assistantMsg.blocks.push({ type: 'sql', content: event.content || '' });
-							}
-							continue;
-						}
-
 						if (event.type === 'text_chunk') {
 							const lastBlock = assistantMsg.blocks[assistantMsg.blocks.length - 1];
 							if (lastBlock?.type === 'text') {
@@ -199,8 +189,6 @@ export const useChatStore = defineStore('chat', () => {
 							columns: event.columns,
 							rows: event.rows,
 							rowCount: event.rowCount,
-							tables: event.tables,
-							reason: event.reason,
 							title: event.title,
 							chartData: event.chartData,
 						};

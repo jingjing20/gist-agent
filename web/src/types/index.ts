@@ -11,13 +11,11 @@ export interface ChartData {
 }
 
 export interface SSEEvent {
-	type: 'thinking' | 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'need_auth' | 'log' | 'chart' | 'chart_loading';
+	type: 'sql' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading';
 	content?: string;
 	columns?: string[];
 	rows?: Record<string, unknown>[];
 	rowCount?: number;
-	tables?: string[];
-	reason?: string;
 	title?: string;
 	chartData?: ChartData;
 }
@@ -28,8 +26,6 @@ export interface MessageBlock {
 	columns?: string[];
 	rows?: Record<string, unknown>[];
 	rowCount?: number;
-	tables?: string[];
-	reason?: string;
 	title?: string;
 	chartData?: ChartData;
 }

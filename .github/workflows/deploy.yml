@@ -20,3 +20,4 @@ jobs:
             cd ${{ secrets.DEPLOY_PATH || '/home/ai-data-analysis' }}
             git pull
             docker compose up -d --build
+            docker compose --profile tools run --rm --build init-db
