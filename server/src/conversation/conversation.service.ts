@@ -128,10 +128,20 @@ export class ConversationService implements OnModuleInit {
 	}
 
 	async remove(id: string, userId: number): Promise<void> {
-		const r = await this.db.execute('DELETE FROM conversation WHERE id = ? AND user_id = ?', [id, userId]);
-		if (r.affectedRows === 0) {
-			throw new NotFoundException('对话不存在或无权删除');
+		const conv = await this.findOne(id, userId);
+		if (!conv) throw new NotFoundException('对话不存在或无权删除');
+
+		const rows = await this.db.query<RowDataPacket[]>(
+			'SELECT id FROM message WHERE conversation_id = ?',
+			[id],
+		);
+		const messageIds = rows.map((r) => r.id);
+		if (messageIds.length > 0) {
+			const placeholders = messageIds.map(() => '?').join(', ');
+			await this.db.execute(`DELETE FROM message_block WHERE message_id IN (${placeholders})`, messageIds);
+			await this.db.execute('DELETE FROM message WHERE conversation_id = ?', [id]);
 		}
+		await this.db.execute('DELETE FROM conversation WHERE id = ?', [id]);
 	}
 
 	async getMessages(conversationId: string, userId: number): Promise<Message[]> {

@@ -66,7 +66,17 @@ export const useChatStore = defineStore('chat', () => {
 		const idx = conversations.value.findIndex((c) => c.id === id);
 		if (idx !== -1) conversations.value.splice(idx, 1);
 		if (activeConversationId.value === id) {
-			activeConversationId.value = conversations.value[0]?.id || null;
+			const nextId = conversations.value[0]?.id || null;
+			activeConversationId.value = nextId;
+			if (nextId) {
+				router.replace(`/${nextId}`);
+				const conv = conversations.value.find((c) => c.id === nextId);
+				if (conv && conv.messages.length === 0) {
+					await fetchMessages(nextId);
+				}
+			} else {
+				router.replace('/');
+			}
 		}
 	}
 
