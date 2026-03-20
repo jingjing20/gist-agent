@@ -55,7 +55,6 @@
           当前数据源：<span class="highlight">{{ activeDatasourceName }}</span>
         </div>
         <div class="example-queries">
-          <div class="example-title">试试这样问:</div>
           <template v-if="suggestionsLoading">
             <div v-for="i in 3" :key="i" class="example-btn example-skeleton" />
           </template>

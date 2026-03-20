@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
+import { SchemaService } from '../../database/schema.service';
 import { LlmService } from '../../llm/llm.service';
 import { RowDataPacket } from 'mysql2/promise';
 import { Parser } from 'node-sql-parser';
@@ -21,6 +22,7 @@ export class SqlExecutorAgent {
 	constructor(
 		private readonly db: DatabaseService,
 		private readonly llm: LlmService,
+		private readonly schemaService: SchemaService,
 	) { }
 
 	private async queryWithTimeout<T>(
@@ -36,7 +38,7 @@ export class SqlExecutorAgent {
 		]);
 	}
 
-	validate(sql: string): void {
+	validate(sql: string, allowedTables: string[] | 'ALL' = 'ALL'): void {
 		const parser = new Parser();
 		let astResult;
 		try {
@@ -51,14 +53,32 @@ export class SqlExecutorAgent {
 
 		// parser.ast 在单条查询时是对象，多条拼接（分号隔开等情况）时是数组
 		const astList = Array.isArray(astResult.ast) ? astResult.ast : [astResult.ast];
-		// 数据分析安全探索白名单
 		const allowedTypes = ['select', 'show', 'desc', 'describe', 'explain'];
 		
 		for (const node of astList) {
 			const type = (node.type || '').toLowerCase();
 			if (!allowedTypes.includes(type)) {
 				// 直接抛往外部让大模型感知自身越权
-				throw new Error(`安全阻断：探测到非法的 [${type}] 操作。当前被限制为纯只读探查模式，禁止可能的数据修改！`);
+				throw new Error(`安全阻断：探测到非法的 [${type}] 操作。当前被限制为纯只读探查模式，禁止可能的数据修改或越权操作！`);
+			}
+		}
+
+		if (allowedTables !== 'ALL') {
+			try {
+				const tables = parser.tableList(sql);
+				for (const tableStr of tables) {
+					// node-sql-parser tableList format: 'select::dbName::tableName'
+					const parts = tableStr.split('::');
+					const tableName = parts[2]?.replace(/`/g, '')?.toLowerCase();
+					if (tableName && !allowedTables.includes(tableName)) {
+						throw new Error(`安全阻断：探测到越权访问。表 [${tableName}] 不在当前数据源的允许范围内。`);
+					}
+				}
+			} catch (e: any) {
+				if (e.message.startsWith('安全阻断')) {
+					throw e;
+				}
+				// 忽略解析表名列表的其他错误，交给后面的执行去报错
 			}
 		}
 	}
@@ -74,6 +94,21 @@ export class SqlExecutorAgent {
 	private isSelectLike(sql: string): boolean {
 		const normalized = sql.trim().toUpperCase();
 		return normalized.startsWith('SELECT') || normalized.startsWith('WITH ');
+	}
+
+	private isShowTables(sql: string): boolean {
+		return /^SHOW\s+(FULL\s+)?TABLES/i.test(sql.trim());
+	}
+
+	private filterShowTablesRows(
+		rows: Record<string, unknown>[],
+		allowedTables: string[],
+	): Record<string, unknown>[] {
+		return rows.filter((row) => {
+			const tableName = Object.values(row)[0];
+			if (typeof tableName !== 'string') return false;
+			return allowedTables.includes(tableName);
+		});
 	}
 
 	private isSyntaxError(error: any): boolean {
@@ -109,17 +144,27 @@ export class SqlExecutorAgent {
 		return cleanSql;
 	}
 
-	async execute(sql: string, datasourceId?: number | null): Promise<QueryResult> {
+	async execute(sql: string, datasourceId?: number | null, userId?: number): Promise<QueryResult> {
 		const maxRetries = 2;
 		let currentSql = sql;
 		let attempt = 0;
+		
+		let allowedTables: string[] | 'ALL' = 'ALL';
+		if (userId) {
+			allowedTables = await this.schemaService.getAllowedTableNames(datasourceId || null, userId);
+		}
 
 		while (attempt <= maxRetries) {
 			try {
-				this.validate(currentSql);
+				this.validate(currentSql, allowedTables);
 				const safeSql = this.isSelectLike(currentSql) ? this.ensureLimit(currentSql) : currentSql;
 
-				const rows = await this.queryWithTimeout<RowDataPacket[]>(safeSql, datasourceId, 15000);
+				let rows = await this.queryWithTimeout<RowDataPacket[]>(safeSql, datasourceId, 15000);
+
+				if (allowedTables !== 'ALL' && this.isShowTables(safeSql)) {
+					rows = this.filterShowTablesRows(rows as Record<string, unknown>[], allowedTables) as RowDataPacket[];
+				}
+
 				const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
 
 				return {

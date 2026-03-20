@@ -17,6 +17,16 @@ export class SchemaService {
 		return this.getExternalDatasourceSchema(datasourceId!);
 	}
 
+	async getAllowedTableNames(datasourceId: number | null, userId: number): Promise<string[] | 'ALL'> {
+		const kind = await this.getDsKind(datasourceId);
+		if (kind === 'external') return 'ALL';
+		
+		const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
+		if (kind === 'file-only') return uploadedTableNames;
+		
+		return [...PRESET_BUSINESS_TABLES, ...uploadedTableNames];
+	}
+
 	private async getDsKind(datasourceId: number | null): Promise<DsKind> {
 		if (!datasourceId) return 'default';
 		const rows = await this.db.query<RowDataPacket[]>(

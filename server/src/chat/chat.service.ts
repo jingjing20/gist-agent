@@ -48,7 +48,7 @@ export class ChatService {
 		const turnMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
 		try {
-			await this.runAgentLoop(emitter, messages, turnMessages, blocks, datasourceId);
+			await this.runAgentLoop(emitter, messages, turnMessages, blocks, datasourceId, userId);
 			emitter.done();
 		} catch (err: any) {
 			const errorEvent: SSEEvent = { type: 'error', content: err.message };
@@ -65,6 +65,7 @@ export class ChatService {
 		turnMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
 		blocks: SSEEvent[],
 		datasourceId?: number | null,
+		userId?: number,
 	): Promise<void> {
 		const tools = this.toolRegistry.getDefinitions();
 
@@ -146,7 +147,7 @@ export class ChatService {
 				let toolResult: string;
 
 				if (tool) {
-					const result = await tool.execute(args, { emitter, datasourceId });
+					const result = await tool.execute(args, { emitter, datasourceId, userId });
 					toolResult = result.toolResult;
 					blocks.push(...result.blocks);
 				} else {

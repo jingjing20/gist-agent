@@ -14,6 +14,7 @@ export interface SSEEmitter {
 export interface ToolContext {
 	emitter: SSEEmitter;
 	datasourceId?: number | null;
+	userId?: number;
 }
 
 export interface ToolExecutionResult {

@@ -33,7 +33,7 @@ export class SqlQueryTool implements Tool {
 		blocks.push(sqlEvent);
 
 		try {
-			const r = await this.sqlExecutor.execute(sql, ctx.datasourceId);
+			const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId);
 
 			if (r.wasFixed) {
 				const fixLog: SSEEvent = {
