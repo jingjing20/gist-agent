@@ -14,13 +14,18 @@ import * as XLSX from 'xlsx';
 const MAX_FILE_ROWS = 50_000;
 
 const NUMERIC_RE = /^-?(\d+\.?\d*|\d*\.\d+)$/;
+const THOUSAND_SEP_RE = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/;
 
 function normalizeValue(v: unknown): unknown {
 	if (v === null || v === undefined) return null;
 	if (typeof v === 'number') return isFinite(v) ? v : null;
 	if (typeof v === 'string') {
-		const s = v.replace(/[\u200B\uFEFF\u00A0]/g, ' ').trim();
-		return s === '' ? null : s;
+		let s = v.replace(/[\u200B\uFEFF\u00A0]/g, ' ').trim();
+		if (s === '') return null;
+		if (THOUSAND_SEP_RE.test(s)) {
+			s = s.replace(/,/g, '');
+		}
+		return s;
 	}
 	return v;
 }
@@ -132,6 +137,7 @@ export class DataSourceController {
 		const uniqueNames = ensureUniqueColumnNames(colNames);
 		const columns = colNames.map((colName, i) => ({
 			name: uniqueNames[i],
+			originalName: colName,
 			type: inferMysqlType(normalizedRows.map(r => r[colName])),
 		}));
 

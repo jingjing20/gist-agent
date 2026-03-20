@@ -32,6 +32,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 			database: process.env.DB_NAME || 'ai_analysis',
 			waitForConnections: true,
 			connectionLimit: 10,
+			flags: ['+LOCAL_FILES'],
 		});
 	}
 
@@ -133,6 +134,15 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 	async execute(sql: string, params?: unknown[]): Promise<ResultSetHeader> {
 		const [result] = await this.localPool.execute<ResultSetHeader>(sql, params as any);
 		return result;
+	}
+
+	// 专门处理极速批量写入的 TSV/CSV 数据流
+	async executeLoad(sql: string, streamFactory: (path: string) => NodeJS.ReadableStream): Promise<ResultSetHeader> {
+		const [result] = await (this.localPool.query as any)({
+			sql,
+			infileStreamFactory: streamFactory,
+		});
+		return result as ResultSetHeader;
 	}
 
 	async onModuleDestroy() {

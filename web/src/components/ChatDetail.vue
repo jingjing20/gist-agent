@@ -51,6 +51,9 @@
         </div>
         <h2>数据分析 Agent</h2>
         <p>选择一个对话或新建对话开始分析</p>
+        <div class="active-ds-info" v-if="activeDatasourceName !== '未指定'">
+          当前数据源：<span class="highlight">{{ activeDatasourceName }}</span>
+        </div>
         <div class="example-queries">
           <div class="example-title">试试这样问:</div>
           <template v-if="suggestionsLoading">
@@ -133,6 +136,13 @@ function isLastAssistantMsg(msg: ChatMessage): boolean {
   }
   return false;
 }
+
+const activeDatasourceName = computed(() => {
+  const id = store.activeDatasourceId;
+  if (id == null) return '未指定';
+  const ds = dsStore.list.find((d: any) => d.id === id);
+  return ds ? ds.name : `未知 (ID: ${id})`;
+});
 
 const DEFAULT_QUERIES = [
   '帮我分析下近一月天河平台的日活趋势',
@@ -317,6 +327,21 @@ watch(
 .empty-state p {
   margin: 0;
   font-size: 14px;
+}
+
+.active-ds-info {
+  margin-top: 4px;
+  padding: 6px 16px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.active-ds-info .highlight {
+  color: var(--accent);
+  font-weight: 500;
 }
 
 .example-queries {

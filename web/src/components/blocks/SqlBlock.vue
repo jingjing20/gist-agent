@@ -1,12 +1,18 @@
 <template>
   <div class="sql-block">
-    <div class="sql-header">
-      <span class="sql-label">SQL</span>
-      <button class="copy-btn" @click="copySQL" :title="copied ? '已复制' : '复制'">
+    <div class="sql-header" @click="isExpanded = !isExpanded" title="点击展开/收起">
+      <div class="sql-title">
+        <span class="toggle-icon">{{ isExpanded ? '▼' : '▶' }}</span>
+        <span class="sql-label">SQL</span>
+        <span v-if="!isExpanded" class="sql-hint">点击展开</span>
+      </div>
+      <button v-show="isExpanded" class="copy-btn" @click.stop="copySQL" :title="copied ? '已复制' : '复制'">
         {{ copied ? '已复制' : '复制' }}
       </button>
     </div>
-    <pre class="sql-code"><code v-html="highlightedSQL"></code></pre>
+    <div v-show="isExpanded" class="sql-content">
+      <pre class="sql-code"><code v-html="highlightedSQL"></code></pre>
+    </div>
   </div>
 </template>
 
@@ -19,6 +25,7 @@ hljs.registerLanguage('sql', sql);
 
 const props = defineProps<{ content?: string }>();
 const copied = ref(false);
+const isExpanded = ref(false);
 
 const highlightedSQL = computed(() => {
   if (!props.content) return '';
@@ -48,7 +55,24 @@ function copySQL() {
   align-items: center;
   padding: 8px 14px;
   background: var(--bg-code-header);
-  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sql-header:hover {
+  background: var(--bg-hover);
+}
+
+.sql-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.toggle-icon {
+  font-size: 10px;
+  color: var(--text-secondary);
+  transition: transform 0.2s;
 }
 
 .sql-label {
@@ -57,6 +81,11 @@ function copySQL() {
   color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+
+.sql-hint {
+  font-size: 12px;
+  color: var(--text-secondary);
 }
 
 .copy-btn {
@@ -73,6 +102,10 @@ function copySQL() {
 .copy-btn:hover {
   background: var(--bg-hover);
   color: var(--text-primary);
+}
+
+.sql-content {
+  border-top: 1px solid var(--border);
 }
 
 .sql-code {

@@ -401,11 +401,16 @@ async function handleCreateByFile() {
   if (!createFileForm.name || !createFileForm.displayName || !createFileForm.file) return;
   createFileError.value = '';
   createFileSubmitting.value = true;
+  let dsId: number | null = null;
   try {
     const ds = await store.create({ name: createFileForm.name });
+    dsId = ds.id;
     await store.uploadTable(ds.id, createFileForm.file, createFileForm.displayName);
     closeCreateByFile();
   } catch (e: any) {
+    if (dsId) {
+      await store.remove(dsId).catch(() => {});
+    }
     createFileError.value = e.message;
   } finally {
     createFileSubmitting.value = false;

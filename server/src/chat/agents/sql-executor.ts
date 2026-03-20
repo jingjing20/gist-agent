@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../../database/database.service';
 import { LlmService } from '../../llm/llm.service';
 import { RowDataPacket } from 'mysql2/promise';
+import { Parser } from 'node-sql-parser';
 
 const MAX_ROWS = 1000;
 
@@ -35,21 +36,30 @@ export class SqlExecutorAgent {
 		]);
 	}
 
-	private readonly FORBIDDEN_KEYWORDS = [
-		'INSERT', 'UPDATE', 'DELETE', 'DROP', 'ALTER',
-		'CREATE', 'TRUNCATE', 'GRANT', 'REVOKE', 'REPLACE',
-		'SET', 'CALL', 'LOCK', 'UNLOCK',
-	];
-
 	validate(sql: string): void {
-		for (const keyword of this.FORBIDDEN_KEYWORDS) {
-			const pattern = new RegExp(`\\b${keyword}\\b`, 'i');
-			if (pattern.test(sql)) {
-				throw new Error(`SQL 包含禁止的操作: ${keyword}`);
-			}
+		const parser = new Parser();
+		let astResult;
+		try {
+			astResult = parser.parse(sql, { database: 'MySQL' });
+		} catch (error: any) {
+			// 将 AST 的解析异常强行包装为原生 SQL 语法错误
+			// 触发本类的 attemptFixSql 由大模型尝试静默修正
+			const syntaxErr = new Error(`[AST 解析异常] ${error.message}`);
+			(syntaxErr as any).code = 'ER_PARSE_ERROR';
+			throw syntaxErr;
 		}
-		if (/\bLOAD\s+DATA\b/i.test(sql)) {
-			throw new Error('SQL 包含禁止的操作: LOAD DATA');
+
+		// parser.ast 在单条查询时是对象，多条拼接（分号隔开等情况）时是数组
+		const astList = Array.isArray(astResult.ast) ? astResult.ast : [astResult.ast];
+		// 数据分析安全探索白名单
+		const allowedTypes = ['select', 'show', 'desc', 'describe', 'explain'];
+		
+		for (const node of astList) {
+			const type = (node.type || '').toLowerCase();
+			if (!allowedTypes.includes(type)) {
+				// 直接抛往外部让大模型感知自身越权
+				throw new Error(`安全阻断：探测到非法的 [${type}] 操作。当前被限制为纯只读探查模式，禁止可能的数据修改！`);
+			}
 		}
 	}
 

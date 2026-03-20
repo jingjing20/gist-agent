@@ -137,7 +137,7 @@ export class DataSourceService {
 		datasourceId: number,
 		userId: number,
 		displayName: string,
-		columns: Array<{ name: string; type: string }>,
+		columns: Array<{ name: string; originalName?: string; type: string }>,
 		rows: Array<Record<string, unknown>>,
 	): Promise<UploadedTable> {
 		const dsRows = await this.db.query<RowDataPacket[]>(
@@ -157,31 +157,61 @@ export class DataSourceService {
 		const colDefs = columns.map(c => `\`${c.name}\` ${c.type}`).join(', ');
 		await this.db.execute(`CREATE TABLE \`${tableName}\` (${colDefs})`);
 
-		const BATCH = 200;
-		for (let i = 0; i < rows.length; i += BATCH) {
-			const batch = rows.slice(i, i + BATCH);
-			if (!batch.length) continue;
-			const placeholders = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
-			const values = batch.flatMap(row => columns.map(c => row[c.name] ?? null));
-			await this.db.execute(
-				`INSERT INTO \`${tableName}\` (${columns.map(c => `\`${c.name}\``).join(', ')}) VALUES ${placeholders}`,
-				values,
+		try {
+			try {
+				// 将全量数据序列化为内存中的 TSV 流，大幅度减少网络 IO 耗时
+				const { Readable } = require('stream');
+				const tsvData = rows.map(r => {
+					return columns.map(c => {
+						const v = r[c.name];
+						if (v === null || v === undefined) return '\\N'; // MySQL LOAD DATA 中 \N 表示 NULL
+						return String(v).replace(/\\/g, '\\\\').replace(/\t/g, ' ').replace(/\n/g, ' ');
+					}).join('\t');
+				}).join('\n') + '\n';
+
+				const loadSql = `LOAD DATA LOCAL INFILE 'stream' INTO TABLE \`${tableName}\` FIELDS TERMINATED BY '\\t' LINES TERMINATED BY '\\n' (${columns.map(c => `\`${c.name}\``).join(', ')})`;
+				await this.db.executeLoad(loadSql, () => Readable.from([tsvData]));
+			} catch (err: any) {
+				// 部分云服务可能屏蔽了 local_infile 权限，遇到异常平滑降级为批量插入
+				const BATCH = Math.max(1, Math.floor(60000 / columns.length));
+				for (let i = 0; i < rows.length; i += BATCH) {
+					const batch = rows.slice(i, i + BATCH);
+					if (!batch.length) continue;
+					const placeholders = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+					const values = batch.flatMap(row => columns.map(c => row[c.name] ?? null));
+					await this.db.execute(
+						`INSERT INTO \`${tableName}\` (${columns.map(c => `\`${c.name}\``).join(', ')}) VALUES ${placeholders}`,
+						values,
+					);
+				}
+			}
+
+			const esc = (s: string) => s.replace(/'/g, "\\'");
+			await this.db.execute(`ALTER TABLE \`${tableName}\` COMMENT = '${esc(displayName)}'`);
+			for (const col of columns) {
+				const comment = col.originalName ?? col.name;
+				await this.db.execute(
+					`ALTER TABLE \`${tableName}\` MODIFY \`${col.name}\` ${col.type} COMMENT '${esc(comment)}'`,
+				);
+			}
+
+			const result = await this.db.execute(
+				'INSERT INTO uploaded_table (datasource_id, user_id, table_name, display_name) VALUES (?, ?, ?, ?)',
+				[datasourceId, userId, tableName, displayName],
 			);
+
+			return {
+				id: result.insertId,
+				datasource_id: datasourceId,
+				user_id: userId,
+				table_name: tableName,
+				display_name: displayName,
+				created_at: new Date().toISOString(),
+			};
+		} catch (error) {
+			await this.db.execute(`DROP TABLE IF EXISTS \`${tableName}\``);
+			throw error;
 		}
-
-		const result = await this.db.execute(
-			'INSERT INTO uploaded_table (datasource_id, user_id, table_name, display_name) VALUES (?, ?, ?, ?)',
-			[datasourceId, userId, tableName, displayName],
-		);
-
-		return {
-			id: result.insertId,
-			datasource_id: datasourceId,
-			user_id: userId,
-			table_name: tableName,
-			display_name: displayName,
-			created_at: new Date().toISOString(),
-		};
 	}
 
 	async listUploadedTables(datasourceId: number, userId: number): Promise<UploadedTable[]> {
