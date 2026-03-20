@@ -20,12 +20,13 @@
               <div class="user-text">{{ msg.content }}</div>
             </template>
             <template v-else>
-              <component
-                v-for="(block, i) in msg.blocks"
-                :key="i"
-                :is="blockComponent(block.type)"
-                v-bind="blockProps(block)"
-              />
+              <template v-for="(block, i) in msg.blocks" :key="i">
+                <component
+                  v-if="block.type !== 'log'"
+                  :is="blockComponent(block.type)"
+                  v-bind="blockProps(block)"
+                />
+              </template>
               <div v-if="store.isLoading && isLastAssistantMsg(msg)" class="streaming-indicator">
                 <span class="dot"></span>
                 <span class="dot"></span>
