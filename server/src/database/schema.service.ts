@@ -6,15 +6,41 @@ const PRESET_BUSINESS_TABLES = ['platform_info', 'daily_active_stats', 'user_beh
 
 type DsKind = 'default' | 'file-only' | 'external';
 
+interface SchemaCacheEntry {
+	prompt: string;
+	timestamp: number;
+}
+
+const CACHE_TTL_MS = 60 * 1000; // 1 分钟缓存
+
 @Injectable()
 export class SchemaService {
+	private readonly cache = new Map<string, SchemaCacheEntry>();
+
 	constructor(private readonly db: DatabaseService) { }
 
 	async getDatabaseSchemaPrompt(datasourceId: number | null, userId: number): Promise<string> {
+		const cacheKey = `${datasourceId || 'local'}_${userId}`;
+		const cached = this.cache.get(cacheKey);
+		if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+			return cached.prompt;
+		}
+
 		const kind = await this.getDsKind(datasourceId);
-		if (kind === 'default') return this.getLocalDatasourceSchema(datasourceId, userId);
-		if (kind === 'file-only') return this.getFileOnlyDatasourceSchema(datasourceId!, userId);
-		return this.getExternalDatasourceSchema(datasourceId!);
+		let prompt = '';
+		if (kind === 'default') prompt = await this.getLocalDatasourceSchema(datasourceId, userId);
+		else if (kind === 'file-only') prompt = await this.getFileOnlyDatasourceSchema(datasourceId!, userId);
+		else prompt = await this.getExternalDatasourceSchema(datasourceId!);
+
+		if (prompt) {
+			this.cache.set(cacheKey, { prompt, timestamp: Date.now() });
+		}
+		return prompt;
+	}
+
+	clearUserCache(datasourceId: number | null, userId: number): void {
+		const cacheKey = `${datasourceId || 'local'}_${userId}`;
+		this.cache.delete(cacheKey);
 	}
 
 	async getAllowedTableNames(datasourceId: number | null, userId: number): Promise<string[] | 'ALL'> {

@@ -201,15 +201,23 @@ export class ConversationService implements OnModuleInit {
 			[id, conversationId, role, content, JSON.stringify(llmMessages)],
 		);
 
+		const blockValues: unknown[] = [];
+		const blockPlaceholders: string[] = [];
+
 		for (let i = 0; i < blocks.length; i++) {
 			const block = blocks[i] as any;
 			const blockId = uuidv4();
 			const { type, content: blockContent, ...rest } = block;
 			const hasMetadata = Object.keys(rest).length > 0;
-			await this.db.execute(
-				'INSERT INTO message_block (id, message_id, sort_order, type, content, metadata) VALUES (?, ?, ?, ?, ?, ?)',
-				[blockId, id, i, type, blockContent ?? null, hasMetadata ? JSON.stringify(rest) : null],
-			);
+			
+			const metadataStr = hasMetadata ? JSON.stringify(rest) : null;
+			blockValues.push(blockId, id, i, type, blockContent ?? null, metadataStr);
+			blockPlaceholders.push('(?, ?, ?, ?, ?, ?)');
+		}
+
+		if (blockPlaceholders.length > 0) {
+			const sql = `INSERT INTO message_block (id, message_id, sort_order, type, content, metadata) VALUES ${blockPlaceholders.join(', ')}`;
+			await this.db.execute(sql, blockValues);
 		}
 
 		await this.db.execute(

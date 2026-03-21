@@ -18,7 +18,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 	private localPool: Pool;
 
 	// 动态数据源连接池 Map，key 为 data_source.id
-	private readonly pools = new Map<number, Pool>();
+	// 存 Promise 而非 Pool，避免 async 懒初始化的并发竞态（双重创建/泄漏）
+	private readonly pools = new Map<number, Promise<Pool>>();
 
 	// 本地默认数据源的 id（从 data_source 表读取，避免硬编码）
 	private localDatasourceId: number | null = null;
@@ -75,34 +76,43 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 			return this.pools.get(datasourceId)!;
 		}
 
-		// 从 data_source 表读取配置
-		const rows = await this.localPool.query<RowDataPacket[]>(
-			'SELECT * FROM data_source WHERE id = ?',
-			[datasourceId]
-		);
-		const list = rows[0] as RowDataPacket[];
-		if (!list.length) {
-			throw new Error(`数据源 id=${datasourceId} 不存在`);
-		}
+		// 把创建过程本身的 Promise 存入 Map，并发请求 await 同一个 Promise，消除竞态
+		const poolPromise = (async () => {
+			const rows = await this.localPool.query<RowDataPacket[]>(
+				'SELECT * FROM data_source WHERE id = ?',
+				[datasourceId]
+			);
+			const list = rows[0] as RowDataPacket[];
+			if (!list.length) {
+				throw new Error(`数据源 id=${datasourceId} 不存在`);
+			}
 
-		const row = list[0] as any;
-		if (row.is_local || !row.host) {
-			return this.localPool;
-		}
+			const row = list[0] as any;
+			if (row.is_local || !row.host) {
+				return this.localPool;
+			}
 
-		const config = row as DataSourceConfig;
-		const pool = this.createPool(config);
-		this.pools.set(datasourceId, pool);
-		this.logger.log(`已创建数据源连接池: id=${datasourceId}, db=${config.database_name}`);
-		return pool;
+			const config = row as DataSourceConfig;
+			const pool = this.createPool(config);
+			this.logger.log(`已创建数据源连接池: id=${datasourceId}, db=${config.database_name}`);
+			return pool;
+		})();
+
+		// 如果初始化失败，清掉这条记录，允许下次重试
+		poolPromise.catch(() => this.pools.delete(datasourceId));
+		this.pools.set(datasourceId, poolPromise);
+		return poolPromise;
 	}
 
 	// 释放指定数据源的连接池（数据源删除时调用）
 	async releasePool(datasourceId: number): Promise<void> {
-		const pool = this.pools.get(datasourceId);
-		if (pool) {
-			await pool.end();
+		const poolPromise = this.pools.get(datasourceId);
+		if (poolPromise) {
 			this.pools.delete(datasourceId);
+			const pool = await poolPromise.catch(() => null);
+			if (pool && pool !== this.localPool) {
+				await pool.end();
+			}
 		}
 	}
 
@@ -147,9 +157,12 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
 	async onModuleDestroy() {
 		await this.localPool.end();
-		for (const [id, pool] of this.pools.entries()) {
-			await pool.end();
-			this.logger.log(`已释放数据源连接池: id=${id}`);
+		for (const [id, poolPromise] of this.pools.entries()) {
+			const pool = await poolPromise.catch(() => null);
+			if (pool && pool !== this.localPool) {
+				await pool.end();
+				this.logger.log(`已释放数据源连接池: id=${id}`);
+			}
 		}
 	}
 }

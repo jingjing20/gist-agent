@@ -1,5 +1,6 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { DatabaseService, DataSourceConfig } from '../database/database.service';
+import { SchemaService } from '../database/schema.service';
 import { RowDataPacket } from 'mysql2/promise';
 
 export interface DataSource {
@@ -26,7 +27,10 @@ export interface UploadedTable {
 
 @Injectable()
 export class DataSourceService {
-	constructor(private readonly db: DatabaseService) { }
+	constructor(
+		private readonly db: DatabaseService,
+		@Inject(forwardRef(() => SchemaService)) private readonly schemaService: SchemaService
+	) { }
 
 	async canAccess(datasourceId: number, userId: number): Promise<boolean> {
 		const rows = await this.db.query<RowDataPacket[]>(
@@ -140,15 +144,8 @@ export class DataSourceService {
 		columns: Array<{ name: string; originalName?: string; type: string }>,
 		rows: Array<Record<string, unknown>>,
 	): Promise<UploadedTable> {
-		const dsRows = await this.db.query<RowDataPacket[]>(
-			'SELECT is_local FROM data_source WHERE id = ?',
-			[datasourceId],
-		);
-		if (!dsRows.length) throw new NotFoundException(`数据源 id=${datasourceId} 不存在`);
-		if ((dsRows[0] as any).is_local === 1) throw new ForbiddenException('公共默认数据源不支持上传文件');
-
-		const ok = await this.canAccess(datasourceId, userId);
-		if (!ok) throw new ForbiddenException('无权访问此数据源');
+		const ds = await this.findOne(datasourceId, userId);
+		if (ds.is_local === 1) throw new ForbiddenException('公共默认数据源不支持上传文件');
 
 		if (columns.length === 0) throw new BadRequestException('文件不包含有效列');
 
@@ -200,6 +197,8 @@ export class DataSourceService {
 				[datasourceId, userId, tableName, displayName],
 			);
 
+			this.schemaService.clearUserCache(datasourceId, userId);
+
 			return {
 				id: result.insertId,
 				datasource_id: datasourceId,
@@ -215,8 +214,7 @@ export class DataSourceService {
 	}
 
 	async listUploadedTables(datasourceId: number, userId: number): Promise<UploadedTable[]> {
-		const ok = await this.canAccess(datasourceId, userId);
-		if (!ok) throw new ForbiddenException('无权访问此数据源');
+		await this.findOne(datasourceId, userId); // 走一遍 findOne 就是包含了鉴权，未抛错即可
 
 		const rows = await this.db.query<RowDataPacket[]>(
 			`SELECT id, datasource_id, user_id, table_name, display_name, created_at
@@ -230,7 +228,7 @@ export class DataSourceService {
 
 	async deleteUploadedTable(tableId: number, userId: number): Promise<void> {
 		const rows = await this.db.query<RowDataPacket[]>(
-			'SELECT table_name, user_id FROM uploaded_table WHERE id = ?',
+			'SELECT table_name, user_id, datasource_id FROM uploaded_table WHERE id = ?',
 			[tableId],
 		);
 		if (!rows.length) throw new NotFoundException(`上传表 id=${tableId} 不存在`);
@@ -239,6 +237,8 @@ export class DataSourceService {
 
 		await this.db.execute(`DROP TABLE IF EXISTS \`${row.table_name}\``);
 		await this.db.execute('DELETE FROM uploaded_table WHERE id = ?', [tableId]);
+		
+		this.schemaService.clearUserCache(row.datasource_id ?? null, userId);
 	}
 
 	async getUploadedTableNames(datasourceId: number, userId: number): Promise<string[]> {

@@ -38,7 +38,7 @@ export class SqlExecutorAgent {
 		]);
 	}
 
-	validate(sql: string, allowedTables: string[] | 'ALL' = 'ALL'): void {
+	validate(sql: string, allowedTables: string[] | 'ALL' = 'ALL'): { astResult: any, parser: Parser } {
 		const parser = new Parser();
 		let astResult;
 		try {
@@ -81,19 +81,34 @@ export class SqlExecutorAgent {
 				// 忽略解析表名列表的其他错误，交给后面的执行去报错
 			}
 		}
+
+		return { astResult, parser };
 	}
 
-	ensureLimit(sql: string): string {
-		const normalized = sql.trim().toUpperCase();
-		if (!normalized.includes('LIMIT')) {
-			return `${sql.replace(/;\s*$/, '')} LIMIT ${MAX_ROWS}`;
+	ensureLimit(astResult: any, parser: Parser): string {
+		const astList = Array.isArray(astResult.ast) ? astResult.ast : [astResult.ast];
+		let modified = false;
+
+		for (const node of astList) {
+			if (node.type?.toLowerCase() === 'select') {
+				if (!node.limit) {
+					// 注入 limit
+					node.limit = {
+						seperator: '',
+						value: [{ type: 'number', value: MAX_ROWS }]
+					};
+					modified = true;
+				}
+			}
 		}
-		return sql;
-	}
 
-	private isSelectLike(sql: string): boolean {
-		const normalized = sql.trim().toUpperCase();
-		return normalized.startsWith('SELECT') || normalized.startsWith('WITH ');
+		if (modified) {
+			return parser.sqlify(astResult.ast, { database: 'MySQL' });
+		}
+		// 如果没修改（比如原本就有 limit 或者 不是 select 语句），我们也可以直接 sqlify
+		// 但为了保持原有格式，返回原 sql（其实 AST 里没存原 SQL，需要外部传或者默认全 sqlify）
+		// 我们直接无脑 sqlify，还能起到统一格式化的作用
+		return parser.sqlify(astResult.ast, { database: 'MySQL' });
 	}
 
 	private isShowTables(sql: string): boolean {
@@ -156,8 +171,8 @@ export class SqlExecutorAgent {
 
 		while (attempt <= maxRetries) {
 			try {
-				this.validate(currentSql, allowedTables);
-				const safeSql = this.isSelectLike(currentSql) ? this.ensureLimit(currentSql) : currentSql;
+				const { astResult, parser } = this.validate(currentSql, allowedTables);
+				const safeSql = this.ensureLimit(astResult, parser);
 
 				let rows = await this.queryWithTimeout<RowDataPacket[]>(safeSql, datasourceId, 15000);
 
