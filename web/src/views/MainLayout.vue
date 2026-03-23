@@ -6,7 +6,7 @@
         <button
           class="tab-btn"
           :class="{ active: activeTab === 'chat' }"
-          @click="goToChat"
+          @click="router.push('/')"
         >
           数据分析
         </button>
@@ -23,42 +23,26 @@
         <button class="btn-logout" @click="handleLogout">退出</button>
       </div>
     </header>
-
     <div class="app-body">
-      <template v-if="activeTab === 'chat'">
-        <ChatSidebar />
-        <ChatDetail />
-      </template>
-      <template v-else>
-        <DataSourcePage />
-      </template>
+      <router-view />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from 'vue';
+import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
-import ChatSidebar from '../components/ChatSidebar.vue';
-import ChatDetail from '../components/ChatDetail.vue';
-import DataSourcePage from '../components/DataSourcePage.vue';
-import { useChatStore } from '../stores/chat';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
 
 const router = useRouter();
 const route = useRoute();
-const chatStore = useChatStore();
 const dsStore = useDataSourceStore();
 const authStore = useAuthStore();
 
 const activeTab = computed<'chat' | 'datasource'>(() =>
-  route.path === '/datasource' ? 'datasource' : 'chat',
+  route.name === 'datasource' ? 'datasource' : 'chat',
 );
-
-function goToChat() {
-  router.push('/');
-}
 
 function goToDataSource() {
   router.push('/datasource');
@@ -69,25 +53,6 @@ function handleLogout() {
   authStore.logout();
   router.push('/login');
 }
-
-function syncRouteToConversation() {
-  if (route.path === '/datasource') return;
-  const convId = route.params.convId as string | undefined;
-  if (convId && convId !== 'login' && convId !== 'register') {
-    if (chatStore.activeConversationId !== convId) {
-      chatStore.selectConversation(convId);
-    }
-  } else if (!convId && chatStore.activeConversationId) {
-    chatStore.startNewChat();
-  }
-}
-
-watch(() => [route.path, route.params.convId], syncRouteToConversation);
-
-onMounted(async () => {
-  await chatStore.fetchConversations();
-  syncRouteToConversation();
-});
 </script>
 
 <style scoped>

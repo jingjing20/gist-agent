@@ -4,129 +4,32 @@
       <div class="chat-header">
         <h2 class="chat-title">{{ store.activeConversation.title }}</h2>
       </div>
-
       <div class="message-list" ref="messageListRef">
-        <div
+        <ChatMessageItem
           v-for="msg in store.activeConversation.messages"
           :key="msg.id"
-          class="message"
-          :class="msg.role"
-        >
-          <div class="message-avatar">
-            {{ msg.role === 'user' ? 'U' : 'AI' }}
-          </div>
-          <div class="message-body">
-            <template v-if="msg.role === 'user'">
-              <div class="user-text">{{ msg.content }}</div>
-            </template>
-            <template v-else>
-              <template v-for="(block, i) in msg.blocks" :key="i">
-                <component
-                  v-if="block.type !== 'log'"
-                  :is="blockComponent(block.type)"
-                  v-bind="blockProps(block)"
-                />
-              </template>
-              <div v-if="store.isLoading && isLastAssistantMsg(msg)" class="streaming-indicator">
-                <span class="dot"></span>
-                <span class="dot"></span>
-                <span class="dot"></span>
-              </div>
-            </template>
-          </div>
-        </div>
+          :msg="msg"
+          :isStreaming="store.isLoading && isLastAssistantMsg(msg)"
+        />
       </div>
     </template>
-
     <template v-else>
-      <div class="empty-state">
-        <div class="empty-icon">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <polyline points="3,18 7,11 12,14 17,6 21,9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            <circle cx="3" cy="18" r="1.8" fill="white"/>
-            <circle cx="7" cy="11" r="1.8" fill="white"/>
-            <circle cx="12" cy="14" r="1.8" fill="white"/>
-            <circle cx="17" cy="6" r="1.8" fill="white"/>
-            <circle cx="21" cy="9" r="1.8" fill="white"/>
-          </svg>
-        </div>
-        <h2>数据分析 Agent</h2>
-        <p>选择一个对话或新建对话开始分析</p>
-        <div class="active-ds-info" v-if="activeDatasourceName !== '未指定'">
-          当前数据源：<span class="highlight">{{ activeDatasourceName }}</span>
-        </div>
-        <div class="example-queries">
-          <template v-if="suggestionsLoading">
-            <div v-for="i in 3" :key="i" class="example-btn example-skeleton" />
-          </template>
-          <template v-else>
-            <button
-              v-for="q in exampleQueries"
-              :key="q"
-              class="example-btn"
-              @click="handleExample(q)"
-            >
-              {{ q }}
-            </button>
-          </template>
-        </div>
-      </div>
+      <ChatEmptyState @select="handleExample" />
     </template>
-
     <ChatInput />
   </div>
 </template>
 
 <script setup lang="ts">
-import { watch, nextTick, ref, computed, type Component } from 'vue';
+import { watch, nextTick, ref } from 'vue';
 import { useChatStore } from '../stores/chat';
-import { useDataSourceStore } from '../stores/datasource';
 import ChatInput from './ChatInput.vue';
-import ThinkingBlock from './blocks/ThinkingBlock.vue';
-import SqlBlock from './blocks/SqlBlock.vue';
-import TableBlock from './blocks/TableBlock.vue';
-import MarkdownBlock from './blocks/MarkdownBlock.vue';
-import LogBlock from './blocks/LogBlock.vue';
-import ChartBlock from './blocks/ChartBlock.vue';
-import type { MessageBlock, ChatMessage } from '../types';
+import ChatEmptyState from './ChatEmptyState.vue';
+import ChatMessageItem from './ChatMessageItem.vue';
+import type { ChatMessage } from '../types';
 
 const store = useChatStore();
-const dsStore = useDataSourceStore();
 const messageListRef = ref<HTMLElement>();
-
-const blockMap: Record<string, Component> = {
-  thinking: ThinkingBlock,
-  sql: SqlBlock,
-  table: TableBlock,
-  text: MarkdownBlock,
-  error: MarkdownBlock,
-  log: LogBlock,
-  chart: ChartBlock,
-};
-
-function blockComponent(type: string): Component {
-  return blockMap[type] || MarkdownBlock;
-}
-
-function blockProps(block: MessageBlock): Record<string, unknown> {
-  if (block.type === 'log') {
-    return {
-      title: block.title,
-      content: block.content,
-    };
-  }
-  if (block.type === 'chart') {
-    return {
-      chartData: block.chartData,
-    };
-  }
-  return {
-    content: block.type === 'error' ? `**错误:** ${block.content}` : block.content,
-    columns: block.columns,
-    rows: block.rows,
-    rowCount: block.rowCount,
-  };
-}
 
 function isLastAssistantMsg(msg: ChatMessage): boolean {
   const msgs = store.activeConversation?.messages;
@@ -137,44 +40,6 @@ function isLastAssistantMsg(msg: ChatMessage): boolean {
   return false;
 }
 
-const activeDatasourceName = computed(() => {
-  const id = store.activeDatasourceId;
-  if (id == null) return '未指定';
-  const ds = dsStore.list.find((d: any) => d.id === id);
-  return ds ? ds.name : `未知 (ID: ${id})`;
-});
-
-const DEFAULT_QUERIES = [
-  '帮我分析下近一月天河平台的日活趋势',
-  '对比三个平台最近一周的新增用户数',
-  '近 7 天用户行为类型分布是怎样的',
-];
-
-const suggestionsLoading = computed(() => {
-  const id = store.activeDatasourceId;
-  return id != null && !!dsStore.suggestionsLoading[id];
-});
-
-const exampleQueries = computed(() => {
-  const id = store.activeDatasourceId;
-  if (id != null && dsStore.suggestionsCache[id]?.length) {
-    return dsStore.suggestionsCache[id];
-  }
-  return DEFAULT_QUERIES;
-});
-
-watch(
-  () => store.activeDatasourceId,
-  (id) => { if (id != null) dsStore.fetchSuggestions(id); },
-  { immediate: true },
-);
-
-async function handleExample(query: string) {
-  store.startNewChat();
-  store.sendMessage(query);
-}
-
-// 自动滚动到底部
 function scrollToBottom() {
   nextTick(() => {
     const el = messageListRef.value;
@@ -182,10 +47,7 @@ function scrollToBottom() {
   });
 }
 
-watch(
-  () => store.activeConversation?.messages.length,
-  scrollToBottom,
-);
+watch(() => store.activeConversation?.messages.length, scrollToBottom);
 
 watch(
   () => {
@@ -195,6 +57,11 @@ watch(
   },
   scrollToBottom,
 );
+
+async function handleExample(query: string) {
+  store.startNewChat();
+  store.sendMessage(query);
+}
 </script>
 
 <style scoped>
@@ -224,176 +91,5 @@ watch(
   flex: 1;
   overflow-y: auto;
   padding: 24px;
-}
-
-.message {
-  display: flex;
-  gap: 14px;
-  margin-bottom: 24px;
-  max-width: 800px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.message-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
-  color: #fff;
-}
-
-.message.user .message-avatar {
-  background: var(--accent);
-}
-
-.message.assistant .message-avatar {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
-}
-
-.message-body {
-  flex: 1;
-  min-width: 0;
-}
-
-.user-text {
-  background: var(--bg-secondary);
-  padding: 10px 16px;
-  border-radius: 12px;
-  border-top-left-radius: 4px;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-primary);
-  display: inline-block;
-}
-
-.streaming-indicator {
-  display: flex;
-  gap: 4px;
-  padding: 10px 0;
-}
-
-.streaming-indicator .dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--accent);
-  animation: streaming-pulse 1.4s infinite ease-in-out;
-}
-
-.streaming-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
-.streaming-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
-
-@keyframes streaming-pulse {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1.1); }
-}
-
-.empty-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--text-secondary);
-}
-
-.empty-icon {
-  width: 64px;
-  height: 64px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, var(--accent), #8b5cf6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 28px;
-  color: #fff;
-  margin-bottom: 8px;
-}
-
-.empty-state h2 {
-  font-size: 22px;
-  color: var(--text-primary);
-  margin: 0;
-  font-weight: 600;
-}
-
-.empty-state p {
-  margin: 0;
-  font-size: 14px;
-}
-
-.active-ds-info {
-  margin-top: 4px;
-  padding: 6px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.active-ds-info .highlight {
-  color: var(--accent);
-  font-weight: 500;
-}
-
-.example-queries {
-  margin-top: 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
-
-.example-title {
-  font-size: 13px;
-  color: var(--text-secondary);
-  margin-bottom: 4px;
-}
-
-.example-btn {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-  max-width: 400px;
-  width: 100%;
-  text-align: left;
-}
-
-.example-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent);
-}
-
-.example-skeleton {
-  height: 40px;
-  cursor: default;
-  border-color: transparent;
-  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-hover) 50%, var(--bg-secondary) 75%);
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s infinite;
-}
-
-.example-skeleton:hover {
-  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-hover) 50%, var(--bg-secondary) 75%);
-  background-size: 200% 100%;
-  border-color: transparent;
-}
-
-@keyframes skeleton-shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
 }
 </style>

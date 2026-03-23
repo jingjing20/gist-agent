@@ -10,16 +10,11 @@ const router = createRouter({
       path: '/',
       component: () => import('../views/MainLayout.vue'),
       meta: { requiresAuth: true },
-    },
-    {
-      path: '/datasource',
-      component: () => import('../views/MainLayout.vue'),
-      meta: { requiresAuth: true },
-    },
-    {
-      path: '/:convId',
-      component: () => import('../views/MainLayout.vue'),
-      meta: { requiresAuth: true },
+      children: [
+        { path: '', name: 'chat', component: () => import('../views/ChatView.vue') },
+        { path: ':convId', name: 'chat-detail', component: () => import('../views/ChatView.vue') },
+        { path: 'datasource', name: 'datasource', component: () => import('../components/DataSourcePage.vue') },
+      ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
