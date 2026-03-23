@@ -18,7 +18,7 @@
         <span class="conv-title">{{ conv.title }}</span>
         <button
           class="delete-btn"
-          @click.stop="store.deleteConversation(conv.id)"
+          @click.stop="confirmDeleteConv(conv.id)"
           title="删除"
         >
           x
@@ -29,14 +29,37 @@
         暂无对话记录
       </div>
     </div>
+
+    <ConfirmModal
+      :modelValue="!!deletingConvId"
+      @update:modelValue="deletingConvId = null"
+      title="确认删除对话"
+      desc="确定要删除此对话吗？历史记录将无法恢复。"
+      confirmText="删除"
+      @confirm="executeDelete"
+    />
   </aside>
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useChatStore } from '../stores/chat';
+import ConfirmModal from './ConfirmModal.vue';
 
 const store = useChatStore();
+
+const deletingConvId = ref<string | null>(null);
+
+function confirmDeleteConv(id: string) {
+  deletingConvId.value = id;
+}
+
+function executeDelete() {
+  if (deletingConvId.value) {
+    store.deleteConversation(deletingConvId.value);
+    deletingConvId.value = null;
+  }
+}
 
 onMounted(() => {
   store.fetchConversations();

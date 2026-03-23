@@ -32,7 +32,7 @@
               >
                 授权
               </button>
-              <button class="btn btn-danger-ghost btn-sm" @click="handleDelete(ds.id)">删除</button>
+              <button class="btn btn-danger-ghost btn-sm" @click="promptDeleteDs(ds.id)">删除</button>
             </template>
           </div>
         </div>
@@ -52,7 +52,7 @@
               <div v-for="t in tables" :key="t.id" class="ds-table-item">
                 <span class="ds-table-name">{{ t.display_name }}</span>
                 <span class="ds-table-meta">{{ t.table_name }}</span>
-                <button class="btn btn-danger-ghost btn-xs" @click="handleDeleteTable(ds.id, t.id)">删除</button>
+                <button class="btn btn-danger-ghost btn-xs" @click="promptDeleteTable(ds.id, t.id)">删除</button>
               </div>
             </div>
           </template>
@@ -207,6 +207,17 @@
         </div>
       </div>
     </div>
+
+    <!-- 删除确认弹窗 -->
+    <ConfirmModal
+      v-model="deleteConfirm.show"
+      :title="deleteConfirm.title"
+      :desc="deleteConfirm.desc"
+      :loading="deleteSubmitting"
+      loadingText="删除中..."
+      confirmText="确认删除"
+      @confirm="executeDelete"
+    />
   </div>
 </template>
 
@@ -215,6 +226,7 @@ import { ref, onMounted, reactive } from 'vue';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
 import { apiFetch } from '../api';
+import ConfirmModal from './ConfirmModal.vue';
 
 const store = useDataSourceStore();
 const authStore = useAuthStore();
@@ -342,12 +354,52 @@ async function handleCreateByFile() {
   }
 }
 
-async function handleDelete(id: number) {
-  if (!confirm('确认删除此数据源？')) return;
+// --- 删除确认逻辑 ---
+const deleteConfirm = reactive({
+  show: false,
+  title: '',
+  desc: '',
+  type: '' as 'ds' | 'table',
+  dsId: 0,
+  tableId: 0,
+});
+const deleteSubmitting = ref(false);
+
+function closeDeleteConfirm() {
+  deleteConfirm.show = false;
+}
+
+function promptDeleteDs(id: number) {
+  deleteConfirm.title = '确认删除数据源';
+  deleteConfirm.desc = '确定要删除此数据源吗？所有上传的表和访问授权都将被移除，此操作不可逆。';
+  deleteConfirm.type = 'ds';
+  deleteConfirm.dsId = id;
+  deleteConfirm.show = true;
+}
+
+function promptDeleteTable(dsId: number, tableId: number) {
+  deleteConfirm.title = '确认删除表';
+  deleteConfirm.desc = '确认删除此表？数据将无法恢复。';
+  deleteConfirm.type = 'table';
+  deleteConfirm.dsId = dsId;
+  deleteConfirm.tableId = tableId;
+  deleteConfirm.show = true;
+}
+
+async function executeDelete() {
+  deleteSubmitting.value = true;
   try {
-    await store.remove(id);
+    if (deleteConfirm.type === 'ds') {
+      await store.remove(deleteConfirm.dsId);
+    } else if (deleteConfirm.type === 'table') {
+      await store.deleteTable(deleteConfirm.dsId, deleteConfirm.tableId);
+      tables.value = tables.value.filter(t => t.id !== deleteConfirm.tableId);
+    }
+    closeDeleteConfirm();
   } catch (e: any) {
     alert(e.message);
+  } finally {
+    deleteSubmitting.value = false;
   }
 }
 
@@ -438,16 +490,6 @@ async function loadTables(dsId: number) {
     tables.value = [];
   } finally {
     tablesLoading.value = false;
-  }
-}
-
-async function handleDeleteTable(dsId: number, tableId: number) {
-  if (!confirm('确认删除此表？数据将无法恢复。')) return;
-  try {
-    await store.deleteTable(dsId, tableId);
-    tables.value = tables.value.filter(t => t.id !== tableId);
-  } catch (e: any) {
-    alert(e.message);
   }
 }
 </script>

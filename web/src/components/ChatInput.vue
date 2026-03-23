@@ -2,16 +2,31 @@
   <div class="chat-input-wrapper">
     <!-- 数据源选择器 -->
     <div class="ds-selector-row">
-      <select
-        id="datasource-select"
-        v-model="chatStore.activeDatasourceId"
-        class="ds-select"
-        :disabled="!!chatStore.activeConversationId"
+      <div
+        class="custom-ds-select"
+        :class="{ disabled: !!chatStore.activeConversationId, open: dsOpen }"
+        tabindex="0"
+        @blur="dsOpen = false"
       >
-        <option v-for="ds in dsStore.list" :key="ds.id" :value="ds.id">
-          {{ ds.name }}{{ ds.is_local ? ' (默认)' : '' }}
-        </option>
-      </select>
+        <div class="ds-trigger" @click="toggleDsDropdown">
+          <svg v-if="activeDs?.is_local" class="ds-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+          <svg v-else class="ds-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+          <span class="ds-value">{{ activeDatasourceName }}</span>
+          <svg class="chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </div>
+        <div v-if="dsOpen" class="ds-dropdown">
+          <div
+            v-for="ds in dsStore.list"
+            :key="ds.id"
+            class="ds-option"
+            :class="{ selected: ds.id === chatStore.activeDatasourceId }"
+            @mousedown.prevent="selectDs(ds.id)"
+          >
+            <span class="ds-option-name">{{ ds.name }}</span>
+            <span v-if="ds.is_local" class="ds-local-badge">公共</span>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="input-container">
@@ -48,7 +63,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted, watch } from 'vue';
+import { ref, computed, nextTick, onMounted, watch } from 'vue';
 import { useChatStore } from '../stores/chat';
 import { useDataSourceStore } from '../stores/datasource';
 
@@ -57,6 +72,29 @@ const dsStore = useDataSourceStore();
 
 const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement>();
+
+const dsOpen = ref(false);
+
+const activeDs = computed(() => {
+  return dsStore.list.find(d => d.id === chatStore.activeDatasourceId);
+});
+
+const activeDatasourceName = computed(() => {
+  const ds = activeDs.value;
+  if (!ds) return '选择数据源';
+  return ds.name;
+});
+
+function toggleDsDropdown() {
+  if (chatStore.activeConversationId) return;
+  dsOpen.value = !dsOpen.value;
+}
+
+function selectDs(id: number) {
+  if (chatStore.activeConversationId) return;
+  chatStore.activeDatasourceId = id;
+  dsOpen.value = false;
+}
 
 onMounted(async () => {
   if (!dsStore.list.length) {
@@ -112,32 +150,113 @@ function handleSubmit(e?: Event) {
   margin: 0 auto 8px;
   display: flex;
   align-items: center;
-  gap: 8px;
 }
 
-.ds-select {
+.custom-ds-select {
+  position: relative;
+  outline: none;
+  border-radius: 8px;
+}
+
+.ds-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
   background: var(--bg-secondary);
   border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 12px;
-  padding: 5px 10px;
-  border-radius: 7px;
-  outline: none;
+  border-radius: 8px;
   cursor: pointer;
-  font-family: inherit;
-  transition: border-color 0.15s, color 0.15s;
+  color: var(--text-secondary);
+  transition: all 0.15s;
 }
 
-.ds-select:hover:not(:disabled),
-.ds-select:focus:not(:disabled) {
+.custom-ds-select:not(.disabled) .ds-trigger:hover,
+.custom-ds-select.open .ds-trigger {
   border-color: var(--accent);
   color: var(--text-primary);
+  background: var(--bg-primary);
 }
 
-.ds-select:disabled {
+.custom-ds-select.disabled .ds-trigger {
   opacity: 0.6;
   cursor: not-allowed;
   background: var(--bg-primary);
+}
+
+.ds-icon {
+  flex-shrink: 0;
+  opacity: 0.8;
+}
+
+.ds-value {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 150px;
+}
+
+.chevron {
+  flex-shrink: 0;
+  transition: transform 0.2s;
+  opacity: 0.6;
+}
+
+.custom-ds-select.open .chevron {
+  transform: rotate(180deg);
+}
+
+.ds-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  z-index: 100;
+  animation: slideUp 0.15s ease-out;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ds-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.ds-option:hover {
+  background: var(--bg-hover);
+}
+
+.ds-option.selected {
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--accent);
+}
+
+.ds-option-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.ds-local-badge {
+  font-size: 10px;
+  color: var(--accent);
+  background: rgba(99, 102, 241, 0.15);
+  padding: 1px 5px;
+  border-radius: 4px;
 }
 
 .input-container {
