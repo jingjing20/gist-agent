@@ -163,21 +163,6 @@ export class DataSourceController {
 		return { ok: true };
 	}
 
-	@Post('test-connection')
-	async testConnection(@CurrentUser() _user: User, @Body() body: {
-		host: string;
-		port: number;
-		user: string;
-		password: string;
-		database_name: string;
-	}) {
-		if (!body.host || body.port == null || !body.user || !body.database_name) {
-			throw new BadRequestException('请填写完整的连接信息');
-		}
-		await this.datasourceService.testConnection(body);
-		return { ok: true };
-	}
-
 	@Get(':id/suggestions')
 	async getSuggestions(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
 		const questions = await this.suggestionService.getSuggestions(id, user.id);
@@ -192,27 +177,12 @@ export class DataSourceController {
 	@Post()
 	async create(@CurrentUser() user: User, @Body() body: {
 		name: string;
-		host?: string;
-		port?: number;
-		user?: string;
-		password?: string;
-		database_name?: string;
 		description?: string;
 	}) {
 		if (!body.name?.trim()) throw new BadRequestException('请提供数据源名称');
 		const created = await this.datasourceService.create(user.id, body);
 		this.suggestionService.triggerAsync(created.id, user.id);
 		return created;
-	}
-
-	@Delete(':id')
-	remove(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
-		return this.datasourceService.remove(id, user.id);
-	}
-
-	@Post(':id/test')
-	test(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
-		return this.datasourceService.testById(id, user.id);
 	}
 
 	@Post(':id/grant')
@@ -240,5 +210,10 @@ export class DataSourceController {
 	@Get(':id/permissions')
 	listPermissions(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
 		return this.datasourceService.listPermissionUsers(id, user.id);
+	}
+
+	@Delete(':id')
+	remove(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
+		return this.datasourceService.remove(id, user.id);
 	}
 }

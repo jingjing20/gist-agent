@@ -5,10 +5,6 @@ import { apiFetch } from '../api';
 export interface DataSource {
 	id: number;
 	name: string;
-	host?: string;
-	port?: number;
-	user?: string;
-	database_name?: string;
 	is_local: number;
 	created_by?: number | null;
 	description?: string;
@@ -44,30 +40,8 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		}
 	}
 
-	async function testConnection(config: {
-		host: string;
-		port: number;
-		user: string;
-		password: string;
-		database_name: string;
-	}): Promise<void> {
-		const res = await apiFetch('/datasources/test-connection', {
-			method: 'POST',
-			body: JSON.stringify(config),
-		});
-		if (!res.ok) {
-			const err = await res.json();
-			throw new Error(err.message || '连接失败');
-		}
-	}
-
 	async function create(body: {
 		name: string;
-		host?: string;
-		port?: number;
-		user?: string;
-		password?: string;
-		database_name?: string;
 		description?: string;
 	}): Promise<DataSource> {
 		const res = await apiFetch('/datasources', {
@@ -163,5 +137,5 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		}
 	}
 
-	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, testConnection, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions };
+	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions };
 });

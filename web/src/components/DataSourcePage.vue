@@ -3,7 +3,7 @@
     <div class="ds-header">
       <h2>数据源</h2>
       <div class="ds-actions">
-        <button class="btn btn-primary" @click="showModeChooser = true">+ 新建数据源</button>
+        <button class="btn btn-primary" @click="showCreateByFile = true">+ 新建数据源</button>
       </div>
     </div>
 
@@ -19,7 +19,7 @@
                 {{ ds.name }}
                 <span v-if="ds.is_local" class="ds-local-tag">公共</span>
               </div>
-              <div class="ds-meta">{{ ds.host }}:{{ ds.port }} / {{ ds.database_name }}</div>
+              <div class="ds-meta">{{ ds.description || '文件数据源' }}</div>
             </div>
           </div>
           <div class="ds-card-right">
@@ -60,26 +60,6 @@
         <button class="ds-expand-btn" @click="toggleExpand(ds)">
           {{ expandedDs === ds.id ? '收起' : (ds.is_local ? '查看示例表' : '查看上传的表') }}
         </button>
-      </div>
-    </div>
-
-    <!-- 新建数据源：选择模式 -->
-    <div v-if="showModeChooser" class="modal-overlay" @click.self="showModeChooser = false">
-      <div class="modal mode-chooser">
-        <h3>新建数据源</h3>
-        <p class="mode-desc">选择数据来源方式</p>
-        <div class="mode-options">
-          <button class="mode-option" @click="showModeChooser = false; showCreate = true">
-            <div class="mode-icon">&#128268;</div>
-            <div class="mode-label">配置数据库连接</div>
-            <div class="mode-sub">连接已有的 MySQL 数据库</div>
-          </button>
-          <button class="mode-option" @click="showModeChooser = false; showCreateByFile = true">
-            <div class="mode-icon">&#128196;</div>
-            <div class="mode-label">上传文件新建</div>
-            <div class="mode-sub">上传 CSV / XLSX 自动建表</div>
-          </button>
-        </div>
       </div>
     </div>
 
@@ -124,58 +104,6 @@
             {{ createFileSubmitting ? '创建中...' : '创建数据源' }}
           </button>
         </div>
-      </div>
-    </div>
-
-    <!-- 配置数据库连接弹窗 -->
-    <div v-if="showCreate" class="modal-overlay" @click.self="showCreate = false">
-      <div class="modal">
-        <h3>添加 MySQL 数据源</h3>
-        <form @submit.prevent="handleCreate">
-          <div class="form-row">
-            <label>名称</label>
-            <input v-model="form.name" placeholder="我的线上库" required @input="connectionTested = false" />
-          </div>
-          <div class="form-row two-col">
-            <div>
-              <label>Host</label>
-              <input v-model="form.host" placeholder="127.0.0.1" required @input="connectionTested = false" />
-            </div>
-            <div>
-              <label>Port</label>
-              <input v-model.number="form.port" type="number" placeholder="3306" required @input="connectionTested = false" />
-            </div>
-          </div>
-          <div class="form-row two-col">
-            <div>
-              <label>用户名</label>
-              <input v-model="form.user" placeholder="root" required @input="connectionTested = false" />
-            </div>
-            <div>
-              <label>密码</label>
-              <input v-model="form.password" type="password" placeholder="••••••" @input="connectionTested = false" />
-            </div>
-          </div>
-          <div class="form-row">
-            <label>数据库名</label>
-            <input v-model="form.database_name" placeholder="my_database" required @input="connectionTested = false" />
-          </div>
-          <div class="form-row">
-            <label>备注（可选）</label>
-            <input v-model="form.description" placeholder="用途描述" />
-          </div>
-          <div v-if="connectionTested" class="form-success">连接成功，可新建数据源</div>
-          <div v-if="formError" class="form-error">{{ formError }}</div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-ghost" @click="showCreate = false">取消</button>
-            <button type="button" class="btn btn-secondary" :disabled="!canTestConnection || testingConnection" @click="handleTestConnection">
-              {{ testingConnection ? '测试中...' : '测试连接' }}
-            </button>
-            <button type="submit" class="btn btn-primary" :disabled="!connectionTested || submitting">
-              {{ submitting ? '创建中...' : '新建数据源' }}
-            </button>
-          </div>
-        </form>
       </div>
     </div>
 
@@ -283,7 +211,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, reactive, watch } from 'vue';
+import { ref, onMounted, reactive } from 'vue';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
 import { apiFetch } from '../api';
@@ -364,9 +292,6 @@ async function handleRevoke(userId: number) {
   }
 }
 
-// --- 新建数据源：模式选择 ---
-const showModeChooser = ref(false);
-
 // --- 上传文件新建数据源 ---
 const showCreateByFile = ref(false);
 const createFileSubmitting = ref(false);
@@ -414,68 +339,6 @@ async function handleCreateByFile() {
     createFileError.value = e.message;
   } finally {
     createFileSubmitting.value = false;
-  }
-}
-
-// --- 添加数据库 ---
-const showCreate = ref(false);
-const submitting = ref(false);
-const testingConnection = ref(false);
-const connectionTested = ref(false);
-const formError = ref('');
-const form = reactive({
-  name: '',
-  host: '127.0.0.1',
-  port: 3306,
-  user: 'root',
-  password: '',
-  database_name: '',
-  description: '',
-});
-
-const canTestConnection = () =>
-  !!form.name?.trim() && !!form.host?.trim() && form.port != null && !!form.user?.trim() && !!form.database_name?.trim();
-
-function resetCreateForm() {
-  connectionTested.value = false;
-  formError.value = '';
-  Object.assign(form, { name: '', host: '127.0.0.1', port: 3306, user: 'root', password: '', database_name: '', description: '' });
-}
-
-watch(showCreate, (v) => { if (v) resetCreateForm(); });
-
-async function handleTestConnection() {
-  if (!canTestConnection()) return;
-  formError.value = '';
-  testingConnection.value = true;
-  try {
-    await store.testConnection({
-      host: form.host,
-      port: form.port,
-      user: form.user,
-      password: form.password,
-      database_name: form.database_name,
-    });
-    connectionTested.value = true;
-  } catch (e: any) {
-    formError.value = e.message;
-  } finally {
-    testingConnection.value = false;
-  }
-}
-
-async function handleCreate() {
-  if (!connectionTested.value) return;
-  formError.value = '';
-  submitting.value = true;
-  try {
-    await store.create({ ...form });
-    showCreate.value = false;
-    resetCreateForm();
-  } catch (e: any) {
-    formError.value = e.message;
-  } finally {
-    submitting.value = false;
   }
 }
 

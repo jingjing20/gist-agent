@@ -1,15 +1,11 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
-import { DatabaseService, DataSourceConfig } from '../database/database.service';
+import { DatabaseService } from '../database/database.service';
 import { SchemaService } from '../database/schema.service';
 import { RowDataPacket } from 'mysql2/promise';
 
 export interface DataSource {
 	id: number;
 	name: string;
-	host?: string;
-	port?: number;
-	user?: string;
-	database_name?: string;
 	is_local: number;
 	created_by?: number | null;
 	description?: string;
@@ -50,7 +46,7 @@ export class DataSourceService {
 
 	async findAllForUser(userId: number): Promise<DataSource[]> {
 		const rows = await this.db.query<RowDataPacket[]>(
-			`SELECT d.id, d.name, d.host, d.port, d.user, d.database_name, d.is_local, d.created_by, d.description, d.created_at
+			`SELECT d.id, d.name, d.is_local, d.created_by, d.description, d.created_at
        FROM data_source d
        LEFT JOIN datasource_permission p ON d.id = p.datasource_id AND p.user_id = ?
        WHERE d.created_by IS NULL OR d.created_by = ? OR p.user_id IS NOT NULL
@@ -64,7 +60,7 @@ export class DataSourceService {
 		const ok = await this.canAccess(id, userId);
 		if (!ok) throw new ForbiddenException('无权访问此数据源');
 		const rows = await this.db.query<RowDataPacket[]>(
-			'SELECT id, name, host, port, user, database_name, is_local, created_by, description, created_at FROM data_source WHERE id = ?',
+			'SELECT id, name, is_local, created_by, description, created_at FROM data_source WHERE id = ?',
 			[id],
 		);
 		if (!rows.length) throw new NotFoundException(`数据源 id=${id} 不存在`);
@@ -73,27 +69,11 @@ export class DataSourceService {
 
 	async create(userId: number, body: {
 		name: string;
-		host?: string;
-		port?: number;
-		user?: string;
-		password?: string;
-		database_name?: string;
 		description?: string;
 	}): Promise<DataSource> {
-		if (body.host) {
-			await this.db.testConnection({
-				host: body.host,
-				port: body.port!,
-				user: body.user!,
-				password: body.password ?? '',
-				database_name: body.database_name!,
-			});
-		}
-
 		const result = await this.db.execute(
-			`INSERT INTO data_source (name, host, port, user, password, database_name, created_by, description)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-			[body.name, body.host ?? null, body.port ?? null, body.user ?? null, body.password ?? null, body.database_name ?? null, userId, body.description ?? null],
+			`INSERT INTO data_source (name, created_by, description) VALUES (?, ?, ?)`,
+			[body.name, userId, body.description ?? null],
 		);
 		await this.db.execute(
 			'INSERT INTO datasource_permission (datasource_id, user_id, granted_by) VALUES (?, ?, ?)',
@@ -122,19 +102,6 @@ export class DataSourceService {
 
 		await this.db.releasePool(id);
 		await this.db.execute('DELETE FROM data_source WHERE id = ?', [id]);
-	}
-
-	async testConnection(config: DataSourceConfig): Promise<void> {
-		await this.db.testConnection(config);
-	}
-
-	async testById(id: number, userId: number): Promise<void> {
-		await this.findOne(id, userId);
-		const rows = await this.db.query<RowDataPacket[]>(
-			'SELECT * FROM data_source WHERE id = ?',
-			[id],
-		);
-		await this.db.testConnection(rows[0] as unknown as DataSourceConfig);
 	}
 
 	async uploadTable(
