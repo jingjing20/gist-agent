@@ -92,11 +92,20 @@ export class ChatService {
 				if (delta.tool_calls) {
 					for (const tc of delta.tool_calls) {
 						if (!toolCalls[tc.index]) {
+							const name = tc.function?.name || '';
 							toolCalls[tc.index] = {
 								id: tc.id,
 								type: 'function',
-								function: { name: tc.function?.name || '', arguments: '' },
+								function: { name, arguments: '' },
 							};
+							const title = `[工具调用] ${name}`;
+							const callLog: SSEEvent = { type: 'log', title, content: '正在生成调用参数...' };
+							emitter.send(callLog);
+							blocks.push(callLog);
+
+							if (name === 'generate_chart') {
+								emitter.send({ type: 'chart_loading' });
+							}
 						}
 						if (tc.function?.arguments) {
 							toolCalls[tc.index].function.arguments += tc.function.arguments;
@@ -139,9 +148,12 @@ export class ChatService {
 				let args: Record<string, unknown> = {};
 				try { args = JSON.parse(argsStr); } catch { /* malformed args */ }
 
-				const callLog: SSEEvent = { type: 'log', title: `[工具调用] ${name}`, content: argsStr };
-				emitter.send(callLog);
-				blocks.push(callLog);
+				const title = `[工具调用] ${name}`;
+				emitter.send({ type: 'log_update', title, content: argsStr } as any);
+				const lastLog = [...blocks].reverse().find(b => b.type === 'log' && b.title === title && b.content === '正在生成调用参数...');
+				if (lastLog) {
+					lastLog.content = argsStr;
+				}
 
 				const tool = this.toolRegistry.get(name);
 				let toolResult: string;
@@ -153,10 +165,6 @@ export class ChatService {
 				} else {
 					toolResult = `工具 ${name} 不存在`;
 				}
-
-				const resultLog: SSEEvent = { type: 'log', title: `[工具返回] ${name}`, content: toolResult };
-				emitter.send(resultLog);
-				blocks.push(resultLog);
 
 				const toolMsg: OpenAI.Chat.Completions.ChatCompletionMessageParam = {
 					role: 'tool',

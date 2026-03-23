@@ -181,6 +181,16 @@ export const useChatStore = defineStore('chat', () => {
 							continue;
 						}
 
+						if (event.type === 'log_update') {
+							const placeholder = [...assistantMsg.blocks].reverse().find(
+								(b) => b.type === 'log' && b.title === event.title && b.content === '正在生成调用参数...',
+							);
+							if (placeholder) {
+								placeholder.content = event.content || '';
+							}
+							continue;
+						}
+
 						if (event.type === 'chart') {
 							const placeholder = [...assistantMsg.blocks].reverse().find(
 								(b) => b.type === 'chart' && !b.chartData,

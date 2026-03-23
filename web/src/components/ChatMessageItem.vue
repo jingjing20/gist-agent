@@ -10,9 +10,8 @@
       <template v-else>
         <template v-for="(block, i) in msg.blocks" :key="i">
           <component
-            v-if="block.type !== 'log'"
             :is="blockComponent(block.type)"
-            v-bind="blockProps(block)"
+            v-bind="blockProps(block, i)"
           />
         </template>
         <div v-if="isStreaming" class="streaming-indicator">
@@ -54,9 +53,14 @@ function blockComponent(type: string): Component {
   return blockMap[type] || MarkdownBlock;
 }
 
-function blockProps(block: MessageBlock): Record<string, unknown> {
+function blockProps(block: MessageBlock, index: number = -1): Record<string, unknown> {
   if (block.type === 'log') {
-    return { title: block.title, content: block.content };
+    const isLast = props.msg.blocks && index === props.msg.blocks.length - 1;
+    return { 
+      title: block.title, 
+      content: block.content,
+      isLoading: props.isStreaming && isLast
+    };
   }
   if (block.type === 'chart') {
     return { chartData: block.chartData };

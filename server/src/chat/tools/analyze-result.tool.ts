@@ -35,7 +35,6 @@ export class AnalyzeResultTool implements Tool {
 
 	async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
 		if (args.needsChart) {
-			ctx.emitter.send({ type: 'chart_loading' });
 			return {
 				toolResult: `图表区域已就绪，请立即调用 generate_chart 提供完整数据（chartType: "${args.chartType}", title: "${args.chartTitle}"）。图表生成完成后再输出文字总结。`,
 				blocks: [],

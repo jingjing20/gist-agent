@@ -3,7 +3,7 @@ import type OpenAI from 'openai';
 export const TOOL_INSTANCES = 'TOOL_INSTANCES';
 
 export interface SSEEvent {
-	type: 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading';
+	type: 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading' | 'log_update';
 	[key: string]: unknown;
 }
 
