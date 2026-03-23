@@ -4,9 +4,9 @@
     <div class="ds-selector-row">
       <select
         id="datasource-select"
-        v-model="selectedDatasourceId"
+        v-model="chatStore.activeDatasourceId"
         class="ds-select"
-        @change="chatStore.activeDatasourceId = selectedDatasourceId"
+        :disabled="!!chatStore.activeConversationId"
       >
         <option v-for="ds in dsStore.list" :key="ds.id" :value="ds.id">
           {{ ds.name }}{{ ds.is_local ? ' (默认)' : '' }}
@@ -57,26 +57,25 @@ const dsStore = useDataSourceStore();
 
 const inputText = ref('');
 const textareaRef = ref<HTMLTextAreaElement>();
-const selectedDatasourceId = ref<number | null>(null);
 
 onMounted(async () => {
   if (!dsStore.list.length) {
     await dsStore.fetchAll();
   }
   // 默认选中本地默认库
-  const local = dsStore.list.find(d => d.is_local);
-  if (local) {
-    selectedDatasourceId.value = local.id;
-    chatStore.activeDatasourceId = local.id;
+  if (!chatStore.activeDatasourceId) {
+    const local = dsStore.list.find(d => d.is_local);
+    if (local) {
+      chatStore.activeDatasourceId = local.id;
+    }
   }
 });
 
 // 当数据源列表变化时（上传文件后），同步默认选中
 watch(() => dsStore.list.length, () => {
-  if (!selectedDatasourceId.value) {
+  if (!chatStore.activeDatasourceId) {
     const local = dsStore.list.find(d => d.is_local);
     if (local) {
-      selectedDatasourceId.value = local.id;
       chatStore.activeDatasourceId = local.id;
     }
   }
@@ -129,10 +128,16 @@ function handleSubmit(e?: Event) {
   transition: border-color 0.15s, color 0.15s;
 }
 
-.ds-select:hover,
-.ds-select:focus {
+.ds-select:hover:not(:disabled),
+.ds-select:focus:not(:disabled) {
   border-color: var(--accent);
   color: var(--text-primary);
+}
+
+.ds-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background: var(--bg-primary);
 }
 
 .input-container {

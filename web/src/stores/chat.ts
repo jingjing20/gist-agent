@@ -22,6 +22,7 @@ export const useChatStore = defineStore('chat', () => {
 		conversations.value = data.map((c: any) => ({
 			id: c.id,
 			title: c.title,
+			datasource_id: c.datasource_id,
 			messages: [],
 			createdAt: new Date(c.created_at).getTime(),
 			updatedAt: new Date(c.updated_at).getTime(),
@@ -52,6 +53,7 @@ export const useChatStore = defineStore('chat', () => {
 		const conv: Conversation = {
 			id: data.id,
 			title: data.title,
+			datasource_id: data.datasource_id,
 			messages: [],
 			createdAt: new Date(data.created_at).getTime(),
 			updatedAt: new Date(data.updated_at).getTime(),
@@ -84,6 +86,9 @@ export const useChatStore = defineStore('chat', () => {
 		activeConversationId.value = id;
 		router.replace(`/${id}`);
 		const conv = conversations.value.find((c) => c.id === id);
+		if (conv?.datasource_id) {
+			activeDatasourceId.value = conv.datasource_id;
+		}
 		if (conv && conv.messages.length === 0) {
 			await fetchMessages(id);
 		}

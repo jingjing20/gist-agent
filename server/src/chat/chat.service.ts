@@ -37,7 +37,7 @@ export class ChatService {
 
 		if (conv.title === '新对话') {
 			const title = message.slice(0, 30) + (message.length > 30 ? '...' : '');
-			await this.conversationService.updateTitle(conversationId, title);
+			await this.conversationService.updateTitle(conversationId, title, datasourceId ?? null);
 		}
 
 		const emitter = new StreamEmitter(res);

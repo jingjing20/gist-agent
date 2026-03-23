@@ -6,6 +6,7 @@ import { RowDataPacket } from 'mysql2/promise';
 export interface Conversation {
 	id: string;
 	title: string;
+	datasource_id: number | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -33,6 +34,7 @@ export class ConversationService implements OnModuleInit {
 			CREATE TABLE IF NOT EXISTS conversation (
 				id VARCHAR(36) PRIMARY KEY,
 				user_id INT NULL COMMENT 'NULL=迁移遗留，不展示',
+				datasource_id INT NULL COMMENT '关联的数据源',
 				title VARCHAR(200) NOT NULL DEFAULT '新对话',
 				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -46,6 +48,15 @@ export class ConversationService implements OnModuleInit {
 			);
 			if (!cols?.length) {
 				await this.db.execute('ALTER TABLE conversation ADD COLUMN user_id INT NULL AFTER id');
+			}
+		} catch { /* ignore */ }
+
+		try {
+			const [cols] = await this.db.query<any[]>(
+				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'datasource_id'",
+			);
+			if (!cols?.length) {
+				await this.db.execute('ALTER TABLE conversation ADD COLUMN datasource_id INT NULL AFTER user_id');
 			}
 		} catch { /* ignore */ }
 
@@ -120,10 +131,10 @@ export class ConversationService implements OnModuleInit {
 		return (await this.findOne(id, userId))!;
 	}
 
-	async updateTitle(id: string, title: string): Promise<void> {
+	async updateTitle(id: string, title: string, datasourceId: number | null = null): Promise<void> {
 		await this.db.execute(
-			'UPDATE conversation SET title = ? WHERE id = ?',
-			[title, id],
+			'UPDATE conversation SET title = ?, datasource_id = ? WHERE id = ?',
+			[title, datasourceId, id],
 		);
 	}
 

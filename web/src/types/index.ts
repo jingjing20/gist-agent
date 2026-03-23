@@ -41,6 +41,7 @@ export interface ChatMessage {
 export interface Conversation {
 	id: string;
 	title: string;
+	datasource_id?: number | null;
 	messages: ChatMessage[];
 	createdAt: number;
 	updatedAt: number;
