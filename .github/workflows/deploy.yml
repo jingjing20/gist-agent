@@ -6,8 +6,39 @@ on:
   workflow_dispatch:
 
 jobs:
+  # ========================
+  # 1️⃣ 构建 & 校验阶段（CI）
+  # ========================
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Install deps
+        run: pnpm install
+
+      - name: Type check & build
+        run: |
+          set -e
+          pnpm --filter web build
+
+  # ========================
+  # 2️⃣ 部署阶段（CD）
+  # ========================
   deploy:
     runs-on: ubuntu-latest
+    needs: build   # 🚨 关键：build 成功才会 deploy
+
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
@@ -17,7 +48,18 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: ${{ secrets.SERVER_PORT || '22' }}
           script: |
+            set -e
+
             cd ${{ secrets.DEPLOY_PATH || '/home/ai-data-analysis' }}
+
+            echo "📦 Pull latest code"
             git pull
-            docker compose up -d --build
+
+            echo "🐳 Build docker images"
+            docker compose build
+
+            echo "🚀 Start services"
+            docker compose up -d
+
+            echo "🧩 Run init job"
             docker compose --profile tools run --rm --build init-db
