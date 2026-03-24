@@ -18,7 +18,7 @@
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{
+defineProps<{
   modelValue: boolean;
   title: string;
   desc: string;
