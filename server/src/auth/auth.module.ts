@@ -4,6 +4,7 @@ import { PassportModule } from '@nestjs/passport';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
+import { MailerService } from './mailer.service';
 import { DatabaseModule } from '../database/database.module';
 
 @Module({
@@ -15,7 +16,7 @@ import { DatabaseModule } from '../database/database.module';
 			signOptions: { expiresIn: '7d' },
 		}),
 	],
-	providers: [AuthService, JwtStrategy],
+	providers: [AuthService, JwtStrategy, MailerService],
 	controllers: [AuthController],
 	exports: [AuthService],
 })

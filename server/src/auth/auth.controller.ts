@@ -35,8 +35,26 @@ export class AuthController {
 		return this.authService.login(email, password);
 	}
 
+	@Public()
+	@Post('forgot-password')
+	async forgotPassword(@Body() body: { email: string; origin?: string }) {
+		if (!body.email?.trim()) {
+			throw new BadRequestException('邮箱不能为空');
+		}
+		await this.authService.requestReset(body.email, body.origin);
+		return { message: '若该邮箱已注册，重置链接已发送，请查收邮件' };
+	}
+
+	@Public()
+	@Post('reset-password')
+	async resetPassword(@Body() body: { token: string; password: string }) {
+		await this.authService.resetPassword(body.token, body.password);
+		return { message: '密码已重置，请重新登录' };
+	}
+
 	@Post('me')
 	async me(@CurrentUser() user: User) {
 		return user;
 	}
 }
+

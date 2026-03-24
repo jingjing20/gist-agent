@@ -146,6 +146,24 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 		return result;
 	}
 
+	/**
+	 * 在本地默认库执行事务
+	 */
+	async withTransaction<T>(worker: (conn: mysql.PoolConnection) => Promise<T>): Promise<T> {
+		const conn = await this.localPool.getConnection();
+		await conn.beginTransaction();
+		try {
+			const result = await worker(conn);
+			await conn.commit();
+			return result;
+		} catch (err) {
+			await conn.rollback();
+			throw err;
+		} finally {
+			conn.release();
+		}
+	}
+
 	// 专门处理极速批量写入的 TSV/CSV 数据流
 	async executeLoad(sql: string, streamFactory: (path: string) => NodeJS.ReadableStream): Promise<ResultSetHeader> {
 		const [result] = await (this.localPool.query as any)({

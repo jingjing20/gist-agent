@@ -93,6 +93,20 @@ async function initDB() {
     ) COMMENT='数据源推荐问题缓存';
   `);
 
+	// password_reset_token 表：密码重置 Token
+	await conn.query(`
+    CREATE TABLE IF NOT EXISTS password_reset_token (
+      id         INT PRIMARY KEY AUTO_INCREMENT,
+      user_id    INT NOT NULL,
+      token      VARCHAR(64) NOT NULL UNIQUE COMMENT 'crypto.randomBytes(32) hex',
+      expires_at DATETIME NOT NULL COMMENT '15 分钟有效',
+      used_at    DATETIME NULL COMMENT '非 NULL 表示已使用',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE,
+      INDEX idx_token (token)
+    ) COMMENT='密码重置 Token';
+  `);
+
 	// 插入本地默认数据源（幂等：只在不存在时插入）
 	await conn.query(`
     INSERT INTO data_source (name, host, port, user, password, database_name, is_local, description)

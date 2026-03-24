@@ -1,26 +1,25 @@
 <template>
   <div class="auth-page">
     <div class="auth-card">
-      <h1>登录</h1>
-      <form @submit.prevent="handleLogin">
-        <div class="form-row">
-          <label>邮箱</label>
-          <input v-model="email" type="email" placeholder="you@example.com" required />
-        </div>
-        <div class="form-row">
-          <label>密码</label>
-          <input v-model="password" type="password" placeholder="至少 6 位" required />
-        </div>
-        <div v-if="error" class="form-error">{{ error }}</div>
-        <button type="submit" class="btn-primary" :disabled="loading">
-          {{ loading ? '登录中...' : '登录' }}
-        </button>
-      </form>
+      <h1>忘记密码</h1>
+      <template v-if="!sent">
+        <form @submit.prevent="handleSubmit">
+          <div class="form-row">
+            <label>注册邮箱</label>
+            <input v-model="email" type="email" placeholder="you@example.com" required />
+          </div>
+          <div v-if="error" class="form-error">{{ error }}</div>
+          <button type="submit" class="btn-primary" :disabled="loading">
+            {{ loading ? '发送中...' : '发送重置链接' }}
+          </button>
+        </form>
+      </template>
+      <template v-else>
+        <p class="sent-tip">若该邮箱已注册，重置链接已发送，请查收邮件。</p>
+        <p class="sent-tip secondary">链接 15 分钟内有效。</p>
+      </template>
       <p class="auth-footer">
-        还没有账号？<router-link to="/register">注册</router-link>
-      </p>
-      <p class="auth-footer">
-        <router-link to="/forgot-password">忘记密码？</router-link>
+        <router-link to="/login">返回登录</router-link>
       </p>
     </div>
   </div>
@@ -28,18 +27,15 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
 
-const router = useRouter();
-const authStore = useAuthStore();
+const API_BASE = '/api';
 
 const email = ref('');
-const password = ref('');
 const error = ref('');
 const loading = ref(false);
+const sent = ref(false);
 
-async function handleLogin() {
+async function handleSubmit() {
   error.value = '';
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
     error.value = '请输入正确的邮箱格式';
@@ -47,10 +43,19 @@ async function handleLogin() {
   }
   loading.value = true;
   try {
-    await authStore.login(email.value, password.value);
-    router.replace('/');
+    const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: email.value,
+        origin: window.location.origin
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || '请求失败');
+    sent.value = true;
   } catch (e: any) {
-    error.value = e.message || '登录失败';
+    error.value = e.message || '请求失败，请稍后重试';
   } finally {
     loading.value = false;
   }
@@ -134,6 +139,19 @@ async function handleLogin() {
 .btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.sent-tip {
+  font-size: 14px;
+  color: var(--text-primary);
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+.sent-tip.secondary {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 0;
 }
 
 .auth-footer {

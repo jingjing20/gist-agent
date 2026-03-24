@@ -43,6 +43,10 @@ const loading = ref(false);
 
 async function handleRegister() {
   error.value = '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
+    error.value = '请输入正确的邮箱格式';
+    return;
+  }
   loading.value = true;
   try {
     await authStore.register(email.value, password.value, name.value || undefined);
