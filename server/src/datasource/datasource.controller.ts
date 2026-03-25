@@ -1,5 +1,5 @@
 import {
-	Controller, Get, Post, Delete, Param, Body, ParseIntPipe,
+	Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe,
 	UseInterceptors, UploadedFile, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -159,7 +159,8 @@ export class DataSourceController {
 		@CurrentUser() user: User,
 		@Param('tableId', ParseIntPipe) tableId: number,
 	) {
-		await this.datasourceService.deleteUploadedTable(tableId, user.id);
+		const dsId = await this.datasourceService.deleteUploadedTable(tableId, user.id);
+		if (dsId) this.suggestionService.invalidateAndRegenerate(dsId, user.id);
 		return { ok: true };
 	}
 
@@ -185,9 +186,7 @@ export class DataSourceController {
 		description?: string;
 	}) {
 		if (!body.name?.trim()) throw new BadRequestException('请提供数据源名称');
-		const created = await this.datasourceService.create(user.id, body);
-		this.suggestionService.triggerAsync(created.id, user.id);
-		return created;
+		return this.datasourceService.create(user.id, body);
 	}
 
 	@Post(':id/grant')
@@ -215,6 +214,18 @@ export class DataSourceController {
 	@Get(':id/permissions')
 	listPermissions(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
 		return this.datasourceService.listPermissionUsers(id, user.id);
+	}
+
+	@Patch(':id')
+	async update(
+		@CurrentUser() user: User,
+		@Param('id', ParseIntPipe) id: number,
+		@Body() body: { name?: string; description?: string },
+	) {
+		if (body.name !== undefined && !body.name.trim()) {
+			throw new BadRequestException('数据源名称不能为空');
+		}
+		return this.datasourceService.update(id, user.id, body);
 	}
 
 	@Delete(':id')

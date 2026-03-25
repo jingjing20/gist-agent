@@ -22,7 +22,11 @@
       </div>
     </template>
     <template v-else>
-      <ChatEmptyState @select="handleExample" />
+      <ChatEmptyState 
+        :sidebar-collapsed="sidebarCollapsed" 
+        @select="handleExample" 
+        @open-sidebar="emit('open-sidebar')" 
+      />
     </template>
     <ChatInput />
   </div>

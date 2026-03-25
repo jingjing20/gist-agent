@@ -1,12 +1,17 @@
 <template>
   <div class="empty-state-container no-scrollbar">
+    <button v-if="sidebarCollapsed" class="expand-sidebar-btn" @click="emit('open-sidebar')" title="展开侧边栏">
+      <i class="fas fa-angle-double-right"></i>
+    </button>
     <div class="empty-state-content">
       <div class="hero-section">
         <div class="brand-icon">
           <i class="fas fa-chart-line"></i>
         </div>
-        <h1 class="hero-title">DataAgent</h1>
-        <p class="hero-subtitle">基于 AI 的智能数据分析助手，连接你的数据并开始探索</p>
+        <div class="hero-text-content">
+          <h1 class="hero-title">DataAgent</h1>
+          <p class="hero-subtitle">基于 AI 的智能数据分析助手，带你开启数据分析新体验</p>
+        </div>
       </div>
 
       <!-- 数据源选择区域 -->
@@ -74,7 +79,14 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useChatStore } from '../stores/chat';
 import { useDataSourceStore } from '../stores/datasource';
 
-const emit = defineEmits<{ (e: 'select', query: string): void }>();
+defineProps<{
+  sidebarCollapsed: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: 'select', query: string): void;
+  (e: 'open-sidebar'): void;
+}>();
 
 const chatStore = useChatStore();
 const dsStore = useDataSourceStore();
@@ -138,7 +150,25 @@ watch(
   flex-direction: column;
   align-items: center;
   overflow-y: auto;
-  padding: 40px 24px; /* Reduced from 80px */
+  padding: 80px 24px;
+  position: relative;
+}
+
+.expand-sidebar-btn {
+  position: absolute;
+  top: 16px;
+  left: 24px;
+  background: none;
+  border: none;
+  color: var(--da-text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 4px;
+}
+
+.expand-sidebar-btn:hover {
+  color: #fff;
 }
 
 .empty-state-content {
@@ -146,45 +176,52 @@ watch(
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: 32px; /* Reduced from 48px */
+  gap: 32px;
 }
 
 /* Hero Section */
 .hero-section {
-  text-align: center;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  gap: 24px;
+  text-align: left;
 }
 
 .brand-icon {
-  width: 64px; /* Reduced from 80px */
-  height: 64px;
+  width: 72px;
+  height: 72px;
   background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
-  border-radius: 16px;
+  border-radius: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 32px;
   color: #fff;
-  margin-bottom: 16px;
-  box-shadow: 0 8px 32px rgba(14, 165, 233, 0.3);
+  flex-shrink: 0;
+  box-shadow: 0 12px 32px rgba(14, 165, 233, 0.3);
+}
+
+.hero-text-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .hero-title {
-  font-size: 28px; /* Reduced from 32px */
-  font-weight: 800;
+  font-size: 32px;
+  font-weight: 850;
   color: #fff;
-  margin: 0 0 8px;
-  letter-spacing: -0.02em;
+  margin: 0;
+  letter-spacing: -0.03em;
 }
 
 .hero-subtitle {
-  font-size: 14px; /* Reduced from 16px */
+  font-size: 14px;
   color: var(--da-text-muted);
   max-width: 500px;
   line-height: 1.6;
   margin: 0;
+  opacity: 0.9;
 }
 
 .section-label {

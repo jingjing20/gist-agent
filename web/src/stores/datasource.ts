@@ -57,6 +57,24 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		return created;
 	}
 
+	async function update(id: number, body: {
+		name?: string;
+		description?: string;
+	}): Promise<DataSource> {
+		const res = await apiFetch(`/datasources/${id}`, {
+			method: 'PATCH',
+			body: JSON.stringify(body),
+		});
+		if (!res.ok) {
+			const err = await res.json();
+			throw new Error(err.message || '更新失败');
+		}
+		const updated: DataSource = await res.json();
+		const idx = list.value.findIndex(d => d.id === id);
+		if (idx !== -1) list.value[idx] = updated;
+		return updated;
+	}
+
 	async function remove(id: number) {
 		const res = await apiFetch(`/datasources/${id}`, { method: 'DELETE' });
 		if (!res.ok) {
@@ -151,5 +169,5 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		return res.json();
 	}
 
-	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions, fetchSchema, clear };
+	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, create, update, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions, fetchSchema, clear };
 });

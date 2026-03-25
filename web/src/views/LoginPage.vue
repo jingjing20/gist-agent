@@ -1,27 +1,49 @@
 <template>
   <div class="auth-page">
+    <div class="mesh-bg"></div>
     <div class="auth-card">
-      <h1>登录</h1>
-      <form @submit.prevent="handleLogin">
+      <div class="brand-header">
+        <div class="brand-icon">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <h1>欢迎回来</h1>
+        <p>登录您的 DataAgent 账号</p>
+      </div>
+
+      <form @submit.prevent="handleLogin" class="auth-form">
         <div class="form-row">
-          <label>邮箱</label>
-          <input v-model="email" type="email" placeholder="you@example.com" required />
+          <label>邮箱地址</label>
+          <div class="input-wrapper">
+            <i class="fas fa-envelope"></i>
+            <input v-model="email" type="email" placeholder="name@company.com" required />
+          </div>
         </div>
         <div class="form-row">
           <label>密码</label>
-          <input v-model="password" type="password" placeholder="至少 6 位" required />
+          <div class="input-wrapper">
+            <i class="fas fa-lock"></i>
+            <input v-model="password" type="password" placeholder="••••••••" required />
+          </div>
         </div>
-        <div v-if="error" class="form-error">{{ error }}</div>
+
+        <div class="form-utils">
+          <router-link to="/forgot-password" class="forgot-link">忘记密码？</router-link>
+        </div>
+
+        <div v-if="error" class="form-error">
+          <i class="fas fa-exclamation-circle"></i>
+          {{ error }}
+        </div>
+
         <button type="submit" class="btn-primary" :disabled="loading">
-          {{ loading ? '登录中...' : '登录' }}
+          <span v-if="!loading">立即登录</span>
+          <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 处理中...</span>
         </button>
       </form>
-      <p class="auth-footer">
-        还没有账号？<router-link to="/register">注册</router-link>
-      </p>
-      <p class="auth-footer">
-        <router-link to="/forgot-password">忘记密码？</router-link>
-      </p>
+
+      <div class="auth-footer">
+        还没有账号？<router-link to="/register">免费注册</router-link>
+      </div>
     </div>
   </div>
 </template>
@@ -63,92 +85,187 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-primary);
+  background: var(--da-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.mesh-bg {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08), transparent 25%),
+              radial-gradient(circle at 20% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+  animation: mesh-rotate 30s linear infinite;
+  z-index: 1;
+}
+
+@keyframes mesh-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .auth-card {
-  width: 360px;
-  padding: 32px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  width: 420px;
+  padding: 40px;
+  background: var(--da-panel);
+  border: 1px solid var(--da-border);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  position: relative;
+  z-index: 2;
+  backdrop-filter: blur(10px);
 }
 
-.auth-card h1 {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 24px;
+.brand-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.brand-icon {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: #fff;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.2);
+}
+
+.brand-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+  letter-spacing: -0.02em;
+}
+
+.brand-header p {
+  font-size: 14px;
+  color: var(--da-text-muted);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .form-row {
-  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .form-row label {
-  display: block;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--da-text-muted);
 }
 
-.form-row input {
-  width: 100%;
-  padding: 10px 12px;
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-wrapper i {
+  position: absolute;
+  left: 14px;
+  color: var(--da-text-muted);
   font-size: 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  border-radius: 8px;
-  box-sizing: border-box;
 }
 
-.form-row input:focus {
+.input-wrapper input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  background: var(--da-card);
+  border: 1px solid var(--da-border);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.input-wrapper input:focus {
   outline: none;
-  border-color: var(--accent);
+  border-color: var(--da-primary);
+  background: rgba(14, 165, 233, 0.05);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+}
+
+.form-utils {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.forgot-link {
+  font-size: 13px;
+  color: var(--da-primary);
+  text-decoration: none;
+  font-weight: 500;
 }
 
 .form-error {
-  font-size: 12px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
   color: #f87171;
-  margin-bottom: 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn-primary {
   width: 100%;
-  padding: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  background: var(--accent);
+  padding: 14px;
+  background: var(--da-primary);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.2s;
+  margin-top: 8px;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--da-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
 .btn-primary:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
 .auth-footer {
-  margin-top: 20px;
-  font-size: 13px;
-  color: var(--text-secondary);
+  margin-top: 32px;
   text-align: center;
+  font-size: 14px;
+  color: var(--da-text-muted);
 }
 
 .auth-footer a {
-  color: var(--accent);
+  color: var(--da-primary);
   text-decoration: none;
+  font-weight: 600;
 }
 
-.auth-footer a:hover {
-  text-decoration: underline;
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 </style>

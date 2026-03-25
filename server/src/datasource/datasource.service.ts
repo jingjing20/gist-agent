@@ -82,6 +82,35 @@ export class DataSourceService {
 		return this.findOne(result.insertId, userId);
 	}
 
+	async update(id: number, userId: number, body: {
+		name?: string;
+		description?: string;
+	}): Promise<DataSource> {
+		const ds = await this.findOne(id, userId);
+		if (ds.created_by !== userId) throw new ForbiddenException('仅创建人可编辑数据源信息');
+
+		const fields: string[] = [];
+		const values: any[] = [];
+		if (body.name !== undefined) {
+			fields.push('name = ?');
+			values.push(body.name);
+		}
+		if (body.description !== undefined) {
+			fields.push('description = ?');
+			values.push(body.description ?? null);
+		}
+
+		if (fields.length > 0) {
+			values.push(id);
+			await this.db.execute(
+				`UPDATE data_source SET ${fields.join(', ')} WHERE id = ?`,
+				values,
+			);
+		}
+
+		return this.findOne(id, userId);
+	}
+
 	async remove(id: number, userId: number): Promise<void> {
 		const rows = await this.db.query<RowDataPacket[]>(
 			'SELECT is_local, created_by FROM data_source WHERE id = ?',
@@ -101,6 +130,7 @@ export class DataSourceService {
 		}
 
 		await this.db.execute('DELETE FROM data_source WHERE id = ?', [id]);
+		this.schemaService.clearUserCache(id, userId);
 	}
 
 	async uploadTable(
@@ -192,7 +222,7 @@ export class DataSourceService {
 		return rows as unknown as UploadedTable[];
 	}
 
-	async deleteUploadedTable(tableId: number, userId: number): Promise<void> {
+	async deleteUploadedTable(tableId: number, userId: number): Promise<number> {
 		const rows = await this.db.query<RowDataPacket[]>(
 			'SELECT table_name, user_id, datasource_id FROM uploaded_table WHERE id = ?',
 			[tableId],
@@ -203,8 +233,8 @@ export class DataSourceService {
 
 		await this.db.execute(`DROP TABLE IF EXISTS \`${row.table_name}\``);
 		await this.db.execute('DELETE FROM uploaded_table WHERE id = ?', [tableId]);
-		
 		this.schemaService.clearUserCache(row.datasource_id ?? null, userId);
+		return row.datasource_id;
 	}
 
 	async getUploadedTableNames(datasourceId: number, userId: number): Promise<string[]> {

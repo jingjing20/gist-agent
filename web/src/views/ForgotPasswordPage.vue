@@ -1,26 +1,49 @@
 <template>
   <div class="auth-page">
+    <div class="mesh-bg"></div>
     <div class="auth-card">
-      <h1>忘记密码</h1>
+      <div class="brand-header">
+        <div class="brand-icon">
+          <i class="fas fa-key"></i>
+        </div>
+        <h1>找回密码</h1>
+        <p>我们将向您的邮箱发送重置链接</p>
+      </div>
+
       <template v-if="!sent">
-        <form @submit.prevent="handleSubmit">
+        <form @submit.prevent="handleSubmit" class="auth-form">
           <div class="form-row">
             <label>注册邮箱</label>
-            <input v-model="email" type="email" placeholder="you@example.com" required />
+            <div class="input-wrapper">
+              <i class="fas fa-envelope"></i>
+              <input v-model="email" type="email" placeholder="name@company.com" required />
+            </div>
           </div>
-          <div v-if="error" class="form-error">{{ error }}</div>
+
+          <div v-if="error" class="form-error">
+            <i class="fas fa-exclamation-circle"></i>
+            {{ error }}
+          </div>
+
           <button type="submit" class="btn-primary" :disabled="loading">
-            {{ loading ? '发送中...' : '发送重置链接' }}
+            <span v-if="!loading">发送重置链接</span>
+            <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 发送中...</span>
           </button>
         </form>
       </template>
       <template v-else>
-        <p class="sent-tip">若该邮箱已注册，重置链接已发送，请查收邮件。</p>
-        <p class="sent-tip secondary">链接 15 分钟内有效。</p>
+        <div class="success-state">
+          <div class="success-icon">
+            <i class="fas fa-check-circle"></i>
+          </div>
+          <p class="sent-tip">若该邮箱已注册，重置链接已发送，请查收邮件。</p>
+          <p class="sent-tip secondary">链接 15 分钟内有效。</p>
+        </div>
       </template>
-      <p class="auth-footer">
+
+      <div class="auth-footer">
         <router-link to="/login">返回登录</router-link>
-      </p>
+      </div>
     </div>
   </div>
 </template>
@@ -68,105 +91,198 @@ async function handleSubmit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--bg-primary);
+  background: var(--da-bg);
+  position: relative;
+  overflow: hidden;
+}
+
+.mesh-bg {
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(14, 165, 233, 0.08), transparent 25%),
+              radial-gradient(circle at 20% 30%, rgba(139, 92, 246, 0.08), transparent 25%);
+  animation: mesh-rotate 30s linear infinite;
+  z-index: 1;
+}
+
+@keyframes mesh-rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 .auth-card {
-  width: 360px;
-  padding: 32px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 16px;
+  width: 420px;
+  padding: 40px;
+  background: var(--da-panel);
+  border: 1px solid var(--da-border);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  position: relative;
+  z-index: 2;
+  backdrop-filter: blur(10px);
 }
 
-.auth-card h1 {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 24px;
+.brand-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.brand-icon {
+  width: 56px;
+  height: 56px;
+  background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: #fff;
+  margin: 0 auto 16px;
+  box-shadow: 0 8px 16px rgba(14, 165, 233, 0.2);
+}
+
+.brand-header h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+  letter-spacing: -0.02em;
+}
+
+.brand-header p {
+  font-size: 14px;
+  color: var(--da-text-muted);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-wrapper i {
+  position: absolute;
+  left: 14px;
+  color: var(--da-text-muted);
+  font-size: 14px;
+}
+
+.input-wrapper input {
+  width: 100%;
+  padding: 12px 14px 12px 40px;
+  background: var(--da-card);
+  border: 1px solid var(--da-border);
+  border-radius: 12px;
+  color: #fff;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.input-wrapper input:focus {
+  outline: none;
+  border-color: var(--da-primary);
+  background: rgba(14, 165, 233, 0.05);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
 }
 
 .form-row {
-  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .form-row label {
-  display: block;
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 6px;
-}
-
-.form-row input {
-  width: 100%;
-  padding: 10px 12px;
-  font-size: 14px;
-  background: var(--bg-primary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  border-radius: 8px;
-  box-sizing: border-box;
-}
-
-.form-row input:focus {
-  outline: none;
-  border-color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--da-text-muted);
 }
 
 .form-error {
-  font-size: 12px;
+  padding: 12px;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 10px;
   color: #f87171;
-  margin-bottom: 12px;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn-primary {
   width: 100%;
-  padding: 12px;
-  font-size: 14px;
-  font-weight: 500;
-  background: var(--accent);
+  padding: 14px;
+  background: var(--da-primary);
   color: #fff;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.2s;
+  margin-top: 8px;
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+  background: var(--da-primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
 .btn-primary:disabled {
-  opacity: 0.6;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
+.success-state {
+  text-align: center;
+  padding: 20px 0;
+}
+
+.success-icon {
+  font-size: 48px;
+  color: #10b981;
+  margin-bottom: 20px;
+}
+
 .sent-tip {
-  font-size: 14px;
-  color: var(--text-primary);
+  font-size: 15px;
+  color: var(--da-text-main);
   line-height: 1.6;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .sent-tip.secondary {
-  font-size: 12px;
-  color: var(--text-secondary);
-  margin-bottom: 0;
+  font-size: 13px;
+  color: var(--da-text-muted);
 }
 
 .auth-footer {
-  margin-top: 20px;
-  font-size: 13px;
-  color: var(--text-secondary);
+  margin-top: 32px;
   text-align: center;
+  font-size: 14px;
+  color: var(--da-text-muted);
 }
 
 .auth-footer a {
-  color: var(--accent);
+  color: var(--da-primary);
   text-decoration: none;
+  font-weight: 600;
 }
 
-.auth-footer a:hover {
-  text-decoration: underline;
+.loading-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 </style>

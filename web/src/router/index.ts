@@ -15,7 +15,7 @@ const router = createRouter({
       children: [
         { path: '', name: 'chat', component: () => import('../views/ChatView.vue') },
         { path: ':convId', name: 'chat-detail', component: () => import('../views/ChatView.vue') },
-        { path: 'datasource', name: 'datasource', component: () => import('../components/DataSourcePage.vue') },
+        { path: 'datasource', name: 'datasource', component: () => import('../views/DataSourceView.vue') },
       ],
     },
     { path: '/:pathMatch(.*)*', redirect: '/' },
