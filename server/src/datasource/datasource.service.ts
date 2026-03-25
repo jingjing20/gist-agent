@@ -100,7 +100,6 @@ export class DataSourceService {
 			await this.db.execute(`DROP TABLE IF EXISTS \`${(t as any).table_name}\``);
 		}
 
-		await this.db.releasePool(id);
 		await this.db.execute('DELETE FROM data_source WHERE id = ?', [id]);
 	}
 

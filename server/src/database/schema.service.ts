@@ -4,8 +4,6 @@ import { RowDataPacket } from 'mysql2/promise';
 
 const PRESET_BUSINESS_TABLES = ['platform_info', 'daily_active_stats', 'user_behavior_log'];
 
-type DsKind = 'default' | 'file-only' | 'external';
-
 interface SchemaCacheEntry {
 	prompt: string;
 	timestamp: number;
@@ -26,12 +24,19 @@ export class SchemaService {
 			return cached.prompt;
 		}
 
-		const kind = await this.getDsKind(datasourceId);
-		let prompt = '';
-		if (kind === 'default') prompt = await this.getLocalDatasourceSchema(datasourceId, userId);
-		else if (kind === 'file-only') prompt = await this.getFileOnlyDatasourceSchema(datasourceId!, userId);
-		else prompt = await this.getExternalDatasourceSchema(datasourceId!);
+		const isInternal = await this.isInternalDs(datasourceId);
+		const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
+		
+		const allowedTables = isInternal 
+			? [...PRESET_BUSINESS_TABLES, ...uploadedTableNames]
+			: uploadedTableNames;
 
+		if (allowedTables.length === 0) {
+			return isInternal ? '当前数据库中没有可用的业务表。' : '当前数据源中还没有上传的表。';
+		}
+
+		const prompt = await this.fetchSchemaPromptFromLocal(allowedTables, uploadedTableNames);
+		
 		if (prompt) {
 			this.cache.set(cacheKey, { prompt, timestamp: Date.now() });
 		}
@@ -43,40 +48,30 @@ export class SchemaService {
 		this.cache.delete(cacheKey);
 	}
 
-	async getAllowedTableNames(datasourceId: number | null, userId: number): Promise<string[] | 'ALL'> {
-		const kind = await this.getDsKind(datasourceId);
-		if (kind === 'external') return 'ALL';
-		
+	async getAllowedTableNames(datasourceId: number | null, userId: number): Promise<string[]> {
+		const isInternal = await this.isInternalDs(datasourceId);
 		const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
-		if (kind === 'file-only') return uploadedTableNames;
 		
-		return [...PRESET_BUSINESS_TABLES, ...uploadedTableNames];
+		if (isInternal) {
+			return [...PRESET_BUSINESS_TABLES, ...uploadedTableNames];
+		}
+		return uploadedTableNames;
 	}
 
-	private async getDsKind(datasourceId: number | null): Promise<DsKind> {
-		if (!datasourceId) return 'default';
+	private async isInternalDs(datasourceId: number | null): Promise<boolean> {
+		if (!datasourceId) return true;
 		const rows = await this.db.query<RowDataPacket[]>(
-			'SELECT is_local, host FROM data_source WHERE id = ?',
+			'SELECT is_local FROM data_source WHERE id = ?',
 			[datasourceId],
 		);
-		if (!rows.length) return 'default';
-		const row = rows[0] as any;
-		if (row.is_local) return 'default';
-		if (!row.host) return 'file-only';
-		return 'external';
+		if (!rows.length) return true;
+		return !!(rows[0] as any).is_local;
 	}
 
-	private async getLocalDatasourceSchema(datasourceId: number | null, userId: number): Promise<string> {
-		const dbNameRows = await this.db.query<any[]>('SELECT DATABASE() AS db_name', []);
+	private async fetchSchemaPromptFromLocal(allowedTables: string[], uploadedTableNames: string[]): Promise<string> {
+		const dbNameRows = await this.db.query<any[]>('SELECT DATABASE() AS db_name');
 		const dbName = dbNameRows[0]?.db_name;
 		if (!dbName) return '无法获取目标数据库名称。';
-
-		const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
-		const allowedTables = [...PRESET_BUSINESS_TABLES, ...uploadedTableNames];
-
-		if (allowedTables.length === 0) {
-			return '当前数据库中没有可用的业务表。';
-		}
 
 		const placeholders = allowedTables.map(() => '?').join(', ');
 		const sql = `
@@ -98,57 +93,6 @@ export class SchemaService {
 		return this.formatSchemaRows(rows, uploadedTableNames);
 	}
 
-	private async getFileOnlyDatasourceSchema(datasourceId: number, userId: number): Promise<string> {
-		const dbNameRows = await this.db.query<any[]>('SELECT DATABASE() AS db_name', []);
-		const dbName = dbNameRows[0]?.db_name;
-		if (!dbName) return '无法获取目标数据库名称。';
-
-		const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
-		if (!uploadedTableNames.length) return '当前数据源中还没有上传的表。';
-
-		const placeholders = uploadedTableNames.map(() => '?').join(', ');
-		const sql = `
-			SELECT
-				c.TABLE_NAME,
-				t.TABLE_COMMENT,
-				c.COLUMN_NAME,
-				c.COLUMN_TYPE,
-				c.COLUMN_COMMENT
-			FROM information_schema.COLUMNS c
-			JOIN information_schema.TABLES t
-			  ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA
-			WHERE c.TABLE_SCHEMA = ?
-			  AND c.TABLE_NAME IN (${placeholders})
-			ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
-		`;
-
-		const rows = await this.db.query<any[]>(sql, [dbName, ...uploadedTableNames]);
-		return this.formatSchemaRows(rows, uploadedTableNames);
-	}
-
-	private async getExternalDatasourceSchema(datasourceId: number): Promise<string> {
-		const dbNameRows = await this.db.query<any[]>('SELECT DATABASE() AS db_name', [], datasourceId);
-		const dbName = dbNameRows[0]?.db_name;
-		if (!dbName) return '无法获取目标数据库名称。';
-
-		const sql = `
-			SELECT
-				c.TABLE_NAME,
-				t.TABLE_COMMENT,
-				c.COLUMN_NAME,
-				c.COLUMN_TYPE,
-				c.COLUMN_COMMENT
-			FROM information_schema.COLUMNS c
-			JOIN information_schema.TABLES t
-			  ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA
-			WHERE c.TABLE_SCHEMA = ?
-			ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
-		`;
-
-		const rows = await this.db.query<any[]>(sql, [dbName], datasourceId);
-		return this.formatSchemaRows(rows, []);
-	}
-
 	private async getUserUploadedTableNames(datasourceId: number | null, userId: number): Promise<string[]> {
 		const actualDatasourceId = datasourceId ?? await this.getLocalDatasourceId();
 		if (!actualDatasourceId) return [];
@@ -163,7 +107,6 @@ export class SchemaService {
 	private async getLocalDatasourceId(): Promise<number | null> {
 		const rows = await this.db.query<RowDataPacket[]>(
 			'SELECT id FROM data_source WHERE is_local = 1 LIMIT 1',
-			[],
 		);
 		return rows.length > 0 ? (rows[0] as any).id : null;
 	}
