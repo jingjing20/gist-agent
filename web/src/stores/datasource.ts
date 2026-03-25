@@ -137,5 +137,13 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		}
 	}
 
-	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions };
+	function clear() {
+		list.value = [];
+		loading.value = false;
+		error.value = null;
+		suggestionsCache.value = {};
+		suggestionsLoading.value = {};
+	}
+
+	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions, clear };
 });

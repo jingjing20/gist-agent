@@ -1,6 +1,9 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
 
+import { useDataSourceStore } from './datasource';
+import { useChatStore } from './chat';
+
 const API_BASE = '/api';
 const TOKEN_KEY = 'auth_token';
 
@@ -64,6 +67,12 @@ export const useAuthStore = defineStore('auth', () => {
 		token.value = null;
 		user.value = null;
 		localStorage.removeItem(TOKEN_KEY);
+		try {
+			useDataSourceStore().clear();
+			useChatStore().clear();
+		} catch (e) {
+			console.error('Failed to clear stores on logout:', e);
+		}
 	}
 
 	function authHeaders(): Record<string, string> {

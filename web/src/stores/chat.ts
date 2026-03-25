@@ -245,6 +245,13 @@ export const useChatStore = defineStore('chat', () => {
 		abortController?.abort();
 	}
 
+	function clear() {
+		conversations.value = [];
+		activeConversationId.value = null;
+		activeDatasourceId.value = null;
+		isLoading.value = false;
+	}
+
 	return {
 		conversations,
 		activeConversationId,
@@ -259,5 +266,6 @@ export const useChatStore = defineStore('chat', () => {
 		startNewChat,
 		sendMessage,
 		abortStream,
+		clear,
 	};
 });
