@@ -163,7 +163,6 @@ onUnmounted(() => {
 
 <style scoped>
 .chart-block {
-  margin: 12px 0;
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;

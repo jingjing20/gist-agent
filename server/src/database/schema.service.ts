@@ -93,6 +93,60 @@ export class SchemaService {
 		return this.formatSchemaRows(rows, uploadedTableNames);
 	}
 
+	async getStructuredSchema(datasourceId: number | null, userId: number): Promise<any[]> {
+		const isInternal = await this.isInternalDs(datasourceId);
+		const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
+		
+		const allowedTables = isInternal 
+			? [...PRESET_BUSINESS_TABLES, ...uploadedTableNames]
+			: uploadedTableNames;
+
+		if (allowedTables.length === 0) return [];
+
+		const dbNameRows = await this.db.query<any[]>('SELECT DATABASE() AS db_name');
+		const dbName = dbNameRows[0]?.db_name;
+		if (!dbName) return [];
+
+		const placeholders = allowedTables.map(() => '?').join(', ');
+		const sql = `
+			SELECT
+				c.TABLE_NAME,
+				t.TABLE_COMMENT,
+				c.COLUMN_NAME,
+				c.COLUMN_TYPE,
+				c.COLUMN_COMMENT
+			FROM information_schema.COLUMNS c
+			JOIN information_schema.TABLES t
+			  ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA
+			WHERE c.TABLE_SCHEMA = ?
+			  AND c.TABLE_NAME IN (${placeholders})
+			ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
+		`;
+
+		const rows = await this.db.query<any[]>(sql, [dbName, ...allowedTables]);
+		const tablesMap = new Map<string, { tableName: string; display_name: string; isUploaded: boolean; fields: any[] }>();
+
+		for (const row of rows) {
+			const tableName = row.TABLE_NAME;
+			if (!tablesMap.has(tableName)) {
+				tablesMap.set(tableName, {
+					tableName,
+					display_name: row.TABLE_COMMENT || tableName,
+					isUploaded: uploadedTableNames.includes(tableName),
+					fields: [],
+				});
+			}
+			const tableInfo = tablesMap.get(tableName)!;
+			tableInfo.fields.push({
+				name: row.COLUMN_NAME,
+				type: row.COLUMN_TYPE,
+				comment: row.COLUMN_COMMENT || '',
+			});
+		}
+
+		return Array.from(tablesMap.values());
+	}
+
 	private async getUserUploadedTableNames(datasourceId: number | null, userId: number): Promise<string[]> {
 		const actualDatasourceId = datasourceId ?? await this.getLocalDatasourceId();
 		if (!actualDatasourceId) return [];

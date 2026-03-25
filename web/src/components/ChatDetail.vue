@@ -2,9 +2,17 @@
   <div class="chat-detail">
     <template v-if="store.activeConversation">
       <div class="chat-header">
-        <h2 class="chat-title">{{ store.activeConversation.title }}</h2>
+        <div class="header-left">
+          <button v-if="sidebarCollapsed" class="toolbar-btn" @click="emit('open-sidebar')" title="展开侧边栏">
+            <i class="fas fa-angle-double-right"></i>
+          </button>
+          <h2 class="chat-title">{{ store.activeConversation.title }}</h2>
+        </div>
+        <button v-if="!drawerOpen" class="toolbar-btn" @click="emit('toggle-drawer')" title="展开数据源上下文">
+          <i class="fas fa-database text-da-primary"></i>
+        </button>
       </div>
-      <div class="message-list" ref="messageListRef">
+      <div class="message-list no-scrollbar" ref="messageListRef">
         <ChatMessageItem
           v-for="msg in store.activeConversation.messages"
           :key="msg.id"
@@ -27,6 +35,16 @@ import ChatInput from './ChatInput.vue';
 import ChatEmptyState from './ChatEmptyState.vue';
 import ChatMessageItem from './ChatMessageItem.vue';
 import type { ChatMessage } from '../types';
+
+defineProps<{
+  sidebarCollapsed?: boolean;
+  drawerOpen?: boolean;
+}>();
+
+const emit = defineEmits<{
+  (e: 'toggle-drawer'): void;
+  (e: 'open-sidebar'): void;
+}>();
 
 const store = useChatStore();
 const messageListRef = ref<HTMLElement>();
@@ -71,25 +89,61 @@ async function handleExample(query: string) {
   flex-direction: column;
   height: 100%;
   overflow: hidden;
-  background: var(--bg-primary);
+  background: var(--da-bg);
+  min-width: 0; /* needed for flex children truncation */
 }
 
 .chat-header {
   padding: 16px 24px;
-  border-bottom: 1px solid var(--border);
+  height: 48px;
+  border-bottom: 1px solid rgba(51, 58, 77, 0.5); /* da-border/50 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   flex-shrink: 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  overflow: hidden;
 }
 
 .chat-title {
   font-size: 16px;
   font-weight: 600;
-  color: var(--text-primary);
+  color: #fff;
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.toolbar-btn {
+  background: none;
+  border: none;
+  color: var(--da-text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 4px;
+}
+.toolbar-btn:hover {
+  color: #fff;
 }
 
 .message-list {
   flex: 1;
   overflow-y: auto;
   padding: 24px;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 </style>

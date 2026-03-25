@@ -1,20 +1,22 @@
 <template>
-  <div v-if="modelValue" class="modal-overlay" @click.self="handleCancel">
-    <div class="modal delete-modal">
-      <h3>{{ title }}</h3>
-      <p class="modal-desc">{{ desc }}</p>
-      <div class="modal-footer">
-        <button class="btn btn-ghost" @click="handleCancel">取消</button>
-        <button 
-          class="btn btn-danger" 
-          @click="handleConfirm" 
-          :disabled="loading"
-        >
-          {{ loading ? (loadingText || '处理中...') : (confirmText || '确认') }}
-        </button>
+  <Teleport to="body">
+    <div v-if="modelValue" class="modal-overlay" @click.self="handleCancel">
+      <div class="modal delete-modal">
+        <h3 class="modal-title">{{ title }}</h3>
+        <p class="modal-desc">{{ desc }}</p>
+        <div class="modal-footer">
+          <button class="btn btn-ghost" @click="handleCancel">取消</button>
+          <button 
+            class="btn btn-danger" 
+            @click="handleConfirm" 
+            :disabled="loading"
+          >
+            {{ loading ? (loadingText || '处理中...') : (confirmText || '确认') }}
+          </button>
+        </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
@@ -47,81 +49,87 @@ function handleConfirm() {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 9999;
 }
 
 .modal {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
+  background: var(--da-panel);
+  border: 1px solid var(--da-border);
   border-radius: 16px;
   padding: 24px 28px;
   width: 400px;
   max-width: 90vw;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
+  animation: modal-pop 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.delete-modal {
-  width: 400px;
+@keyframes modal-pop {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-.modal h3 {
-  font-size: 17px;
-  font-weight: 600;
-  color: var(--text-primary);
+.modal-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
   margin-bottom: 12px;
   margin-top: 0;
 }
 
 .modal-desc {
   font-size: 14px;
-  color: var(--text-secondary);
-  line-height: 1.5;
+  color: var(--da-text-muted);
+  line-height: 1.6;
   margin-bottom: 24px;
 }
 
 .modal-footer {
   display: flex;
   justify-content: flex-end;
-  gap: 10px;
+  gap: 12px;
 }
 
 .btn {
-  font-size: 13px;
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 10px 20px;
+  border-radius: 10px;
   border: none;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
   font-family: inherit;
 }
 
 .btn-ghost {
-  background: transparent;
-  color: var(--text-secondary);
-  border: 1px solid var(--border);
+  background: var(--da-card);
+  color: var(--da-text-main);
+  border: 1px solid var(--da-border);
 }
 
 .btn-ghost:hover {
-  color: var(--text-primary);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--da-border);
+  color: #fff;
 }
 
 .btn-danger {
   background: #ef4444;
   color: white;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
 }
 
 .btn-danger:hover:not(:disabled) {
   background: #dc2626;
+  transform: translateY(-1px);
 }
 
 .btn-danger:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 </style>

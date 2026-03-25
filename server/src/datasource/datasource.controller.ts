@@ -169,6 +169,11 @@ export class DataSourceController {
 		return { questions };
 	}
 
+	@Get(':id/schema')
+	async getSchema(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
+		return this.datasourceService['schemaService'].getStructuredSchema(id, user.id);
+	}
+
 	@Get(':id')
 	findOne(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
 		return this.datasourceService.findOne(id, user.id);

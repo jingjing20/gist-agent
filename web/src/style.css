@@ -15,6 +15,19 @@
   --accent: #6366f1;
   --accent-hover: #5558e6;
   --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* DataAgent Theme Variables */
+  --da-bg: #171a25;
+  --da-panel: #1e2330;
+  --da-card: #252b3b;
+  --da-border: #333a4d;
+  --da-text-main: #e2e8f0;
+  --da-text-muted: #94a3b8;
+  --da-primary: #0ea5e9;
+  --da-primary-hover: #0284c7;
+  --da-gradient-start: #8b5cf6;
+  --da-gradient-end: #3b82f6;
+  --da-chart-bg: #1a1f2e;
 }
 
 *,
@@ -28,7 +41,7 @@
 html, body {
   height: 100%;
   font-family: var(--font-family);
-  background: var(--bg-primary);
+  background: var(--bg-primary); /* Keeps old default, ChatView will force its own bg */
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;

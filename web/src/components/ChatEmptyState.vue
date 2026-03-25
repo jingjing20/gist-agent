@@ -1,40 +1,76 @@
 <template>
-  <div class="empty-state">
-    <div class="empty-icon">
-      <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <polyline points="3,18 7,11 12,14 17,6 21,9" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        <circle cx="3" cy="18" r="1.8" fill="white"/>
-        <circle cx="7" cy="11" r="1.8" fill="white"/>
-        <circle cx="12" cy="14" r="1.8" fill="white"/>
-        <circle cx="17" cy="6" r="1.8" fill="white"/>
-        <circle cx="21" cy="9" r="1.8" fill="white"/>
-      </svg>
-    </div>
-    <h2>数据分析 Agent</h2>
-    <p>选择一个对话或新建对话开始分析</p>
-    <div class="active-ds-info" v-if="activeDatasourceName !== '未指定'">
-      当前数据源：<span class="highlight">{{ activeDatasourceName }}</span>
-    </div>
-    <div class="example-queries">
-      <template v-if="suggestionsLoading">
-        <div v-for="i in 3" :key="i" class="example-btn example-skeleton" />
-      </template>
-      <template v-else>
-        <button
-          v-for="q in exampleQueries"
-          :key="q"
-          class="example-btn"
-          @click="emit('select', q)"
+  <div class="empty-state-container no-scrollbar">
+    <div class="empty-state-content">
+      <div class="hero-section">
+        <div class="brand-icon">
+          <i class="fas fa-chart-line"></i>
+        </div>
+        <h1 class="hero-title">DataAgent</h1>
+        <p class="hero-subtitle">基于 AI 的智能数据分析助手，连接你的数据并开始探索</p>
+      </div>
+
+      <!-- 数据源选择区域 -->
+      <div class="ds-selection-box">
+        <div class="section-label">选择数据源</div>
+        <div
+          class="custom-ds-select"
+          :class="{ open: dsOpen }"
+          tabindex="0"
+          @blur="dsOpen = false"
         >
-          {{ q }}
-        </button>
-      </template>
+          <div class="ds-trigger" @click="dsOpen = !dsOpen">
+            <div class="ds-info">
+              <i v-if="activeDs?.is_local" class="fas fa-database ds-type-icon"></i>
+              <i v-else class="fas fa-file-csv ds-type-icon"></i>
+              <span class="ds-value">{{ activeDatasourceName }}</span>
+            </div>
+            <i class="fas fa-chevron-down chevron"></i>
+          </div>
+
+          <div v-if="dsOpen" class="ds-dropdown">
+            <div
+              v-for="ds in dsStore.list"
+              :key="ds.id"
+              class="ds-option"
+              :class="{ selected: ds.id === chatStore.activeDatasourceId }"
+              @mousedown.prevent="selectDs(ds.id)"
+            >
+              <div class="ds-option-label">
+                <i :class="ds.is_local ? 'fas fa-database' : 'fas fa-file-csv'"></i>
+                <span>{{ ds.name }}</span>
+              </div>
+              <span v-if="ds.is_local" class="local-badge">公共库</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 推荐查询区域 -->
+      <div class="suggestions-section">
+        <div class="section-label">您可能想问</div>
+        <div class="suggestions-grid">
+          <template v-if="suggestionsLoading">
+            <div v-for="i in 3" :key="i" class="suggestion-card skeleton" />
+          </template>
+          <template v-else>
+            <button
+              v-for="q in exampleQueries"
+              :key="q"
+              class="suggestion-card"
+              @click="emit('select', q)"
+            >
+              <span class="query-text">{{ q }}</span>
+              <i class="fas fa-arrow-right query-icon"></i>
+            </button>
+          </template>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useChatStore } from '../stores/chat';
 import { useDataSourceStore } from '../stores/datasource';
 
@@ -43,17 +79,20 @@ const emit = defineEmits<{ (e: 'select', query: string): void }>();
 const chatStore = useChatStore();
 const dsStore = useDataSourceStore();
 
+const dsOpen = ref(false);
+
 const DEFAULT_QUERIES = [
-  '帮我分析下近一月天河平台的日活趋势',
-  '对比三个平台最近一周的新增用户数',
+  '帮我分析下近一月平台的日活趋势',
+  '对比不同平台最近一周的新增用户数',
   '近 7 天用户行为类型分布是怎样的',
 ];
 
+const activeDs = computed(() => {
+  return dsStore.list.find(d => d.id === chatStore.activeDatasourceId);
+});
+
 const activeDatasourceName = computed(() => {
-  const id = chatStore.activeDatasourceId;
-  if (id == null) return '未指定';
-  const ds = dsStore.list.find((d: any) => d.id === id);
-  return ds ? ds.name : `未知 (ID: ${id})`;
+  return activeDs.value?.name || '选择数据源';
 });
 
 const suggestionsLoading = computed(() => {
@@ -69,6 +108,22 @@ const exampleQueries = computed(() => {
   return DEFAULT_QUERIES;
 });
 
+function selectDs(id: number) {
+  chatStore.activeDatasourceId = id;
+  dsOpen.value = false;
+}
+
+onMounted(async () => {
+  if (!dsStore.list.length) {
+    await dsStore.fetchAll();
+  }
+  // 如果没有激活的数据源，默认选中第一个本地库
+  if (!chatStore.activeDatasourceId) {
+    const local = dsStore.list.find(d => d.is_local === 1) || dsStore.list[0];
+    if (local) chatStore.activeDatasourceId = local.id;
+  }
+});
+
 watch(
   () => chatStore.activeDatasourceId,
   (id) => { if (id != null) dsStore.fetchSuggestions(id); },
@@ -77,100 +132,256 @@ watch(
 </script>
 
 <style scoped>
-.empty-state {
+.empty-state-container {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: var(--text-secondary);
+  overflow-y: auto;
+  padding: 40px 24px; /* Reduced from 80px */
 }
 
-.empty-icon {
-  width: 64px;
+.empty-state-content {
+  max-width: 800px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 32px; /* Reduced from 48px */
+}
+
+/* Hero Section */
+.hero-section {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.brand-icon {
+  width: 64px; /* Reduced from 80px */
   height: 64px;
+  background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
   border-radius: 16px;
-  background: linear-gradient(135deg, var(--accent), #8b5cf6);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 28px;
   color: #fff;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
+  box-shadow: 0 8px 32px rgba(14, 165, 233, 0.3);
 }
 
-.empty-state h2 {
-  font-size: 22px;
-  color: var(--text-primary);
+.hero-title {
+  font-size: 28px; /* Reduced from 32px */
+  font-weight: 800;
+  color: #fff;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.hero-subtitle {
+  font-size: 14px; /* Reduced from 16px */
+  color: var(--da-text-muted);
+  max-width: 500px;
+  line-height: 1.6;
   margin: 0;
+}
+
+.section-label {
+  font-size: 12px;
   font-weight: 600;
+  color: var(--da-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 12px;
 }
 
-.empty-state p {
-  margin: 0;
+/* Data Source Selection */
+.ds-selection-box {
+  background: var(--da-panel);
+  border: 1px solid var(--da-border);
+  border-radius: 16px;
+  padding: 16px 20px; /* Reduced from 24px */
+  display: flex;
+  flex-direction: column;
+}
+
+.custom-ds-select {
+  position: relative;
+  outline: none;
+}
+
+.ds-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: var(--da-card);
+  border: 1px solid var(--da-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.ds-trigger:hover {
+  border-color: var(--da-primary);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.ds-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ds-type-icon {
+  color: var(--da-primary);
+  font-size: 16px;
+}
+
+.ds-value {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--da-text-main);
+}
+
+.chevron {
+  font-size: 12px;
+  color: var(--da-text-muted);
+  transition: transform 0.2s;
+}
+
+.custom-ds-select.open .chevron {
+  transform: rotate(180deg);
+}
+
+.ds-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: var(--da-card);
+  border: 1px solid var(--da-border);
+  border-radius: 10px;
+  padding: 8px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  animation: slideDown 0.2s cubic-bezier(0, 0, 0.2, 1);
+}
+
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ds-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ds-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.ds-option.selected {
+  background: rgba(14, 165, 233, 0.1);
+  color: var(--da-primary);
+}
+
+.ds-option-label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   font-size: 14px;
-}
-
-.active-ds-info {
-  margin-top: 4px;
-  padding: 6px 16px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  font-size: 13px;
-  color: var(--text-secondary);
-}
-
-.active-ds-info .highlight {
-  color: var(--accent);
   font-weight: 500;
 }
 
-.example-queries {
-  margin-top: 24px;
+.local-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  background: rgba(14, 165, 233, 0.15);
+  color: var(--da-primary);
+  border-radius: 4px;
+}
+
+/* Suggestions Section */
+.suggestions-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.suggestion-card {
+  background: var(--da-card);
+  border: 1px solid var(--da-border);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
   display: flex;
   flex-direction: column;
+  justify-content: space-between;
   gap: 8px;
-  align-items: center;
+  height: 140px; /* Increased from 120px to fit 4 lines */
+  position: relative;
 }
 
-.example-btn {
-  background: var(--bg-secondary);
-  border: 1px solid var(--border);
-  color: var(--text-primary);
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.15s;
-  max-width: 400px;
-  width: 100%;
-  text-align: left;
+.suggestion-card:hover {
+  border-color: var(--da-primary);
+  background: rgba(14, 165, 233, 0.05);
+  transform: translateY(-2px);
 }
 
-.example-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--accent);
+.query-text {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--da-text-main);
+  font-weight: 400;
+  /* Line clamp for 4 lines */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.example-skeleton {
-  height: 40px;
-  cursor: default;
-  border-color: transparent;
-  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-hover) 50%, var(--bg-secondary) 75%);
+.query-icon {
+  font-size: 12px;
+  color: var(--da-text-muted);
+  transition: all 0.2s;
+  align-self: flex-end;
+}
+
+.suggestion-card:hover .query-icon {
+  transform: translateX(4px);
+  color: var(--da-primary);
+}
+
+/* Skeleton */
+.skeleton {
+  background: linear-gradient(90deg, var(--da-card) 25%, var(--da-border) 50%, var(--da-card) 75%);
   background-size: 200% 100%;
-  animation: skeleton-shimmer 1.4s infinite;
+  animation: shimmer 1.5s infinite;
+  border-color: transparent !important;
 }
 
-.example-skeleton:hover {
-  background: linear-gradient(90deg, var(--bg-secondary) 25%, var(--bg-hover) 50%, var(--bg-secondary) 75%);
-  background-size: 200% 100%;
-  border-color: transparent;
-}
-
-@keyframes skeleton-shimmer {
+@keyframes shimmer {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }
 </style>

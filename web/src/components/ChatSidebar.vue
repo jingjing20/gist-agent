@@ -1,13 +1,16 @@
 <template>
-  <aside class="sidebar">
+  <aside class="sidebar" :class="{ 'is-collapsed': collapsed }">
     <div class="sidebar-header">
       <button class="new-chat-btn" @click="store.startNewChat()">
-        <span class="icon">+</span>
-        新建对话
+        <i class="fas fa-plus"></i>
+        <span>新建对话</span>
+      </button>
+      <button class="collapse-btn" @click="emit('collapse')" title="收起侧边栏">
+        <i class="fas fa-angle-double-left"></i>
       </button>
     </div>
 
-    <div class="conversation-list">
+    <div class="conversation-list no-scrollbar">
       <div
         v-for="conv in store.conversations"
         :key="conv.id"
@@ -15,14 +18,17 @@
         :class="{ active: conv.id === store.activeConversationId }"
         @click="store.selectConversation(conv.id)"
       >
-        <span class="conv-title">{{ conv.title }}</span>
-        <button
-          class="delete-btn"
-          @click.stop="confirmDeleteConv(conv.id)"
-          title="删除"
-        >
-          x
-        </button>
+        <div class="active-indicator" v-if="conv.id === store.activeConversationId"></div>
+        <span class="conv-title" :title="conv.title">{{ conv.title }}</span>
+        <div class="conv-actions">
+          <button
+            class="action-btn delete-btn"
+            @click.stop="confirmDeleteConv(conv.id)"
+            title="删除"
+          >
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </div>
       </div>
 
       <div v-if="store.conversations.length === 0" class="empty-hint">
@@ -46,8 +52,15 @@ import { ref, onMounted } from 'vue';
 import { useChatStore } from '../stores/chat';
 import ConfirmModal from './ConfirmModal.vue';
 
-const store = useChatStore();
+defineProps<{
+  collapsed: boolean;
+}>();
 
+const emit = defineEmits<{
+  (e: 'collapse'): void;
+}>();
+
+const store = useChatStore();
 const deletingConvId = ref<string | null>(null);
 
 function confirmDeleteConv(id: string) {
@@ -71,111 +84,167 @@ onMounted(() => {
   width: 260px;
   min-width: 260px;
   height: 100%;
-  background: var(--bg-sidebar);
-  border-right: 1px solid var(--border);
+  background: var(--da-panel);
+  backdrop-filter: blur(12px);
+  border-right: 1px solid var(--da-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  flex-shrink: 0;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.is-collapsed {
+  margin-left: -260px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .sidebar-header {
-  padding: 20px 16px 16px;
-  border-bottom: 1px solid var(--border);
-}
-
-.logo {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin: 0 0 14px 0;
-  letter-spacing: -0.3px;
+  padding: 16px;
+  border-bottom: 1px solid var(--da-border);
+  display: flex;
+  gap: 10px;
 }
 
 .new-chat-btn {
-  width: 100%;
+  flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  padding: 10px 14px;
-  background: var(--accent);
-  color: #fff;
-  border: none;
-  border-radius: 8px;
+  padding: 10px 16px;
+  background: var(--da-card);
+  color: var(--da-text-main);
+  border: 1px solid var(--da-border);
+  border-radius: 10px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: all 0.2s;
 }
 
 .new-chat-btn:hover {
-  background: var(--accent-hover);
+  background: var(--da-border);
+  border-color: var(--da-primary);
 }
 
-.icon {
-  font-size: 18px;
-  font-weight: 300;
+.collapse-btn {
+  width: 42px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--da-card);
+  color: var(--da-text-muted);
+  border: 1px solid var(--da-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.collapse-btn:hover {
+  background: var(--da-border);
+  color: var(--da-text-main);
 }
 
 .conversation-list {
   flex: 1;
   overflow-y: auto;
-  padding: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .conversation-item {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 12px;
-  border-radius: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background 0.12s;
-  margin-bottom: 2px;
+  transition: all 0.2s;
+  background: transparent;
+  border: 1px solid transparent;
 }
 
 .conversation-item:hover {
-  background: var(--bg-hover);
+  background: rgba(255, 255, 255, 0.03);
+  border-color: var(--da-border);
 }
 
 .conversation-item.active {
-  background: var(--bg-active);
+  background: rgba(14, 165, 233, 0.1);
+  border-color: rgba(14, 165, 233, 0.2);
+}
+
+.active-indicator {
+  position: absolute;
+  left: 0;
+  top: 10px;
+  bottom: 10px;
+  width: 3px;
+  background: var(--da-primary);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 10px var(--da-primary);
 }
 
 .conv-title {
   font-size: 13px;
-  color: var(--text-primary);
+  color: var(--da-text-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   flex: 1;
   min-width: 0;
+  transition: color 0.2s;
+}
+
+.conversation-item:hover .conv-title {
+  color: var(--da-text-main);
+}
+
+.active .conv-title {
+  color: #fff;
+  font-weight: 500;
+}
+
+.conv-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .delete-btn {
-  display: none;
   background: none;
   border: none;
-  color: var(--text-secondary);
-  font-size: 14px;
+  color: var(--da-text-muted);
   cursor: pointer;
-  padding: 2px 6px;
+  opacity: 0;
+  transition: all 0.2s;
+  padding: 4px;
   border-radius: 4px;
-  flex-shrink: 0;
 }
 
 .conversation-item:hover .delete-btn {
-  display: block;
+  opacity: 1;
 }
 
 .delete-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 }
 
 .empty-hint {
   text-align: center;
-  color: var(--text-secondary);
+  color: var(--da-text-muted);
   font-size: 13px;
-  padding: 40px 0;
+  padding: 60px 0;
+  font-style: italic;
 }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>

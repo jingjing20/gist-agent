@@ -1,23 +1,28 @@
 <template>
   <div class="message" :class="msg.role">
     <div class="message-avatar">
-      {{ msg.role === 'user' ? 'U' : 'AI' }}
+      <i v-if="msg.role === 'user'" class="fas fa-user-circle"></i>
+      <div v-else class="ai-avatar">DA</div>
     </div>
     <div class="message-body">
       <template v-if="msg.role === 'user'">
-        <div class="user-text">{{ msg.content }}</div>
+        <div class="user-text-container">
+          <div class="user-text">{{ msg.content }}</div>
+        </div>
       </template>
       <template v-else>
-        <template v-for="(block, i) in msg.blocks" :key="i">
-          <component
-            :is="blockComponent(block.type)"
-            v-bind="blockProps(block, i)"
-          />
-        </template>
-        <div v-if="isStreaming" class="streaming-indicator">
-          <span class="dot"></span>
-          <span class="dot"></span>
-          <span class="dot"></span>
+        <div class="assistant-content">
+          <template v-for="(block, i) in msg.blocks" :key="i">
+            <component
+              :is="blockComponent(block.type)"
+              v-bind="blockProps(block, i)"
+            />
+          </template>
+          <div v-if="isStreaming" class="streaming-indicator">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
         </div>
       </template>
     </div>
@@ -77,32 +82,40 @@ function blockProps(block: MessageBlock, index: number = -1): Record<string, unk
 <style scoped>
 .message {
   display: flex;
-  gap: 14px;
-  margin-bottom: 24px;
-  max-width: 800px;
+  gap: 16px;
+  margin-bottom: 32px;
+  max-width: 900px;
   margin-left: auto;
   margin-right: auto;
+  width: 100%;
 }
 
 .message-avatar {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.message-avatar i {
+  font-size: 32px;
+  color: var(--da-text-muted);
+}
+
+.ai-avatar {
   width: 32px;
   height: 32px;
+  background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
   border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
-  font-weight: 700;
-  flex-shrink: 0;
+  font-weight: 800;
   color: #fff;
-}
-
-.message.user .message-avatar {
-  background: var(--accent);
-}
-
-.message.assistant .message-avatar {
-  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
 }
 
 .message-body {
@@ -110,29 +123,41 @@ function blockProps(block: MessageBlock, index: number = -1): Record<string, unk
   min-width: 0;
 }
 
+.user-text-container {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .user-text {
-  background: var(--bg-secondary);
-  padding: 10px 16px;
+  background: var(--da-panel);
+  padding: 12px 16px;
   border-radius: 12px;
   border-top-left-radius: 4px;
   font-size: 14px;
   line-height: 1.6;
-  color: var(--text-primary);
-  display: inline-block;
+  color: var(--da-text-main);
+  border: 1px solid var(--da-border);
+}
+
+.assistant-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .streaming-indicator {
   display: flex;
-  gap: 4px;
-  padding: 10px 0;
+  gap: 6px;
+  padding: 8px 0;
 }
 
 .streaming-indicator .dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--da-primary);
   animation: streaming-pulse 1.4s infinite ease-in-out;
+  opacity: 0.6;
 }
 
 .streaming-indicator .dot:nth-child(2) { animation-delay: 0.2s; }

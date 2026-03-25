@@ -145,5 +145,11 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		suggestionsLoading.value = {};
 	}
 
-	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions, clear };
+	async function fetchSchema(datasourceId: number): Promise<any[]> {
+		const res = await apiFetch(`/datasources/${datasourceId}/schema`);
+		if (!res.ok) throw new Error('获取数据源结构失败');
+		return res.json();
+	}
+
+	return { list, loading, error, suggestionsCache, suggestionsLoading, fetchAll, create, remove, grant, revoke, listPermissions, uploadTable, listTables, deleteTable, fetchSuggestions, fetchSchema, clear };
 });

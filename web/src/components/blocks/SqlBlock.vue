@@ -2,16 +2,20 @@
   <div class="sql-block">
     <div class="sql-header" @click="isExpanded = !isExpanded" title="点击展开/收起">
       <div class="sql-title">
-        <span class="toggle-icon">{{ isExpanded ? '▼' : '▶' }}</span>
-        <span class="sql-label">SQL</span>
-        <span v-if="!isExpanded" class="sql-hint">点击展开</span>
+        <i class="fas fa-terminal sql-type-icon"></i>
+        <span class="sql-label">SQL 查询语句</span>
+        <span v-if="!isExpanded" class="sql-hint">点击展开代码</span>
       </div>
-      <button v-show="isExpanded" class="copy-btn" @click.stop="copySQL" :title="copied ? '已复制' : '复制'">
-        {{ copied ? '已复制' : '复制' }}
-      </button>
+      <div class="header-actions">
+        <button v-show="isExpanded" class="action-btn" @click.stop="copySQL" :title="copied ? '已复制' : '复制'">
+          <i class="fas" :class="copied ? 'fa-check' : 'fa-copy'"></i>
+          {{ copied ? '已复制' : '复制' }}
+        </button>
+        <i class="fas fa-chevron-down toggle-icon" :class="{ 'is-flipped': isExpanded }"></i>
+      </div>
     </div>
     <div v-show="isExpanded" class="sql-content">
-      <pre class="sql-code"><code v-html="highlightedSQL"></code></pre>
+      <pre class="sql-code no-scrollbar"><code v-html="highlightedSQL"></code></pre>
     </div>
   </div>
 </template>
@@ -42,78 +46,101 @@ function copySQL() {
 
 <style scoped>
 .sql-block {
-  background: var(--bg-code);
-  border-radius: 8px;
+  background: var(--da-panel);
+  border-radius: 12px;
   overflow: hidden;
-  margin: 8px 0;
-  border: 1px solid var(--border);
+  border: 1px solid var(--da-border);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
 .sql-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 14px;
-  background: var(--bg-code-header);
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
   user-select: none;
+  transition: background 0.2s;
 }
 
 .sql-header:hover {
-  background: var(--bg-hover);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 .sql-title {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
-.toggle-icon {
-  font-size: 10px;
-  color: var(--text-secondary);
-  transition: transform 0.2s;
+.sql-type-icon {
+  font-size: 14px;
+  color: var(--da-primary);
 }
 
 .sql-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: var(--accent);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  color: #fff;
 }
 
 .sql-hint {
   font-size: 12px;
-  color: var(--text-secondary);
+  color: var(--da-text-muted);
+  opacity: 0.7;
 }
 
-.copy-btn {
-  background: none;
-  border: 1px solid var(--border);
-  color: var(--text-secondary);
-  font-size: 12px;
-  padding: 2px 10px;
-  border-radius: 4px;
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.action-btn {
+  background: var(--da-card);
+  border: 1px solid var(--da-border);
+  color: var(--da-text-muted);
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.copy-btn:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+.action-btn:hover {
+  background: var(--da-border);
+  color: #fff;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  color: var(--da-text-muted);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toggle-icon.is-flipped {
+  transform: rotate(180deg);
 }
 
 .sql-content {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--da-border);
+  background: #0f172a; /* Slate-900 like standard code bg */
 }
 
 .sql-code {
-  padding: 14px;
+  padding: 16px;
   margin: 0;
   overflow-x: auto;
   font-size: 13px;
   line-height: 1.6;
-  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  color: #e2e8f0;
 }
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>
