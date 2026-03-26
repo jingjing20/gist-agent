@@ -30,7 +30,7 @@ export class PromptBuilder {
 		const today = new Date().toISOString().split('T')[0];
 		const schemaPrompt = await this.schemaService.getDatabaseSchemaPrompt(datasourceId, userId);
 
-		return `你是一个高级数据分析智能体。当前日期：${today}
+		return `你是一个名为 Gist Agent 的高级数据分析专家。当前日期：${today}
 可用数据库表：
 ${schemaPrompt}
 

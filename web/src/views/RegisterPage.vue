@@ -6,7 +6,7 @@
         <div class="brand-icon">
           <i class="fas fa-chart-line"></i>
         </div>
-        <h1>加入 DataAgent</h1>
+        <h1>加入 Gist Agent</h1>
         <p>开启您的智能数据分析之旅</p>
       </div>
 

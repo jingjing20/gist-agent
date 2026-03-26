@@ -7,7 +7,7 @@
           <div class="logo-bar logo-bar-2"></div>
           <div class="logo-bar logo-bar-3"></div>
         </div>
-        <span class="brand-text">DataAgent</span>
+        <span class="brand-text">Gist Agent</span>
       </div>
 
       <nav class="header-tabs">
@@ -29,7 +29,7 @@
 
       <div class="header-user">
         <div class="user-info">
-          <img class="user-avatar" src="https://api.dicebear.com/7.x/notionists/svg?seed=DataAgent" alt="avatar" />
+          <img class="user-avatar" src="https://api.dicebear.com/7.x/notionists/svg?seed=GistAgent" alt="avatar" />
           <span class="user-name">{{ authStore.user?.name || authStore.user?.email }}</span>
         </div>
         <button class="btn-logout" @click="handleLogout">退出</button>

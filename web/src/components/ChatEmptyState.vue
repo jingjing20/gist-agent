@@ -9,8 +9,8 @@
           <i class="fas fa-chart-line"></i>
         </div>
         <div class="hero-text-content">
-          <h1 class="hero-title">DataAgent</h1>
-          <p class="hero-subtitle">基于 AI 的智能数据分析助手，带你开启数据分析新体验</p>
+          <h1 class="hero-title">Gist Agent</h1>
+          <p class="hero-subtitle">基于 AI 的智能数据分析专家，助你快速洞察业务本质</p>
         </div>
       </div>
 
@@ -367,7 +367,7 @@ watch(
   flex-direction: column;
   justify-content: space-between;
   gap: 8px;
-  height: 140px; /* Increased from 120px to fit 4 lines */
+  height: 120px;
   position: relative;
 }
 
@@ -382,10 +382,10 @@ watch(
   line-height: 1.5;
   color: var(--da-text-main);
   font-weight: 400;
-  /* Line clamp for 4 lines */
+  /* Line clamp for 3 lines */
   display: -webkit-box;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;

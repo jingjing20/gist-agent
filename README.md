@@ -1,4 +1,4 @@
-# AI Data Analysis (Data Agent)
+# Gist Agent (Data Agent)
 
 基于大语言模型 (LLM) 的智能数据分析平台。用户上传自己的数据文件（CSV / Excel），通过自然语言与数据对话，由 Agent 自动生成 SQL、执行查询、输出分析结论并渲染可交互图表。
 

@@ -7,7 +7,6 @@
       </div>
       <span class="title">{{ title }}</span>
       <div class="header-right">
-        <span v-if="isLoading" class="pulse-text">正在处理...</span>
         <i class="fas fa-chevron-down toggle-icon" :class="{ 'is-flipped': !collapsed }" v-if="!isLoading"></i>
       </div>
     </div>

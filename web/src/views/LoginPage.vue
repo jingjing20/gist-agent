@@ -7,7 +7,7 @@
           <i class="fas fa-chart-line"></i>
         </div>
         <h1>欢迎回来</h1>
-        <p>登录您的 DataAgent 账号</p>
+        <p>登录您的 Gist Agent 账号</p>
       </div>
 
       <form @submit.prevent="handleLogin" class="auth-form">
