@@ -14,7 +14,7 @@
         <button
           class="tab-btn"
           :class="{ active: activeTab === 'chat' }"
-          @click="router.push('/')"
+          @click="router.push('/chat')"
         >
           开始分析
         </button>

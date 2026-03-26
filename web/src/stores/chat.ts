@@ -73,20 +73,20 @@ export const useChatStore = defineStore('chat', () => {
 			const nextId = conversations.value[0]?.id || null;
 			activeConversationId.value = nextId;
 			if (nextId) {
-				router.replace(`/${nextId}`);
+				router.replace(`/chat/${nextId}`);
 				const conv = conversations.value.find((c) => c.id === nextId);
 				if (conv && conv.messages.length === 0) {
 					await fetchMessages(nextId);
 				}
 			} else {
-				router.replace('/');
+				router.replace('/chat');
 			}
 		}
 	}
 
 	async function selectConversation(id: string) {
 		activeConversationId.value = id;
-		router.replace(`/${id}`);
+		router.replace(`/chat/${id}`);
 		const conv = conversations.value.find((c) => c.id === id);
 		if (conv?.datasource_id) {
 			activeDatasourceId.value = conv.datasource_id;
@@ -98,7 +98,7 @@ export const useChatStore = defineStore('chat', () => {
 
 	function startNewChat() {
 		activeConversationId.value = null;
-		router.replace('/');
+		router.replace('/chat');
 	}
 
 	async function sendMessage(content: string) {
@@ -121,7 +121,7 @@ export const useChatStore = defineStore('chat', () => {
 		// 第一条消息更新标题
 		if (conv.messages.length === 1) {
 			conv.title = content.slice(0, 30) + (content.length > 30 ? '...' : '');
-			router.replace(`/${conv.id}`);
+			router.replace(`/chat/${conv.id}`);
 		}
 
 		// 占位助手消息
