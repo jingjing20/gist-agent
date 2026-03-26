@@ -29,7 +29,7 @@ hljs.registerLanguage('sql', sql);
 
 const props = defineProps<{ content?: string }>();
 const copied = ref(false);
-const isExpanded = ref(false);
+const isExpanded = ref(true);
 
 const highlightedSQL = computed(() => {
   if (!props.content) return '';

@@ -88,12 +88,12 @@ function handleApply() {
   border-radius: 6px;
   font-size: 13px;
   color: var(--text-secondary);
-  border-left: 3px solid #6366f1;
+  border-left: 3px solid var(--da-primary);
   margin-bottom: 16px;
 }
 
 .apply-btn {
-  background: var(--accent);
+  background: var(--da-primary);
   color: white;
   border: none;
   padding: 8px 16px;
@@ -104,7 +104,7 @@ function handleApply() {
 }
 
 .apply-btn:hover:not(:disabled) {
-  opacity: 0.9;
+  background: var(--da-primary-hover);
 }
 
 .apply-btn:disabled {

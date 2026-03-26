@@ -190,7 +190,7 @@ export const useChatStore = defineStore('chat', () => {
 
 						if (event.type === 'log_update') {
 							const placeholder = [...assistantMsg.blocks].reverse().find(
-								(b) => b.type === 'log' && b.title === event.title && b.content === '正在生成调用参数...',
+								(b) => b.type === 'log' && b.title === event.title,
 							);
 							if (placeholder) {
 								placeholder.content = event.content || '';

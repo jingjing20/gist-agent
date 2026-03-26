@@ -17,7 +17,7 @@ export class ChatService {
 		private readonly llm: LlmService,
 		private readonly toolRegistry: ToolRegistry,
 		private readonly promptBuilder: PromptBuilder,
-	) {}
+	) { }
 
 	async handleChat(
 		res: Response,
@@ -98,8 +98,10 @@ export class ChatService {
 								type: 'function',
 								function: { name, arguments: '' },
 							};
-							const title = `[工具调用] ${name}`;
-							const callLog: SSEEvent = { type: 'log', title, content: '正在生成调用参数...' };
+
+							const title = name === 'execute_sql_query' ? '[SQL 生成]' : `[工具调用] ${name}`;
+							const content = name === 'execute_sql_query' ? '正在构思查询逻辑...' : '正在处理...';
+							const callLog: SSEEvent = { type: 'log', title, content };
 							emitter.send(callLog);
 							blocks.push(callLog);
 
@@ -148,11 +150,18 @@ export class ChatService {
 				let args: Record<string, unknown> = {};
 				try { args = JSON.parse(argsStr); } catch { /* malformed args */ }
 
-				const title = `[工具调用] ${name}`;
-				emitter.send({ type: 'log_update', title, content: argsStr } as any);
-				const lastLog = [...blocks].reverse().find(b => b.type === 'log' && b.title === title && b.content === '正在生成调用参数...');
+				const title = name === 'execute_sql_query' ? '[SQL 生成]' : `[工具调用] ${name}`;
+				const lastLog = [...blocks].reverse().find(b => b.type === 'log' && b.title === title);
 				if (lastLog) {
-					lastLog.content = argsStr;
+					lastLog.content = name === 'execute_sql_query' ? 'SQL 生成完毕' : (argsStr || '处理完毕');
+					emitter.send({ ...lastLog, type: 'log_update' } as any);
+				}
+
+				// 如果是 SQL 查询，生成完成后立刻渲染出源码区块
+				if (name === 'execute_sql_query' && args.sql) {
+					const sqlBlock: SSEEvent = { type: 'sql', content: args.sql as string };
+					emitter.send(sqlBlock);
+					blocks.push(sqlBlock);
 				}
 
 				const tool = this.toolRegistry.get(name);

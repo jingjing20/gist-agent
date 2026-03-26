@@ -22,15 +22,16 @@ export class SqlQueryTool implements Tool {
 		},
 	};
 
-	constructor(private readonly sqlExecutor: SqlExecutorAgent) {}
+	constructor(private readonly sqlExecutor: SqlExecutorAgent) { }
 
 	async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
 		const sql = args.sql as string;
 		const blocks: SSEEvent[] = [];
 
-		const sqlEvent: SSEEvent = { type: 'sql', content: sql };
-		ctx.emitter.send(sqlEvent);
-		blocks.push(sqlEvent);
+		const execLog: SSEEvent = { type: 'log', title: '[数据查询]', content: '正在从数据库提取并处理结果...' };
+		ctx.emitter.send(execLog);
+		blocks.push(execLog);
+
 
 		try {
 			const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId);
@@ -45,6 +46,9 @@ export class SqlQueryTool implements Tool {
 				blocks.push(fixLog);
 			}
 
+			execLog.content = `查询成功，共读取 ${r.rowCount} 条数据`;
+			ctx.emitter.send({ ...execLog, type: 'log_update' } as any);
+
 			const tableEvent: SSEEvent = { type: 'table', columns: r.columns, rows: r.rows, rowCount: r.rowCount };
 			ctx.emitter.send(tableEvent);
 			blocks.push(tableEvent);
@@ -58,6 +62,8 @@ export class SqlQueryTool implements Tool {
 
 			return { toolResult, blocks };
 		} catch (e: any) {
+			execLog.content = `查询失败: ${e.message}`;
+			ctx.emitter.send({ ...execLog, type: 'log_update' } as any);
 			return { toolResult: `SQL 执行出错: ${e.message}`, blocks };
 		}
 	}

@@ -30,7 +30,16 @@ echarts.use([
   CanvasRenderer,
 ]);
 
-const COLORS = ['#6366f1', '#22d3ee', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6', '#ec4899'];
+// Updated to match Gist Agent New Theme (Sky/Blue/Violet)
+const COLORS = [
+  '#0ea5e9', // da-primary (Sky-500)
+  '#8b5cf6', // da-gradient-start (Violet-500)
+  '#3b82f6', // da-gradient-end (Blue-500)
+  '#10b981', // Emerald-500
+  '#f59e0b', // Amber-500
+  '#ec4899', // Pink-500
+  '#ef4444', // Red-500
+];
 
 const props = defineProps<{
   chartData?: ChartData;
@@ -47,13 +56,22 @@ function buildOption(data: ChartData): Record<string, unknown> {
     title: {
       text: data.title,
       left: 'center',
-      textStyle: { color: '#e2e8f0', fontSize: 15, fontWeight: 600 },
+      textStyle: { 
+        color: '#e2e8f0', // da-text-main
+        fontSize: 15, 
+        fontWeight: 600 
+      },
     },
     tooltip: {
       trigger: isPie ? 'item' : 'axis',
-      backgroundColor: 'rgba(15, 23, 42, 0.9)',
-      borderColor: 'rgba(99, 102, 241, 0.3)',
+      backgroundColor: 'rgba(26, 31, 46, 0.95)', // da-chart-bg / panel based
+      borderColor: 'rgba(14, 165, 233, 0.4)', // da-primary-alpha
+      borderWidth: 1,
       textStyle: { color: '#e2e8f0', fontSize: 12 },
+      padding: [10, 14],
+      borderRadius: 8,
+      shadowBlur: 10,
+      shadowColor: 'rgba(0, 0, 0, 0.3)',
     },
     color: COLORS,
   };
@@ -66,13 +84,20 @@ function buildOption(data: ChartData): Record<string, unknown> {
 
     base.series = [{
       type: 'pie',
-      radius: ['40%', '70%'],
+      radius: ['45%', '70%'],
       center: ['50%', '55%'],
-      itemStyle: { borderRadius: 6, borderColor: '#0f172a', borderWidth: 2 },
+      itemStyle: { 
+        borderRadius: 8, 
+        borderColor: '#1a1f2e', // da-chart-bg
+        borderWidth: 2 
+      },
       label: { color: '#94a3b8', fontSize: 12 },
       emphasis: {
         label: { fontSize: 14, fontWeight: 'bold' },
-        itemStyle: { shadowBlur: 10, shadowColor: 'rgba(99, 102, 241, 0.5)' },
+        itemStyle: { 
+          shadowBlur: 15, 
+          shadowColor: 'rgba(14, 165, 233, 0.4)' // da-primary shadow
+        },
       },
       data: pieData,
     }];
@@ -80,24 +105,40 @@ function buildOption(data: ChartData): Record<string, unknown> {
   }
 
   base.grid = {
-    left: '3%', right: '4%', bottom: '3%', containLabel: true,
+    left: '3%', 
+    right: '4%', 
+    bottom: '3%', 
+    top: data.series.length > 1 ? '18%' : '15%',
+    containLabel: true,
   };
+  
   base.xAxis = {
     type: 'category',
     data: data.xAxis ?? [],
-    axisLabel: { color: '#94a3b8', fontSize: 11 },
-    axisLine: { lineStyle: { color: '#334155' } },
+    axisLabel: { color: '#94a3b8', fontSize: 11, margin: 12 },
+    axisLine: { lineStyle: { color: '#333a4d' } }, // da-border
+    axisTick: { show: false },
     splitLine: { show: false },
   };
+  
   base.yAxis = {
     type: 'value',
     axisLabel: { color: '#94a3b8', fontSize: 11 },
-    splitLine: { lineStyle: { color: '#1e293b', type: 'dashed' } },
+    splitLine: { 
+      lineStyle: { 
+        color: 'rgba(51, 58, 77, 0.4)', // da-border light alpha
+        type: 'dashed' 
+      } 
+    },
   };
 
   if (data.series.length > 1) {
     base.legend = {
-      top: 30,
+      top: 35,
+      itemGap: 15,
+      itemWidth: 10,
+      itemHeight: 10,
+      icon: 'circle',
       textStyle: { color: '#94a3b8', fontSize: 12 },
     };
   }
@@ -112,19 +153,26 @@ function buildOption(data: ChartData): Record<string, unknown> {
     if (data.chartType === 'line') {
       seriesBase.smooth = true;
       seriesBase.symbol = 'circle';
-      seriesBase.symbolSize = 6;
-      seriesBase.lineStyle = { width: 2.5 };
+      seriesBase.symbolSize = 8;
+      seriesBase.lineStyle = { width: 3 };
       seriesBase.areaStyle = {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: COLORS[i % COLORS.length] + '40' },
-          { offset: 1, color: COLORS[i % COLORS.length] + '05' },
+          { offset: 0, color: COLORS[i % COLORS.length] + '33' },
+          { offset: 1, color: COLORS[i % COLORS.length] + '00' },
         ]),
       };
     }
 
     if (data.chartType === 'bar') {
-      seriesBase.barMaxWidth = 40;
-      seriesBase.itemStyle = { borderRadius: [4, 4, 0, 0] };
+      seriesBase.barMaxWidth = 32;
+      seriesBase.itemStyle = { 
+        borderRadius: [6, 6, 0, 0],
+        // Gradient for bars
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: COLORS[i % COLORS.length] },
+          { offset: 1, color: COLORS[i % COLORS.length] + 'aa' },
+        ])
+      };
     }
 
     return seriesBase;
@@ -163,16 +211,18 @@ onUnmounted(() => {
 
 <style scoped>
 .chart-block {
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid var(--da-border);
+  border-radius: 12px;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(15, 23, 42, 0.6), rgba(30, 41, 59, 0.4));
-  backdrop-filter: blur(8px);
+  background: var(--da-chart-bg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 
 .chart-container {
   width: 100%;
   height: 380px;
+  padding: 12px;
+  box-sizing: border-box;
 }
 
 .chart-skeleton {
@@ -181,17 +231,17 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 40px 20px;
+  padding: 32px 40px 24px;
   box-sizing: border-box;
 }
 
 .skeleton-title {
-  width: 140px;
-  height: 14px;
+  width: 160px;
+  height: 16px;
   border-radius: 4px;
-  background: rgba(99, 102, 241, 0.12);
+  background: rgba(14, 165, 233, 0.12); /* da-primary alpha */
   animation: shimmer 1.8s infinite ease-in-out;
-  margin-bottom: 24px;
+  margin-bottom: 32px;
 }
 
 .skeleton-body {
@@ -201,29 +251,30 @@ onUnmounted(() => {
   align-items: flex-end;
   justify-content: center;
   gap: 24px;
-  padding-bottom: 8px;
+  padding-bottom: 12px;
 }
 
 .skeleton-bar {
   width: 36px;
-  border-radius: 4px 4px 0 0;
-  background: rgba(99, 102, 241, 0.10);
+  border-radius: 6px 6px 0 0;
+  background: rgba(14, 165, 233, 0.08); /* da-primary alpha */
   animation: shimmer 1.8s infinite ease-in-out;
 }
 
-.skeleton-bar:nth-child(2) { animation-delay: 0.15s; }
-.skeleton-bar:nth-child(3) { animation-delay: 0.3s; }
-.skeleton-bar:nth-child(4) { animation-delay: 0.45s; }
-.skeleton-bar:nth-child(5) { animation-delay: 0.6s; }
+.skeleton-bar:nth-child(2) { animation-delay: 0.15s; background: rgba(139, 92, 246, 0.08); }
+.skeleton-bar:nth-child(3) { animation-delay: 0.3s; background: rgba(59, 130, 246, 0.08); }
+.skeleton-bar:nth-child(4) { animation-delay: 0.45s; background: rgba(14, 165, 233, 0.08); }
+.skeleton-bar:nth-child(5) { animation-delay: 0.6s; background: rgba(139, 92, 246, 0.08); }
 
 .skeleton-axis {
   width: 100%;
   height: 1px;
-  background: rgba(99, 102, 241, 0.12);
+  background: var(--da-border);
+  opacity: 0.5;
 }
 
 @keyframes shimmer {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.3; transform: scaleY(0.98); }
+  50% { opacity: 0.8; transform: scaleY(1); }
 }
 </style>

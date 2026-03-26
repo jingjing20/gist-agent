@@ -93,7 +93,7 @@ function formatCell(value: unknown): string {
 
 .table-wrapper {
   overflow-x: auto;
-  max-height: 400px;
+  max-height: 260px;
   overflow-y: auto;
   position: relative;
 }
