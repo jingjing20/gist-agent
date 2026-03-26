@@ -79,9 +79,11 @@ import { ref, computed, watch, onMounted } from 'vue';
 import { useChatStore } from '../stores/chat';
 import { useDataSourceStore } from '../stores/datasource';
 
-defineProps<{
-  sidebarCollapsed: boolean;
-}>();
+withDefaults(defineProps<{
+  sidebarCollapsed?: boolean;
+}>(), {
+  sidebarCollapsed: false
+});
 
 const emit = defineEmits<{
   (e: 'select', query: string): void;
