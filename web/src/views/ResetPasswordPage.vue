@@ -58,6 +58,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
+import { useToastStore } from '../stores/toast';
 
 const API_BASE = '/api';
 
@@ -70,6 +71,7 @@ const confirm = ref('');
 const error = ref('');
 const loading = ref(false);
 const done = ref(false);
+const toast = useToastStore();
 
 onMounted(() => {
   token.value = (route.query.token as string) ?? '';
@@ -82,6 +84,7 @@ async function handleSubmit() {
   error.value = '';
   if (password.value !== confirm.value) {
     error.value = '两次输入的密码不一致';
+    toast.error(error.value);
     return;
   }
   loading.value = true;
@@ -94,9 +97,11 @@ async function handleSubmit() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || '重置失败');
     done.value = true;
+    toast.success('密码重置成功，请重新登录');
     setTimeout(() => router.replace('/login'), 2000);
   } catch (e: any) {
     error.value = e.message || '重置失败，请稍后重试';
+    toast.error('重置失败: ' + error.value);
   } finally {
     loading.value = false;
   }

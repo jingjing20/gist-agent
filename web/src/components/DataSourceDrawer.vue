@@ -51,6 +51,7 @@
 import { ref, computed, watch, onMounted } from 'vue';
 import { useDataSourceStore } from '../stores/datasource';
 import { useChatStore } from '../stores/chat';
+import { useToastStore } from '../stores/toast';
 
 const props = defineProps<{
   modelValue: boolean; // Controls open/close state
@@ -62,6 +63,7 @@ const emit = defineEmits<{
 
 const dsStore = useDataSourceStore();
 const chatStore = useChatStore();
+const toast = useToastStore();
 
 const schemaTables = ref<any[]>([]);
 const loadingSchema = ref(false);
@@ -82,8 +84,9 @@ async function loadSchema() {
     if (!selectedTable.value && schemaTables.value.length > 0) {
       selectedTable.value = schemaTables.value[0];
     }
-  } catch (err) {
+  } catch (err: any) {
     console.error('Failed to load schema', err);
+    toast.error('获取表格架构失败: ' + err.message);
   } finally {
     loadingSchema.value = false;
   }

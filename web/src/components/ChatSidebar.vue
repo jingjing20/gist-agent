@@ -50,6 +50,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { useChatStore } from '../stores/chat';
+import { useToastStore } from '../stores/toast';
 import ConfirmModal from './ConfirmModal.vue';
 
 defineProps<{
@@ -61,15 +62,21 @@ const emit = defineEmits<{
 }>();
 
 const store = useChatStore();
+const toast = useToastStore();
 const deletingConvId = ref<string | null>(null);
 
 function confirmDeleteConv(id: string) {
   deletingConvId.value = id;
 }
 
-function executeDelete() {
+async function executeDelete() {
   if (deletingConvId.value) {
-    store.deleteConversation(deletingConvId.value);
+    try {
+      await store.deleteConversation(deletingConvId.value);
+      toast.success('对话已删除');
+    } catch (e: any) {
+      toast.error('删除对话失败: ' + e.message);
+    }
     deletingConvId.value = null;
   }
 }

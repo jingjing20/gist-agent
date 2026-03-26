@@ -55,9 +55,11 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useToastStore } from '../stores/toast';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const toast = useToastStore();
 
 const email = ref('');
 const password = ref('');
@@ -74,9 +76,11 @@ async function handleRegister() {
   loading.value = true;
   try {
     await authStore.register(email.value, password.value, name.value || undefined);
+    toast.success('注册成功，欢迎加入');
     router.replace('/');
   } catch (e: any) {
     error.value = e.message || '注册失败';
+    toast.error('注册失败: ' + error.value);
   } finally {
     loading.value = false;
   }

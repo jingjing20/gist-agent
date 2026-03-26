@@ -19,9 +19,9 @@
                 <div class="t-name">{{ t.display_name }}</div>
                 <div class="t-code">{{ t.table_name }}</div>
               </div>
-              <button 
-                v-if="!modelValue.is_local" 
-                class="t-delete-btn" 
+              <button
+                v-if="!modelValue.is_local"
+                class="t-delete-btn"
                 @click="emit('delete-table', modelValue.id, t.id)"
               >
                 <i class="fas fa-trash-alt"></i>

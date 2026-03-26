@@ -50,6 +50,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useToastStore } from '../stores/toast';
 
 const API_BASE = '/api';
 
@@ -57,6 +58,7 @@ const email = ref('');
 const error = ref('');
 const loading = ref(false);
 const sent = ref(false);
+const toast = useToastStore();
 
 async function handleSubmit() {
   error.value = '';
@@ -77,8 +79,10 @@ async function handleSubmit() {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || '请求失败');
     sent.value = true;
+    toast.success('重置链接已发送至您的邮箱');
   } catch (e: any) {
     error.value = e.message || '请求失败，请稍后重试';
+    toast.error('发送失败: ' + error.value);
   } finally {
     loading.value = false;
   }

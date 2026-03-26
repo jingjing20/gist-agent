@@ -46,11 +46,13 @@ import { computed } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
+import { useToastStore } from '../stores/toast';
 
 const router = useRouter();
 const route = useRoute();
 const dsStore = useDataSourceStore();
 const authStore = useAuthStore();
+const toast = useToastStore();
 
 const activeTab = computed<'chat' | 'datasource'>(() =>
   route.name === 'datasource' ? 'datasource' : 'chat',
@@ -63,6 +65,7 @@ function goToDataSource() {
 
 function handleLogout() {
   authStore.logout();
+  toast.info('已退出登录');
   router.push('/login');
 }
 </script>

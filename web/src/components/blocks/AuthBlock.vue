@@ -23,6 +23,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue';
+import { useToastStore } from '../../stores/toast';
 
 defineProps<{
   tables?: string[];
@@ -30,9 +31,11 @@ defineProps<{
 }>();
 
 const applied = ref(false);
+const toast = useToastStore();
 
 function handleApply() {
   applied.value = true;
+  toast.info('申请已提交，请等待管理员审批');
 }
 </script>
 

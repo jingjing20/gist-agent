@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import type { Conversation, ChatMessage, MessageBlock, SSEEvent } from '../types';
 import { apiFetch } from '../api';
+import { useToastStore } from './toast';
 
 export const useChatStore = defineStore('chat', () => {
 	const router = useRouter();
@@ -10,6 +11,7 @@ export const useChatStore = defineStore('chat', () => {
 	const activeConversationId = ref<string | null>(null);
 	const activeDatasourceId = ref<number | null>(null);
 	const isLoading = ref(false);
+	const toast = useToastStore();
 	let abortController: AbortController | null = null;
 
 	const activeConversation = computed(() =>
@@ -231,6 +233,7 @@ export const useChatStore = defineStore('chat', () => {
 			} else {
 				const errorMsg = err instanceof Error ? err.message : '请求失败';
 				assistantMsg.blocks.push({ type: 'error', content: errorMsg });
+				toast.error('发送失败: ' + errorMsg);
 			}
 		} finally {
 			abortController = null;

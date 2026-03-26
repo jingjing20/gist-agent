@@ -52,9 +52,11 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useToastStore } from '../stores/toast';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const toast = useToastStore();
 
 const email = ref('');
 const password = ref('');
@@ -70,9 +72,11 @@ async function handleLogin() {
   loading.value = true;
   try {
     await authStore.login(email.value, password.value);
+    toast.success('登录成功，欢迎回来');
     router.replace('/');
   } catch (e: any) {
     error.value = e.message || '登录失败';
+    toast.error('登录失败: ' + error.value);
   } finally {
     loading.value = false;
   }

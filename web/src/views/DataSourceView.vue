@@ -86,6 +86,7 @@
 import { ref, onMounted, reactive } from 'vue';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
+import { useToastStore } from '../stores/toast';
 import { apiFetch } from '../api';
 import DataSourceCard from '../components/datasource/DataSourceCard.vue';
 import CreateSourceModal from '../components/datasource/CreateSourceModal.vue';
@@ -98,6 +99,7 @@ import type { DataSource, UploadedTable } from '../stores/datasource';
 
 const dsStore = useDataSourceStore();
 const authStore = useAuthStore();
+const toast = useToastStore();
 
 onMounted(() => dsStore.fetchAll());
 
@@ -111,8 +113,10 @@ async function handleCreate(form: { name: string; description?: string }) {
   try {
     await dsStore.create({ name: form.name, description: form.description });
     showCreateModal.value = false;
+    toast.success('数据源创建成功');
   } catch (e: any) {
     createError.value = e.message;
+    toast.error('创建失败: ' + e.message);
   } finally {
     createSubmitting.value = false;
   }
@@ -135,8 +139,10 @@ async function handleEditSubmit(form: { name: string; description: string }) {
   try {
     await dsStore.update(editTargetDs.value.id, form);
     editTargetDs.value = null;
+    toast.success('数据源更新成功');
   } catch (e: any) {
     editError.value = e.message;
+    toast.error('更新失败: ' + e.message);
   } finally {
     editSubmitting.value = false;
   }
@@ -160,7 +166,11 @@ async function handleUpload(_id: number, file: File, displayName: string) {
        tables.value = await dsStore.listTables(uploadTargetDs.value.id);
     }
     uploadTargetDs.value = null;
-  } catch (e: any) { uploadError.value = e.message; } finally { uploading.value = false; }
+    toast.success('文件上传并同步成功');
+  } catch (e: any) { 
+    uploadError.value = e.message; 
+    toast.error('上传失败: ' + e.message);
+  } finally { uploading.value = false; }
 }
 
 // --- Permissions ---
@@ -196,12 +206,24 @@ function debouncedSearch(q: string) {
 
 async function handleGrant(userId: number) {
   if (!grantDs.value) return;
-  try { await dsStore.grant(grantDs.value.id, userId); await loadPermissions(); } catch (e: any) { alert(e.message); }
+  try { 
+    await dsStore.grant(grantDs.value.id, userId); 
+    await loadPermissions(); 
+    toast.success('权限授权成功');
+  } catch (e: any) { 
+    toast.error('授权失败: ' + e.message);
+  }
 }
 
 async function handleRevoke(userId: number) {
   if (!grantDs.value) return;
-  try { await dsStore.revoke(grantDs.value.id, userId); await loadPermissions(); } catch (e: any) { alert(e.message); }
+  try { 
+    await dsStore.revoke(grantDs.value.id, userId); 
+    await loadPermissions(); 
+    toast.success('权限取消成功');
+  } catch (e: any) { 
+    toast.error('取消授权失败: ' + e.message);
+  }
 }
 
 // --- Tables ---
@@ -252,12 +274,16 @@ async function executeDelete() {
   try {
     if (deleteConfirm.type === 'ds') {
       await dsStore.remove(deleteConfirm.dsId);
+      toast.success('数据源删除成功');
     } else if (deleteConfirm.type === 'table') {
       await dsStore.deleteTable(deleteConfirm.dsId, deleteConfirm.tableId);
       tables.value = tables.value.filter(t => t.id !== deleteConfirm.tableId);
+      toast.success('数据表删除成功');
     }
     deleteConfirm.show = false;
-  } catch (e: any) { alert(e.message); } finally { deleteSubmitting.value = false; }
+  } catch (e: any) { 
+    toast.error('删除失败: ' + e.message);
+  } finally { deleteSubmitting.value = false; }
 }
 </script>
 
