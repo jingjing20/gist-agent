@@ -45,9 +45,17 @@ vim .env   # 或 nano / 其他编辑器
 | `OPENAI_API_KEY` | 大模型 API Key | `sk-xxxx` |
 | `OPENAI_BASE_URL` | 大模型 API 地址 | `https://api.openai.com/v1` 或第三方地址 |
 | `OPENAI_MODEL` | 模型名 | `gpt-4o` |
-| `DB_PASSWORD` | MySQL root 密码（容器内使用） | 强密码，不要用默认 |
+| `DB_HOST` | 数据库地址 | `localhost` 或容器服务名 `mysql` |
+| `DB_PORT` | 数据库端口 | `3306` |
+| `DB_USER` | 数据库用户 | `root` |
+| `DB_PASSWORD` | 数据库密码 | 强密码，不要用默认 |
 | `DB_NAME` | 数据库名 | `ai_analysis` |
 | `JWT_SECRET` | 登录 Token 签名密钥 | 随机长字符串，生产务必改 |
+| `SMTP_HOST` | SMTP 服务器地址 | `smtp.qq.com` |
+| `SMTP_PORT` | SMTP 端口 | `465` |
+| `SMTP_USER` | SMTP 用户名 | `your-email@qq.com` |
+| `SMTP_PASS` | SMTP 授权码/密码 | `your-smtp-password` |
+| `SMTP_FROM` | 邮件发送者信息 | `"AI Data Analysis <your-email@qq.com>"` |
 
 **注意：** `.env` 不要提交到 Git，已在 `.gitignore` 中。
 
@@ -109,7 +117,7 @@ ports:
 **使用域名 + HTTPS：**
 
 1. 域名 A 记录解析到本服务器 IP。
-2. 在服务器再装一个 Nginx（宿主机），用 certbot 申请证书，并反向代理到本机 `http://127.0.0.1:80`（或你映射的端口）。  
+2. 在服务器再装一个 Nginx（宿主机），用 certbot 申请证书，并反向代理到本机 `http://127.0.0.1:80`（或你映射的端口）。
    或：把 web 的 `ports` 改为 `"127.0.0.1:80:80"`，仅本机访问，由宿主机 Nginx 做 SSL 与域名。
 
 ---
@@ -140,13 +148,16 @@ ports:
 
 **3. init-db 报错连接 MySQL 失败**
 
-- 先执行 `docker compose up -d`，等约 30 秒再执行：  
+- 先执行 `docker compose up -d`，等约 30 秒再执行：
   `docker compose --profile tools run --rm init-db`。
 - 确认 `.env` 中 `DB_PASSWORD`、`DB_NAME` 与 docker-compose 里 MySQL 的配置一致（compose 里数据库名、root 密码来自 `.env`）。
 
 **4. 修改 .env 后不生效**
 
+- 修改了 .env 必须同步在 `docker-compose.yml` 中添加对应的配置项
+- 两步操作：服务器环境变量文件 .env 手动添加变量，本地代码中 `docker-compose.yml` 中添加对应的配置项
 - 改完保存后执行：`docker compose up -d` 重新创建 server 容器，使新环境变量生效。
+- 或者走 github action 自动 cicd 就行
 
 ---
 
