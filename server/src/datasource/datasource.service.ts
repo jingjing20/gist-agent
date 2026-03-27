@@ -2,6 +2,7 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { DatabaseService } from '../database/database.service';
 import { SchemaService } from '../database/schema.service';
 import { RowDataPacket } from 'mysql2/promise';
+import { SchemaEnrichmentService } from './schema-enrichment.service';
 
 export interface DataSource {
 	id: number;
@@ -25,7 +26,8 @@ export interface UploadedTable {
 export class DataSourceService {
 	constructor(
 		private readonly db: DatabaseService,
-		@Inject(forwardRef(() => SchemaService)) private readonly schemaService: SchemaService
+		@Inject(forwardRef(() => SchemaService)) private readonly schemaService: SchemaService,
+		private readonly schemaEnrichmentService: SchemaEnrichmentService
 	) { }
 
 	async canAccess(datasourceId: number, userId: number): Promise<boolean> {
@@ -194,6 +196,7 @@ export class DataSourceService {
 			);
 
 			this.schemaService.clearUserCache(datasourceId, userId);
+			this.schemaEnrichmentService.enrichTableSchemaAsync(tableName);
 
 			return {
 				id: result.insertId,
