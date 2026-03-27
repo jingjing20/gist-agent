@@ -56,6 +56,7 @@ function buildOption(data: ChartData): Record<string, unknown> {
     title: {
       text: data.title,
       left: 'center',
+      top: 10,
       textStyle: { 
         color: '#e2e8f0', // da-text-main
         fontSize: 15, 
@@ -105,10 +106,10 @@ function buildOption(data: ChartData): Record<string, unknown> {
   }
 
   base.grid = {
-    left: '3%', 
-    right: '4%', 
-    bottom: '3%', 
-    top: data.series.length > 1 ? '18%' : '15%',
+    left: 15, 
+    right: 15, 
+    bottom: 10, 
+    top: data.series.length > 1 ? 85 : 55,
     containLabel: true,
   };
   
@@ -134,7 +135,7 @@ function buildOption(data: ChartData): Record<string, unknown> {
 
   if (data.series.length > 1) {
     base.legend = {
-      top: 35,
+      top: 40,
       itemGap: 15,
       itemWidth: 10,
       itemHeight: 10,
@@ -221,7 +222,7 @@ onUnmounted(() => {
 .chart-container {
   width: 100%;
   height: 380px;
-  padding: 12px;
+  padding: 4px;
   box-sizing: border-box;
 }
 
