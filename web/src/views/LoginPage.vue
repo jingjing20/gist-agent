@@ -281,6 +281,7 @@ async function handleLogin() {
 .forgot-link {
   font-size: 14px;
   color: var(--da-primary);
+  font-weight: 700;
   text-decoration: none;
   opacity: 0.8;
   transition: all 0.2s;

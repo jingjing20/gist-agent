@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import OpenAI from 'openai';
+import { wrapOpenAI } from 'langsmith/wrappers';
 
 @Injectable()
 export class LlmService {
@@ -7,10 +8,11 @@ export class LlmService {
 	readonly model: string;
 
 	constructor() {
-		this.client = new OpenAI({
+		const rawClient = new OpenAI({
 			apiKey: process.env.OPENAI_API_KEY,
 			baseURL: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
 		});
+		this.client = wrapOpenAI(rawClient);
 		this.model = process.env.OPENAI_MODEL || 'gpt-4o';
 	}
 
