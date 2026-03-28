@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { SqlExecutorAgent } from './agents/sql-executor';
-import { SummarizerAgent } from './agents/summarizer';
 import { ToolRegistry } from './tools/tool-registry';
 import { TOOL_INSTANCES, type Tool } from './tools/base-tool';
 import { SqlQueryTool } from './tools/sql-query.tool';
@@ -11,6 +10,7 @@ import { GenerateChartTool } from './tools/generate-chart.tool';
 import { PromptBuilder } from './prompt-builder';
 import { ConversationModule } from '../conversation/conversation.module';
 import { DataSourceModule } from '../datasource/datasource.module';
+import { SemanticDistillerService } from './agents/semantic-distiller.service';
 
 @Module({
 	imports: [ConversationModule, DataSourceModule],
@@ -18,7 +18,7 @@ import { DataSourceModule } from '../datasource/datasource.module';
 	providers: [
 		ChatService,
 		SqlExecutorAgent,
-		SummarizerAgent,
+		SemanticDistillerService,
 		PromptBuilder,
 		SqlQueryTool,
 		AnalyzeResultTool,

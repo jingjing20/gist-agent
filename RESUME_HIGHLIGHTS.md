@@ -31,9 +31,16 @@
   - 配合前端定义的高内聚 `MessageBlock` 数据结构，将后端工具栈中的每一步微小动作（从思考路径、执行 SQL 执行态、取数结果到 ECharts 配置下发）实现毫秒级 UI 实时呈现。
   - **价值**：显著削弱用户的等待焦躁感，在交互上达到专业分析师一步步推演的“仪式感”。
 
-### 5. 极速批处理缓冲与长短记忆压缩系统
-- **高并发数据上传**：通过内置内存流 `Readable Stream` 模拟绕过磁盘 IO 进行极速 `LOAD DATA LOCAL INFILE` 入库。相较传统 `INSERT` 提速数十倍。
-- **智能多轮记忆管理**：面对用户无限的追问场景很容易出现 Token 上限溢出，后端在 `PromptBuilder` 设计了 **摘要折叠记忆（Compact History）与 Token 自适应截断与池分配策略**。保留历史结构，放弃非必要的数据大表文本，让模型永远可以在预算范围内理解业务上下文。
+### 5. 工业级多级分层记忆引擎 (Multi-Tier Memory Engine)
+- **挑战**：BI 场景下 SQL 结果集动辄数千 Token，简单的滑窗截断会导致“前聊后忘”，丢弃核心业务口径。
+- **方案**：
+  - **Tier 1 (Working Memory) - 历史消息软脱水**：在上下文拼装时，对历史 `role: tool` 原始数据执行 **Selective Truncation (选择性裁剪)**，仅保留 SQL 逻辑与前 3 行数据样本，物理权重降低 80% 以上。
+  - **Tier 2 (Semantic Memory) - 异步知识蒸馏**：引入后台异步“蒸馏”机制，每轮对话后自动增量更新会话的 **State JSON (逻辑状态库)**。
+  - **动态 Prompt 注入**：将 Tier 2 的语义事实钉在 System Prompt 顶部，确保即使原始消息因 Token 限制被截断，Agent 也能长效保留“高价值用户定义”等业务共识。
+- **价值**：极大平衡了逻辑连贯性与 Token 开销成本。
+
+### 6. 极速批处理数据入库系统
+- **高并发数据上传**：自研内置内存流 `Readable Stream` 模拟管道技术，绕过磁盘 IO 实现极速 `LOAD DATA LOCAL INFILE` 指令下发，提速传统 ORM 批量 `INSERT` 数十倍，支撑千万级行数的高阶分析。
 
 ## 📊 技术栈
 - **后端引擎**：NestJS, TypeScript

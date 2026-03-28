@@ -7,6 +7,7 @@ export interface Conversation {
 	id: string;
 	title: string;
 	datasource_id: number | null;
+	semantic_state?: Record<string, any> | null;
 	created_at: string;
 	updated_at: string;
 }
@@ -57,6 +58,15 @@ export class ConversationService implements OnModuleInit {
 			);
 			if (!cols?.length) {
 				await this.db.execute('ALTER TABLE conversation ADD COLUMN datasource_id INT NULL AFTER user_id');
+			}
+		} catch { /* ignore */ }
+
+		try {
+			const [cols] = await this.db.query<any[]>(
+				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'semantic_state'"
+			);
+			if (!cols?.length) {
+				await this.db.execute("ALTER TABLE conversation ADD COLUMN semantic_state JSON NULL COMMENT 'Semantic Summary' AFTER title");
 			}
 		} catch { /* ignore */ }
 
@@ -135,6 +145,13 @@ export class ConversationService implements OnModuleInit {
 		await this.db.execute(
 			'UPDATE conversation SET title = ?, datasource_id = ? WHERE id = ?',
 			[title, datasourceId, id],
+		);
+	}
+
+	async updateSemanticState(id: string, state: Record<string, any>): Promise<void> {
+		await this.db.execute(
+			'UPDATE conversation SET semantic_state = ? WHERE id = ?',
+			[JSON.stringify(state), id],
 		);
 	}
 

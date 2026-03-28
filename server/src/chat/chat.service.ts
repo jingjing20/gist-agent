@@ -6,6 +6,7 @@ import { LlmService } from '../llm/llm.service';
 import { ToolRegistry } from './tools/tool-registry';
 import { PromptBuilder } from './prompt-builder';
 import { StreamEmitter } from './stream-emitter';
+import { SemanticDistillerService } from './agents/semantic-distiller.service';
 import type { SSEEvent } from './tools/base-tool';
 import type OpenAI from 'openai';
 
@@ -17,6 +18,7 @@ export class ChatService {
 		private readonly llm: LlmService,
 		private readonly toolRegistry: ToolRegistry,
 		private readonly promptBuilder: PromptBuilder,
+		private readonly distiller: SemanticDistillerService,
 	) { }
 
 	async handleChat(
@@ -41,7 +43,7 @@ export class ChatService {
 		}
 
 		const emitter = new StreamEmitter(res);
-		const systemPrompt = await this.promptBuilder.buildSystemPrompt(datasourceId ?? null, userId);
+		const systemPrompt = await this.promptBuilder.buildSystemPrompt(datasourceId ?? null, userId, conversationId);
 		const messages = await this.promptBuilder.buildMessages(conversationId, userId, systemPrompt);
 
 		const blocks: SSEEvent[] = [];
@@ -57,6 +59,9 @@ export class ChatService {
 		}
 
 		await this.conversationService.addMessage(conversationId, 'assistant', '', blocks, turnMessages);
+
+		// 异步触发语义摘要蒸馏，完成“中期记忆”提取
+		this.distiller.updateStateAsync(conversationId, userId, message, blocks);
 	}
 
 	private async runAgentLoop(
