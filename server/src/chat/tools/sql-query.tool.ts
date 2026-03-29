@@ -3,6 +3,8 @@ import type OpenAI from 'openai';
 import type { Tool, ToolContext, ToolExecutionResult, SSEEvent } from './base-tool';
 import { SqlExecutorAgent } from '../agents/sql-executor';
 
+const MAX_TOOL_RESULT_CHARS = 60000;
+
 @Injectable()
 export class SqlQueryTool implements Tool {
 	readonly name = 'execute_sql_query';
@@ -55,12 +57,25 @@ export class SqlQueryTool implements Tool {
 			ctx.emitter.send(tableEvent);
 			blocks.push(tableEvent);
 
+			let resultRows = r.rows;
+			let truncationNote = '';
+
+			const serialized = JSON.stringify(resultRows);
+			if (serialized.length > MAX_TOOL_RESULT_CHARS && resultRows.length > 1) {
+				const avgSize = serialized.length / resultRows.length;
+				const fitCount = Math.max(1, Math.floor(MAX_TOOL_RESULT_CHARS / avgSize));
+				resultRows = r.rows.slice(0, fitCount);
+				truncationNote = `\n[注意：完整查询共 ${r.rowCount} 条，因数据体积超限仅提供前 ${fitCount} 条用于分析，请在结论中注明数据未完整展示。]`;
+			}
+
 			const toolResult = r.wasFixed
 				? JSON.stringify({
-					SystemMessage: `注意：由于你写的原始 SQL 存在特定语法错误，已被系统防腐代理自动拦截修复！最终成功执行的 SQL 为: ${r.finalSql}。请在最终结论中以此为准。`,
-					data: r.rows.slice(0, 50),
+					systemMessage: `注意：由于你写的原始 SQL 存在特定语法错误，已被系统防腐代理自动拦截修复！最终成功执行的 SQL 为: ${r.finalSql}。请在最终结论中以此为准。${truncationNote}`,
+					data: resultRows,
 				})
-				: JSON.stringify(r.rows.slice(0, 50));
+				: truncationNote
+					? JSON.stringify({ systemMessage: truncationNote.trim(), data: resultRows })
+					: JSON.stringify(resultRows);
 
 			return { toolResult, blocks };
 		} catch (e: any) {
