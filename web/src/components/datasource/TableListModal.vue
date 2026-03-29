@@ -16,11 +16,14 @@
           <div v-else class="table-grid">
             <div v-for="t in tables" :key="t.id" class="table-list-item">
               <div class="t-info">
-                <div class="t-name">{{ t.display_name }}</div>
+                <div class="t-name">
+                  {{ t.display_name }}
+                  <span class="t-uploader" v-if="t.uploader_name">· 上传者: {{ t.uploader_name }}</span>
+                </div>
                 <div class="t-code">{{ t.table_name }}</div>
               </div>
               <button
-                v-if="!modelValue.is_local"
+                v-if="!modelValue.is_local && canDelete(modelValue, t)"
                 class="t-delete-btn"
                 @click="emit('delete-table', modelValue.id, t.id)"
               >
@@ -36,12 +39,21 @@
 
 <script setup lang="ts">
 import type { DataSource, UploadedTable } from '../../stores/datasource';
+import { useAuthStore } from '../../stores/auth';
 
 defineProps<{
   modelValue: DataSource | null;
   tables: UploadedTable[];
   loading: boolean;
 }>();
+
+const authStore = useAuthStore();
+
+const canDelete = (ds: DataSource, t: UploadedTable) => {
+  const uid = authStore.user?.id;
+  if (!uid) return false;
+  return ds.created_by === uid || t.user_id === uid;
+};
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: DataSource | null): void;
@@ -136,7 +148,8 @@ const emit = defineEmits<{
   gap: 2px;
 }
 
-.t-name { font-weight: 600; color: #fff; font-size: 14px; }
+.t-name { font-weight: 600; color: #fff; font-size: 14px; display: flex; align-items: center; }
+.t-uploader { font-size: 11px; font-weight: 400; color: var(--da-text-muted); margin-left: 8px; }
 .t-code { font-size: 12px; color: var(--da-text-muted); font-family: monospace; }
 
 .t-delete-btn {

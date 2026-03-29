@@ -94,7 +94,8 @@ const isCreator = computed(() => {
 
 const ownerName = computed(() => {
   if (props.ds.is_local) return 'System';
-  return isCreator.value ? '我' : '共享用户';
+  if (isCreator.value) return `${props.ds.creator_name || '我'} (我)`;
+  return props.ds.creator_name || '未知用户';
 });
 
 const formattedDate = computed(() => {

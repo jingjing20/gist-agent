@@ -7,6 +7,7 @@ export interface DataSource {
 	name: string;
 	is_local: number;
 	created_by?: number | null;
+	creator_name?: string | null;
 	description?: string;
 	created_at: string;
 }
@@ -15,6 +16,7 @@ export interface UploadedTable {
 	id: number;
 	datasource_id: number;
 	user_id: number;
+	uploader_name?: string | null;
 	table_name: string;
 	display_name: string;
 	created_at: string;

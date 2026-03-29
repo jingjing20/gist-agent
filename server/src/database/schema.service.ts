@@ -152,8 +152,8 @@ export class SchemaService {
 		if (!actualDatasourceId) return [];
 
 		const rows = await this.db.query<RowDataPacket[]>(
-			'SELECT table_name FROM uploaded_table WHERE datasource_id = ? AND user_id = ?',
-			[actualDatasourceId, userId],
+			'SELECT table_name FROM uploaded_table WHERE datasource_id = ?',
+			[actualDatasourceId],
 		);
 		return rows.map((r: any) => r.table_name);
 	}

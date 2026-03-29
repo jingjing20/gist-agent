@@ -5,7 +5,12 @@
         <i class="fas fa-table text-da-primary"></i>
         <span class="table-label">查询结果预览</span>
       </div>
-      <span class="row-count">共 {{ rowCount || rows?.length || 0 }} 条记录</span>
+      <div class="header-right">
+        <span class="row-count">共 {{ rowCount || rows?.length || 0 }} 条记录</span>
+        <button v-if="rows && rows.length > 0" class="export-btn" @click="exportToExcel">
+          <i class="fas fa-download"></i> 导出
+        </button>
+      </div>
     </div>
     <div class="table-wrapper no-scrollbar">
       <table>
@@ -32,7 +37,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 
-const MAX_DISPLAY = 50;
+const MAX_DISPLAY = 200;
 
 const props = defineProps<{
   columns?: string[];
@@ -49,7 +54,53 @@ function formatCell(value: unknown): string {
   if (typeof value === 'number') {
     return Number.isInteger(value) ? value.toLocaleString() : value.toFixed(2);
   }
-  return String(value);
+  
+  const strVal = String(value);
+  // 处理 ISO 日期字符串 (例如: 2026-02-27T16:00:00.000Z)
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value)) {
+    const date = new Date(value);
+    if (!isNaN(date.getTime())) {
+      // 如果正好是 00:00:00 (东八区补转后的结果)，则只显示日期
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+  }
+  
+  return strVal;
+}
+
+function exportToExcel() {
+  if (!props.rows || props.rows.length === 0) return;
+  
+  const header = props.columns || Object.keys(props.rows[0] || {});
+  
+  const csvRows = [];
+  csvRows.push(header.join(','));
+  
+  for (const row of props.rows) {
+    const values = header.map(col => {
+      let val = row[col];
+      if (val === null || val === undefined) val = '';
+      const strVal = String(val);
+      if (strVal.includes(',') || strVal.includes('"') || strVal.includes('\n')) {
+        return `"${strVal.replace(/"/g, '""')}"`;
+      }
+      return strVal;
+    });
+    csvRows.push(values.join(','));
+  }
+  
+  const csvContent = '\uFEFF' + csvRows.join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `data_export_${new Date().getTime()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 </script>
 
@@ -81,6 +132,31 @@ function formatCell(value: unknown): string {
   font-size: 13px;
   font-weight: 600;
   color: #fff;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.export-btn {
+  background: rgba(14, 165, 233, 0.1);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.2);
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.export-btn:hover {
+  background: rgba(14, 165, 233, 0.2);
+  border-color: rgba(14, 165, 233, 0.4);
 }
 
 .row-count {
