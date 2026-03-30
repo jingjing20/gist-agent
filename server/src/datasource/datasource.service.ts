@@ -150,6 +150,13 @@ export class DataSourceService {
 
 		if (columns.length === 0) throw new BadRequestException('文件不包含有效列');
 
+		const SAFE_COLUMN_NAME = /^[a-zA-Z_\u4e00-\u9fff][a-zA-Z0-9_\u4e00-\u9fff]*$/;
+		for (const col of columns) {
+			if (!SAFE_COLUMN_NAME.test(col.name)) {
+				throw new BadRequestException(`列名 "${col.name}" 包含非法字符，仅允许字母、数字、下划线和中文`);
+			}
+		}
+
 		const tableName = `ut_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 		const colDefs = columns.map(c => `\`${c.name}\` ${c.type}`).join(', ');

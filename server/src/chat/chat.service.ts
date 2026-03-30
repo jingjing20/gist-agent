@@ -10,6 +10,9 @@ import { SemanticDistillerService } from './agents/semantic-distiller.service';
 import type { SSEEvent } from './tools/base-tool';
 import type OpenAI from 'openai';
 
+const MAX_AGENT_ITERATIONS = 15;
+const CHAT_TIMEOUT_MS = 120_000;
+
 @Injectable()
 export class ChatService {
 	constructor(
@@ -50,7 +53,12 @@ export class ChatService {
 		const turnMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
 		try {
-			await this.runAgentLoop(emitter, messages, turnMessages, blocks, datasourceId, userId);
+			await Promise.race([
+				this.runAgentLoop(emitter, messages, turnMessages, blocks, datasourceId, userId),
+				new Promise<never>((_, reject) =>
+					setTimeout(() => reject(new Error('分析超时，请尝试简化问题后重试')), CHAT_TIMEOUT_MS),
+				),
+			]);
 			emitter.done();
 		} catch (err: any) {
 			const errorEvent: SSEEvent = { type: 'error', content: err.message };
@@ -74,7 +82,7 @@ export class ChatService {
 	): Promise<void> {
 		const tools = this.toolRegistry.getDefinitions();
 
-		while (true) {
+		for (let iteration = 0; iteration < MAX_AGENT_ITERATIONS; iteration++) {
 			const stream = await this.llm.client.chat.completions.create({
 				model: this.llm.model,
 				messages,
