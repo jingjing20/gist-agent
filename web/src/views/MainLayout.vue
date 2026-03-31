@@ -3,9 +3,7 @@
     <header class="app-header">
       <div class="header-brand">
         <div class="logo-icon">
-          <div class="logo-bar logo-bar-1"></div>
-          <div class="logo-bar logo-bar-2"></div>
-          <div class="logo-bar logo-bar-3"></div>
+          <i class="fas fa-chart-line"></i>
         </div>
         <span class="brand-text">Gist Agent</span>
       </div>
@@ -100,19 +98,17 @@ function handleLogout() {
 }
 
 .logo-icon {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
+  border-radius: 8px;
   display: flex;
-  align-items: flex-end;
-  gap: 2px;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
 }
-
-.logo-bar {
-  width: 6px;
-  border-radius: 2px 2px 0 0;
-}
-
-.logo-bar-1 { height: 16px; background: var(--da-gradient-start); }
-.logo-bar-2 { height: 24px; background: var(--da-primary); }
-.logo-bar-3 { height: 12px; background: var(--da-gradient-end); }
 
 .brand-text {
   font-size: 20px;
