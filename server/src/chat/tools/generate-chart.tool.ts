@@ -16,7 +16,7 @@ export class GenerateChartTool implements Tool {
 				properties: {
 					chartType: {
 						type: 'string',
-						enum: ['line', 'bar', 'pie', 'scatter'],
+						enum: ['line', 'bar', 'pie', 'scatter', 'radar', 'funnel'],
 						description: '图表类型，与 analyze_result 中声明的一致',
 					},
 					title: {
@@ -26,7 +26,7 @@ export class GenerateChartTool implements Tool {
 					xAxis: {
 						type: 'array',
 						items: { type: 'string' },
-						description: '各数据点的标签；bar/line/scatter 为 X 轴分类，饼图为各扇区名称（必填，与 series[0].data 一一对应）',
+						description: '各数据点的标签；bar/line/scatter 为 X 轴分类，pie/funnel 为各扇区名称，radar 为多维指标名称（必填，长度需对应数据）',
 					},
 					series: {
 						type: 'array',

@@ -20,8 +20,8 @@ export class AnalyzeResultTool implements Tool {
 					},
 					chartType: {
 						type: 'string',
-						enum: ['line', 'bar', 'pie', 'scatter'],
-						description: '图表类型（needsChart=true 时必填）：line 趋势时序 / bar 对比排名 / pie 占比分布 / scatter 相关性',
+						enum: ['line', 'bar', 'pie', 'scatter', 'radar', 'funnel'],
+						description: '图表类型（needsChart=true 时必填）：line 趋势时序 / bar 对比排名 / pie 占比 / scatter 相关性 / radar 多维对比 / funnel 阶段转化',
 					},
 					chartTitle: {
 						type: 'string',

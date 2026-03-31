@@ -14,7 +14,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import * as echarts from 'echarts/core';
-import { BarChart, LineChart, PieChart, ScatterChart } from 'echarts/charts';
+import { BarChart, LineChart, PieChart, ScatterChart, RadarChart, FunnelChart } from 'echarts/charts';
 import {
   TitleComponent,
   TooltipComponent,
@@ -25,7 +25,7 @@ import { CanvasRenderer } from 'echarts/renderers';
 import type { ChartData } from '../../types';
 
 echarts.use([
-  BarChart, LineChart, PieChart, ScatterChart,
+  BarChart, LineChart, PieChart, ScatterChart, RadarChart, FunnelChart,
   TitleComponent, TooltipComponent, GridComponent, LegendComponent,
   CanvasRenderer,
 ]);
@@ -51,6 +51,8 @@ let chart: echarts.ECharts | null = null;
 
 function buildOption(data: ChartData): Record<string, unknown> {
   const isPie = data.chartType === 'pie';
+  const isFunnel = data.chartType === 'funnel';
+  const isRadar = data.chartType === 'radar';
 
   const base: Record<string, unknown> = {
     title: {
@@ -77,31 +79,76 @@ function buildOption(data: ChartData): Record<string, unknown> {
     color: COLORS,
   };
 
-  if (isPie) {
-    const pieData = data.series[0]?.data.map((val, i) => ({
+  if (isPie || isFunnel) {
+    const chartData = data.series[0]?.data.map((val, i) => ({
       name: data.xAxis?.[i] ?? data.series[0]?.name ?? `${i}`,
       value: val,
     })) ?? [];
 
-    base.series = [{
-      type: 'pie',
-      radius: ['45%', '70%'],
-      center: ['50%', '55%'],
-      itemStyle: { 
-        borderRadius: 8, 
-        borderColor: '#1a1f2e', // da-chart-bg
-        borderWidth: 2 
-      },
-      label: { color: '#94a3b8', fontSize: 12 },
-      emphasis: {
-        label: { fontSize: 14, fontWeight: 'bold' },
+    if (isPie) {
+      base.series = [{
+        type: 'pie',
+        radius: ['45%', '70%'],
+        center: ['50%', '55%'],
         itemStyle: { 
-          shadowBlur: 15, 
-          shadowColor: 'rgba(14, 165, 233, 0.4)' // da-primary shadow
+          borderRadius: 8, 
+          borderColor: '#1a1f2e', // da-chart-bg
+          borderWidth: 2 
         },
-      },
-      data: pieData,
+        label: { color: '#94a3b8', fontSize: 12 },
+        emphasis: {
+          label: { fontSize: 14, fontWeight: 'bold' },
+          itemStyle: { 
+            shadowBlur: 15, 
+            shadowColor: 'rgba(14, 165, 233, 0.4)' // da-primary shadow
+          },
+        },
+        data: chartData,
+      }];
+    } else {
+      base.series = [{
+        type: 'funnel',
+        left: '10%',
+        width: '80%',
+        label: { color: '#94a3b8', fontSize: 12 },
+        itemStyle: { 
+          borderColor: '#1a1f2e',
+          borderWidth: 2 
+        },
+        data: chartData,
+      }];
+    }
+    return base;
+  }
+
+  if (isRadar) {
+    const indicators = (data.xAxis ?? []).map((name) => ({ name }));
+    base.radar = {
+      indicator: indicators,
+      axisName: { color: '#94a3b8', padding: [3, 5] },
+      splitLine: { lineStyle: { color: 'rgba(51, 58, 77, 0.4)' } },
+      splitArea: { show: false },
+      axisLine: { lineStyle: { color: 'rgba(51, 58, 77, 0.4)' } },
+    };
+
+    base.series = [{
+      type: 'radar',
+      symbol: 'circle',
+      symbolSize: 6,
+      lineStyle: { width: 2 },
+      areaStyle: { opacity: 0.2 },
+      data: data.series.map(s => ({
+        name: s.name,
+        value: s.data
+      }))
     }];
+    
+    if (data.series.length > 1) {
+      base.legend = {
+        top: 40,
+        textStyle: { color: '#94a3b8', fontSize: 12 },
+      };
+    }
     return base;
   }
 

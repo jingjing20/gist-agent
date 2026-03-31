@@ -4,7 +4,7 @@ export interface ChartSeries {
 }
 
 export interface ChartData {
-	chartType: 'line' | 'bar' | 'pie' | 'scatter';
+	chartType: 'line' | 'bar' | 'pie' | 'scatter' | 'radar' | 'funnel';
 	title: string;
 	xAxis?: string[];
 	series: ChartSeries[];
