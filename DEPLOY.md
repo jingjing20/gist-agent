@@ -51,11 +51,14 @@ vim .env   # 或 nano / 其他编辑器
 | `DB_PASSWORD` | 数据库密码 | 强密码，不要用默认 |
 | `DB_NAME` | 数据库名 | `ai_analysis` |
 | `JWT_SECRET` | 登录 Token 签名密钥 | 随机长字符串，生产务必改 |
-| `SMTP_HOST` | SMTP 服务器地址 | `smtp.qq.com` |
+| `SMTP_HOST` | SMTP 服务器地址 | `smtp.example.com` |
 | `SMTP_PORT` | SMTP 端口 | `465` |
-| `SMTP_USER` | SMTP 用户名 | `your-email@qq.com` |
+| `SMTP_USER` | SMTP 用户名 | `your-email@example.com` |
 | `SMTP_PASS` | SMTP 授权码/密码 | `your-smtp-password` |
-| `SMTP_FROM` | 邮件发送者信息 | `"AI Data Analysis <your-email@qq.com>"` |
+| `SMTP_FROM` | 邮件发送者信息 | `"AI Data Analysis <your-email@example.com>"` |
+| `LANGSMITH_TRACING` | 是否开启 LangSmith 追踪 | `true` / `false` |
+| `LANGSMITH_API_KEY` | LangSmith API Key | `lsv2_pt_...` |
+| `LANGSMITH_PROJECT` | LangSmith 项目名 | `gist-agent` |
 
 **注意：** `.env` 不要提交到 Git，已在 `.gitignore` 中。
 
