@@ -35,7 +35,7 @@ export class SqlQueryTool implements Tool {
 		blocks.push(execLog);
 
 		// Add a slight delay to enhance the perception of "thinking/processing"
-		await new Promise(resolve => setTimeout(resolve, 600));
+		await new Promise(resolve => setTimeout(resolve, 1000));
 
 		try {
 			const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId);

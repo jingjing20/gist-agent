@@ -166,7 +166,7 @@ export class ChatService {
 				const title = name === 'execute_sql_query' ? '[SQL 生成]' : `[工具调用] ${name}`;
 				const lastLog = [...blocks].reverse().find(b => b.type === 'log' && b.title === title);
 				if (lastLog) {
-					lastLog.content = name === 'execute_sql_query' ? 'SQL 生成完毕' : (argsStr || '处理完毕');
+					lastLog.content = name === 'execute_sql_query' ? 'SQL 生成完毕，具体查询逻辑请查看下方SQL代码块' : (argsStr || '处理完毕');
 					emitter.send({ ...lastLog, type: 'log_update' } as any);
 				}
 
