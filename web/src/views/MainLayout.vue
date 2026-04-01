@@ -125,26 +125,44 @@ function handleLogout() {
 }
 
 .tab-btn {
+  position: relative;
   height: 100%;
-  padding: 0 16px;
+  padding: 0 20px;
   color: var(--da-text-muted);
   font-size: 15px;
   font-weight: 500;
   background: transparent;
   border: none;
   cursor: pointer;
-  border-bottom: 2px solid transparent;
-  transition: color 0.2s;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-family: inherit;
 }
 
 .tab-btn:hover {
-  color: #fff;
+  color: var(--da-text-main);
 }
 
 .tab-btn.active {
   color: #fff;
-  border-bottom-color: var(--da-primary);
+  font-weight: 600;
+}
+
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20px;
+  right: 20px;
+  height: 3px;
+  background: var(--da-primary);
+  border-radius: 3px 3px 0 0;
+  transform: scaleX(0);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 -2px 10px var(--da-primary);
+}
+
+.tab-btn.active::after {
+  transform: scaleX(1);
 }
 
 .header-user {

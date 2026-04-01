@@ -1,7 +1,10 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="modal-overlay" @click.self="handleCancel">
-      <div class="modal delete-modal">
+    <div v-if="modelValue" class="modal-overlay">
+      <div class="modal da-modal delete-modal">
+        <button class="modal-close" @click="handleCancel">
+          <i class="fas fa-times"></i>
+        </button>
         <h3 class="modal-title">{{ title }}</h3>
         <p class="modal-desc">{{ desc }}</p>
         <div class="modal-footer">
@@ -46,16 +49,7 @@ function handleConfirm() {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
+/* modal-overlay is now global in style.css */
 
 .modal {
   background: var(--da-panel);

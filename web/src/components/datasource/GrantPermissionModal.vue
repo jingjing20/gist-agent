@@ -1,7 +1,10 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="modal-overlay" @click.self="emit('update:modelValue', null)">
+    <div v-if="modelValue" class="modal-overlay">
       <div class="modal da-modal grant-modal">
+        <button class="modal-close" @click="emit('update:modelValue', null)">
+          <i class="fas fa-times"></i>
+        </button>
         <h3>权限管理: {{ modelValue.name }}</h3>
 
         <div class="granted-list-section">
@@ -48,15 +51,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import type { DataSource } from '../../stores/datasource';
 
-defineProps<{
+const props = defineProps<{
   modelValue: DataSource | null;
   grantedUsers: any[];
   searchResults: any[];
   authUser: any;
 }>();
+
+watch(() => props.modelValue, (val) => {
+  if (val) {
+    searchQuery.value = '';
+    emit('search', '');
+  }
+});
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: DataSource | null): void;
@@ -73,16 +83,7 @@ function handleSearch() {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
+/* modal-overlay is now global in style.css */
 
 .modal {
   background: var(--da-panel);

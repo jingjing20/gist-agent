@@ -114,10 +114,10 @@ export const useDataSourceStore = defineStore('datasource', () => {
 		return res.json();
 	}
 
-	async function uploadTable(datasourceId: number, file: File, displayName: string): Promise<UploadedTable> {
+	async function uploadTable(datasourceId: number, file: File, tableConfigs: { sheetName?: string; displayName: string }[]): Promise<UploadedTable[]> {
 		const form = new FormData();
 		form.append('file', file);
-		form.append('displayName', displayName);
+		form.append('tableConfigs', JSON.stringify(tableConfigs));
 		const res = await apiFetch(`/datasources/${datasourceId}/tables`, {
 			method: 'POST',
 			body: form,

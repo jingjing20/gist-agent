@@ -89,69 +89,93 @@ export class DataSourceController {
 		@CurrentUser() user: User,
 		@Param('id', ParseIntPipe) datasourceId: number,
 		@UploadedFile() file: Express.Multer.File,
-		@Body('displayName') displayName: string,
+		@Body('tableConfigs') tableConfigsStr: string,
 	) {
 		if (!file) throw new BadRequestException('请上传文件');
-		if (!displayName?.trim()) throw new BadRequestException('请提供表名');
+		if (!tableConfigsStr) throw new BadRequestException('缺失表配置信息');
 
-		const ext = file.originalname.split('.').pop()?.toLowerCase();
-		let rawRows: Record<string, unknown>[] = [];
-
-		if (ext === 'csv') {
-			rawRows = await new Promise((resolve, reject) => {
-				const results: Record<string, unknown>[] = [];
-				const readable = Readable.from(file.buffer);
-				const csvStream = readable.pipe(csvParser());
-				csvStream
-					.on('data', (row: Record<string, unknown>) => {
-						results.push(row);
-						if (results.length > MAX_FILE_ROWS) {
-							readable.destroy();
-							csvStream.destroy();
-							reject(new BadRequestException(`文件行数超过上限 ${MAX_FILE_ROWS} 行，请分批上传或裁剪后重试`));
-						}
-					})
-					.on('end', () => resolve(results))
-					.on('error', reject);
-			});
-		} else if (ext === 'xlsx' || ext === 'xls') {
-			const workbook = XLSX.read(file.buffer, { type: 'buffer' });
-			const sheet = workbook.Sheets[workbook.SheetNames[0]];
-			rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true }) as Record<string, unknown>[];
-			if (rawRows.length > MAX_FILE_ROWS) {
-				throw new BadRequestException(`文件行数超过上限 ${MAX_FILE_ROWS} 行，请分批上传或裁剪后重试`);
-			}
-		} else {
-			throw new BadRequestException('只支持 .csv / .xlsx / .xls 格式');
+		let tableConfigs: { sheetName?: string; displayName: string }[] = [];
+		try {
+			tableConfigs = JSON.parse(tableConfigsStr);
+		} catch (e) {
+			throw new BadRequestException('表配置格式错误');
 		}
 
-		if (!rawRows.length) throw new BadRequestException('文件内容为空');
+		if (!tableConfigs.length) throw new BadRequestException('请选择至少一个要上传的表');
 
-		const colNames = Object.keys(rawRows[0]);
-		const normalizedRows = rawRows.map(row => {
-			const out: Record<string, unknown> = {};
-			for (const key of colNames) out[key] = normalizeValue(row[key]);
-			return out;
-		});
+		const ext = file.originalname.split('.').pop()?.toLowerCase();
+		const results: any[] = [];
 
-		const uniqueNames = ensureUniqueColumnNames(colNames);
-		const columns = colNames.map((colName, i) => ({
-			name: uniqueNames[i],
-			originalName: colName,
-			type: inferMysqlType(normalizedRows.map(r => r[colName])),
-		}));
+		let workbook: XLSX.WorkBook | null = null;
+		if (ext === 'xlsx' || ext === 'xls') {
+			workbook = XLSX.read(file.buffer, { type: 'buffer' });
+		}
 
-		const cleanRows = normalizedRows.map(row => {
-			const cleaned: Record<string, unknown> = {};
-			colNames.forEach((orig, i) => {
-				cleaned[columns[i].name] = coerce(row[orig], columns[i].type);
+		for (const config of tableConfigs) {
+			let rawRows: Record<string, unknown>[] = [];
+			const displayName = config.displayName.trim();
+			if (!displayName) continue;
+
+			if (ext === 'csv') {
+				rawRows = await new Promise((resolve, reject) => {
+					const rows: Record<string, unknown>[] = [];
+					const readable = Readable.from(file.buffer);
+					const csvStream = readable.pipe(csvParser());
+					csvStream
+						.on('data', (row: Record<string, unknown>) => {
+							rows.push(row);
+							if (rows.length > MAX_FILE_ROWS) {
+								readable.destroy();
+								csvStream.destroy();
+								reject(new BadRequestException(`文件行数超过上限 ${MAX_FILE_ROWS} 行`));
+							}
+						})
+						.on('end', () => resolve(rows))
+						.on('error', reject);
+				});
+			} else if (workbook) {
+				const sheetName = config.sheetName || workbook.SheetNames[0];
+				const sheet = workbook.Sheets[sheetName];
+				if (!sheet) continue;
+				rawRows = XLSX.utils.sheet_to_json(sheet, { defval: null, raw: true }) as Record<string, unknown>[];
+				if (rawRows.length > MAX_FILE_ROWS) {
+					throw new BadRequestException(`Sheet「${sheetName}」行数超过上限 ${MAX_FILE_ROWS} 行`);
+				}
+			}
+
+			if (!rawRows.length) continue;
+
+			const colNames = Object.keys(rawRows[0]);
+			const normalizedRows = rawRows.map(row => {
+				const out: Record<string, unknown> = {};
+				for (const key of colNames) out[key] = normalizeValue(row[key]);
+				return out;
 			});
-			return cleaned;
-		});
 
-		const result = await this.datasourceService.uploadTable(datasourceId, user.id, displayName.trim(), columns, cleanRows);
-		this.suggestionService.invalidateAndRegenerate(datasourceId, user.id);
-		return result;
+			const uniqueNames = ensureUniqueColumnNames(colNames);
+			const columns = colNames.map((colName, i) => ({
+				name: uniqueNames[i],
+				originalName: colName,
+				type: inferMysqlType(normalizedRows.map(r => r[colName])),
+			}));
+
+			const cleanRows = normalizedRows.map(row => {
+				const cleaned: Record<string, unknown> = {};
+				colNames.forEach((orig, i) => {
+					cleaned[columns[i].name] = coerce(row[orig], columns[i].type);
+				});
+				return cleaned;
+			});
+
+			const result = await this.datasourceService.uploadTable(datasourceId, user.id, displayName, columns, cleanRows);
+			results.push(result);
+		}
+
+		if (results.length > 0) {
+			this.suggestionService.invalidateAndRegenerate(datasourceId, user.id);
+		}
+
+		return results;
 	}
 
 	@Delete(':id/tables/:tableId')

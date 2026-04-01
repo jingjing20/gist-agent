@@ -1,7 +1,10 @@
 <template>
   <Teleport to="body">
-    <div v-if="modelValue" class="modal-overlay" @click.self="emit('update:modelValue', false)">
+    <div v-if="modelValue" class="modal-overlay">
       <div class="modal da-modal">
+        <button class="modal-close" @click="emit('update:modelValue', false)">
+          <i class="fas fa-times"></i>
+        </button>
         <h3>新建数据源</h3>
         <div class="da-form">
           <div class="form-group">
@@ -30,9 +33,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue';
+import { ref, reactive, watch } from 'vue';
 
-defineProps<{
+const props = defineProps<{
   modelValue: boolean;
   submitting: boolean;
   error?: string;
@@ -48,6 +51,13 @@ const form = reactive<{ name: string; description: string }>({
   description: '',
 });
 
+watch(() => props.modelValue, (val) => {
+  if (val) {
+    form.name = '';
+    form.description = '';
+  }
+});
+
 function handleSubmit() {
   if (form.name) {
     emit('submit', { ...form });
@@ -56,16 +66,7 @@ function handleSubmit() {
 </script>
 
 <style scoped>
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
+/* modal-overlay is now global in style.css */
 
 .modal {
   background: var(--da-panel);

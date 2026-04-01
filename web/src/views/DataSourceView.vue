@@ -156,12 +156,12 @@ function openUpload(ds: DataSource) {
   uploadTargetDs.value = ds;
   uploadError.value = '';
 }
-async function handleUpload(_id: number, file: File, displayName: string) {
+async function handleUpload(_id: number, file: File, tableConfigs: { sheetName?: string; displayName: string }[]) {
   if (!uploadTargetDs.value) return;
   uploadError.value = '';
   uploading.value = true;
   try {
-    await dsStore.uploadTable(uploadTargetDs.value.id, file, displayName);
+    await dsStore.uploadTable(uploadTargetDs.value.id, file, tableConfigs);
     if (showingTablesDs.value?.id === uploadTargetDs.value.id) {
        tables.value = await dsStore.listTables(uploadTargetDs.value.id);
     }

@@ -12,7 +12,7 @@
           <i class="fas fa-database text-da-primary"></i>
         </button>
       </div>
-      <div class="message-list no-scrollbar" ref="messageListRef">
+      <div class="message-list no-scrollbar" ref="messageListRef" @scroll="handleScroll">
         <ChatMessageItem
           v-for="msg in store.activeConversation.messages"
           :key="msg.id"
@@ -62,22 +62,40 @@ function isLastAssistantMsg(msg: ChatMessage): boolean {
   return false;
 }
 
-function scrollToBottom() {
+const isUserScrolledUp = ref(false);
+
+function handleScroll(e: Event) {
+  const el = e.target as HTMLElement;
+  const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+  // 给一定容差，超过 50px 认为用户主动上卷了
+  isUserScrolledUp.value = distance > 50;
+}
+
+function scrollToBottom(force = false) {
+  if (!force && isUserScrolledUp.value) return;
   nextTick(() => {
     const el = messageListRef.value;
     if (el) el.scrollTop = el.scrollHeight;
   });
 }
 
-watch(() => store.activeConversation?.messages.length, scrollToBottom);
+watch(
+  () => store.activeConversation?.messages.length,
+  (newLen, oldLen) => {
+    if (newLen && (!oldLen || newLen > oldLen)) {
+      isUserScrolledUp.value = false;
+      scrollToBottom(true);
+    }
+  },
+  { immediate: true }
+);
 
 watch(
+  () => store.activeConversation?.messages,
   () => {
-    const conv = store.activeConversation;
-    if (!conv) return 0;
-    return conv.messages.reduce((n, m) => n + m.blocks.length, 0);
+    scrollToBottom(false);
   },
-  scrollToBottom,
+  { deep: true }
 );
 
 async function handleExample(query: string) {

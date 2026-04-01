@@ -90,6 +90,10 @@ function blockProps(block: MessageBlock, index: number = -1): Record<string, unk
   width: 100%;
 }
 
+.message.user {
+  flex-direction: row-reverse;
+}
+
 .message-avatar {
   width: 36px;
   height: 36px;
@@ -125,18 +129,20 @@ function blockProps(block: MessageBlock, index: number = -1): Record<string, unk
 
 .user-text-container {
   display: flex;
-  justify-content: flex-start;
+  justify-content: flex-end;
 }
 
 .user-text {
-  background: var(--da-panel);
+  background: var(--da-primary);
   padding: 12px 16px;
   border-radius: 12px;
-  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
   font-size: 14px;
   line-height: 1.6;
-  color: var(--da-text-main);
-  border: 1px solid var(--da-border);
+  color: #fff;
+  border: none;
+  max-width: 85%;
+  text-align: left;
 }
 
 .assistant-content {
