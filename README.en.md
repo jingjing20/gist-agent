@@ -1,30 +1,43 @@
-# Gist Agent
+<div align="center">
+  <img src="./web/public/gist-agent-banner.png" width="600" />
 
-> [中文文档](./README.md)
+  # Gist Agent
 
-An LLM-powered data analysis platform. Upload CSV/Excel files, ask questions in natural language — the agent generates SQL, executes queries, and renders charts in real time.
+  An LLM-powered data analysis platform. Upload CSV/Excel files,
+  ask questions in natural language — the agent generates SQL,
+  executes queries, and renders charts in real time.
 
----
+  <p>
+    <img src="https://img.shields.io/badge/Node.js-%3E%3D18-green" alt="Node version" />
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License" />
+    <img src="https://img.shields.io/badge/MySQL-%3E%3D5.7-orange" alt="MySQL" />
+  </p>
 
-## Quick Demo
-
-### datasource
-
-![datasource](./web/public/ai-datasource.gif)
-
-### analysis
-
-![analysis](./web/public/ai-analysis.gif)
-
----
-
-## Architecture Diagram
-
-![Architecture](./web/public/project_design.png)
+  <p>
+    <b>English</b> · <a href="./README.md">简体中文</a>
+  </p>
+</div>
 
 ---
 
-## Features
+<h2 align="center">Quick Demo</h2>
+
+<video src="./web/public/ai-analysis-login.mp4" width="100%" controls autoplay muted loop></video>
+
+<video src="./web/public/ai-analysis.mp4" width="100%" controls autoplay muted loop></video>
+
+<video src="./web/public/ai-datasource.mp4" width="100%" controls autoplay muted loop></video>
+
+---
+<h2 align="center">Architecture Diagram</h2>
+
+<p align="center">
+  <img src="./web/public/project-design.png" width="800" />
+</p>
+
+---
+
+<h2 align="center">Features</h2>
 
 | Feature | Description |
 |---|---|

@@ -1,28 +1,37 @@
-# Gist Agent
+<div align="center">
+  <img src="./web/public/gist-agent-banner.png" width="600" />
 
-> [English](./README.en.md)
+  # Gist Agent
 
-基于大语言模型（LLM）的智能数据分析平台。上传 CSV / Excel 文件，用自然语言提问，Agent 自动生成 SQL、执行查询、实时渲染图表。
+  基于大语言模型（LLM）的智能数据分析平台。上传 CSV / Excel 文件，
+  用自然语言提问，Agent 自动生成 SQL、执行查询、实时渲染图表。
 
----
+  <p>
+    <img src="https://img.shields.io/badge/Node.js-%3E%3D18-green" alt="Node version" />
+    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License" />
+    <img src="https://img.shields.io/badge/MySQL-%3E%3D5.7-orange" alt="MySQL" />
+  </p>
 
-## 项目演示
+  <p>
+    <a href="./README.en.md">English</a> · <b>简体中文</b>
+  </p>
+</div>
 
-### 数据源
 
-![数据源](./web/public/ai-datasource.gif)
+<h2 align="center">项目演示</h2>
 
-### 对话
+<video src="./web/public/ai-analysis-login.mp4" width="100%" controls autoplay muted loop></video>
 
-![对话](./web/public/ai-analysis.gif)
+<video src="./web/public/ai-analysis.mp4" width="100%" controls autoplay muted loop></video>
 
----
+<video src="./web/public/ai-datasource.mp4" width="100%" controls autoplay muted loop></video>
 
-## 架构图
+<h2 align="center">架构图（具体见功能特性）</h2>
 
-![Architecture](./web/public/project-design.png)
+<p align="center">
+  <img src="./web/public/project-design.png" width="800" />
+</p>
 
----
 
 ## 功能特性
 
@@ -40,7 +49,6 @@
 | **多租户隔离** | JWT 认证 + SMTP 密码找回。数据源支持精细权限管理（grant/revoke），不同用户的表空间、会话历史完全隔离。 |
 | **LangSmith 追踪** | 配置 `LANGSMITH_API_KEY` 即开启全链路追踪：Tool 调用链、Token 用量、SQL 执行耗时。 |
 
----
 
 ## 项目结构
 
@@ -70,7 +78,6 @@ gist-agent/                  # pnpm workspaces Monorepo
 └── FAQ.md                   # 架构设计 FAQ & 运维实践
 ```
 
----
 
 ## 技术栈
 
@@ -82,7 +89,6 @@ gist-agent/                  # pnpm workspaces Monorepo
 | 可观测性 | LangSmith（可选） |
 | 运行环境 | Node.js >= 18、pnpm >= 8、MySQL >= 5.7 |
 
----
 
 ## 快速启动
 
@@ -137,14 +143,12 @@ pnpm dev:server   # http://localhost:3000
 pnpm dev:web      # http://localhost:5173
 ```
 
----
 
 ## 更多资源
 
 - **[FAQ.md](./FAQ.md)** -- 架构设计问答（Tool vs Agent 界定、SQL 防腐层原理）及运维实践（SSH 隧道连接线上 MySQL）
 - **[DEPLOY.md](./DEPLOY.md)** -- Docker Compose 编排、Nginx 反代、GitHub Actions CI/CD
 
----
 
 ## 许可证
 
