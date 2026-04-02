@@ -23,8 +23,8 @@ docker compose version
 
 ```bash
 cd /opt   # 或你习惯的目录
-git clone <你的仓库地址> ai-data-analysis
-cd ai-data-analysis
+git clone <你的仓库地址> gist-agent
+cd gist-agent
 ```
 
 ---
@@ -196,7 +196,7 @@ cat ~/.ssh/deploy.pub
 | `SERVER_USER` | SSH 登录用户名 | `root` 或 `ubuntu` |
 | `SSH_PRIVATE_KEY` | 上面生成的**私钥**完整内容 | 含 `-----BEGIN ... KEY-----` 整段 |
 | `SERVER_PORT` | 可选，SSH 端口，不填默认 22 | `22` |
-| `DEPLOY_PATH` | 可选，项目在服务器上的路径，不填默认 `/opt/ai-data-analysis` | `/opt/ai-data-analysis` |
+| `DEPLOY_PATH` | 可选，项目在服务器上的路径，不填默认 `/opt/gist-agent` | `/opt/gist-agent` |
 
 `SSH_PRIVATE_KEY`：打开 `~/.ssh/deploy`，复制全部内容（包括首尾两行）粘贴到 secret 值里。
 
@@ -213,7 +213,7 @@ cat ~/.ssh/deploy.pub
 ## 十一、部署流程小结（复制执行）
 
 ```bash
-cd /opt && git clone <仓库地址> ai-data-analysis && cd ai-data-analysis
+cd /opt && git clone <仓库地址> gist-agent && cd gist-agent
 cp .env.example .env
 # 编辑 .env 填入真实配置
 vim .env
