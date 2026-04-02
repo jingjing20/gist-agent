@@ -20,11 +20,17 @@
 
 <h2 align="center">项目演示</h2>
 
-<video src="./web/public/ai-analysis-login.mp4" width="100%" controls autoplay muted loop></video>
-
-<video src="./web/public/ai-analysis.mp4" width="100%" controls autoplay muted loop></video>
-
-<video src="./web/public/ai-datasource.mp4" width="100%" controls autoplay muted loop></video>
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/cfb71f36-dfa8-40c1-84d2-2db81a5cd825" width="100%" autoplay loop muted playsinline>
+    Your browser does not support video playback.
+  </video>
+  <video src="https://github.com/user-attachments/assets/c6252c3d-237f-4809-92f0-3e850702a8b5" width="100%" autoplay loop muted playsinline>
+    Your browser does not support video playback.
+  </video>
+  <video src="https://github.com/user-attachments/assets/04861aa2-b6cb-4767-a96d-6f4a49a4cfe6" width="100%" autoplay loop muted playsinline>
+    Your browser does not support video playback.
+  </video>
+</div>
 
 <h2 align="center">架构图（具体见功能特性）</h2>
 
