@@ -69,7 +69,7 @@ export class ChatService {
 		await this.conversationService.addMessage(conversationId, 'assistant', '', blocks, turnMessages);
 
 		// 异步触发语义摘要蒸馏，完成“中期记忆”提取
-		this.distiller.updateStateAsync(conversationId, userId, message, blocks);
+		this.distiller.updateStateAsync(conversationId, userId, message);
 	}
 
 	private async runAgentLoop(

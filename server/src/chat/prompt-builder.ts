@@ -43,11 +43,7 @@ export class PromptBuilder {
 			if (conv?.semantic_state) {
 				const state = conv.semantic_state;
 				const defs = Object.entries(state.definitions || {}).map(([k, v]) => `- ${k}: ${v}`).join('\n');
-				const facts = Object.entries(state.facts || {}).map(([k, v]) => `- ${k}: ${v}`).join('\n');
-				
-				statePrompt = `\n## 历史业务背景与事实库 (Semantic Memory)\n`;
-				if (defs) statePrompt += `### 业务定义/口径：\n${defs}\n`;
-				if (facts) statePrompt += `### 已确认的数据事实：\n${facts}\n`;
+				if (defs) statePrompt = `\n## 业务口径定义 (Semantic Memory)\n${defs}\n`;
 			}
 		}
 
