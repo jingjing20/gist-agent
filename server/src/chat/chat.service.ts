@@ -13,6 +13,9 @@ import type OpenAI from 'openai';
 const MAX_AGENT_ITERATIONS = 15;
 const CHAT_TIMEOUT_MS = 120_000;
 
+/**
+ * 对话核心服务：编排 LLM 思考流程、管理上下文、触发工具执行并实时推送结果。
+ */
 @Injectable()
 export class ChatService {
 	constructor(
@@ -24,6 +27,9 @@ export class ChatService {
 		private readonly distiller: SemanticDistillerService,
 	) { }
 
+	/**
+	 * 处理单次对话请求：权限校验 -> 消息入库 -> 启动 Agent 循环 -> 触发异步记忆提取。
+	 */
 	async handleChat(
 		res: Response,
 		userId: number,
@@ -68,10 +74,16 @@ export class ChatService {
 
 		await this.conversationService.addMessage(conversationId, 'assistant', '', blocks, turnMessages);
 
-		// 异步触发语义摘要蒸馏，完成“中期记忆”提取
+		// 异步触发语义摘要蒸馏，将对话碎片转化为“中期记忆”，避免上下文爆炸
 		this.distiller.updateStateAsync(conversationId, userId, message);
 	}
 
+	/**
+	 * Agent 核心循环 (ReAct 模式):
+	 * 1. 推理 (Reasoning): LLM 根据提示词决定是直接输出文本，还是生成 tool_calls。
+	 * 2. 行动 (Acting): 解析 tool_calls 并反射执行本地工具。
+	 * 3. 观察 (Observation): 获取工具运行结果（tool_result），追加到上下文重新喂给 LLM。
+	 */
 	private async runAgentLoop(
 		emitter: StreamEmitter,
 		messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
@@ -138,6 +150,7 @@ export class ChatService {
 				}
 			}
 
+			// 检查本次迭代是否有工具调用
 			const validToolCalls = toolCalls.filter(Boolean);
 
 			if (validToolCalls.length === 0) {
@@ -177,6 +190,7 @@ export class ChatService {
 					blocks.push(sqlBlock);
 				}
 
+				// 反射获取工具实例并执行
 				const tool = this.toolRegistry.get(name);
 				let toolResult: string;
 

@@ -24,6 +24,10 @@ interface HistoryEntry {
 	compactTokens: number;
 }
 
+/**
+ * 提示词构建器：负责组装 System Prompt 并根据 Token 预算管理上下文窗口。
+ * 使用多级压缩策略（Full/Medium/Compact）确保在有限的 Context Window 内保留尽可能多的关键信息。
+ */
 @Injectable()
 export class PromptBuilder {
 	private readonly logger = new Logger(PromptBuilder.name);
@@ -33,6 +37,9 @@ export class PromptBuilder {
 		private readonly conversationService: ConversationService,
 	) {}
 
+	/**
+	 * 构建系统提示词：包含身份定义、实时表结构、业务口径（语义状态）和强制执行规则。
+	 */
 	async buildSystemPrompt(datasourceId: number | null, userId: number, conversationId?: string): Promise<string> {
 		const today = new Date().toISOString().split('T')[0];
 		const schemaPrompt = await this.schemaService.getDatabaseSchemaPrompt(datasourceId, userId);
@@ -65,6 +72,9 @@ ${statePrompt}
 - generate_chart 的数据必须严格来自 execute_sql_query 的查询结果，不得编造数据。`;
 	}
 
+	/**
+	 * 构建完整的消息列表：计算预算 -> 加载历史 -> 择优压缩并填充。
+	 */
 	async buildMessages(
 		conversationId: string,
 		userId: number,
@@ -93,6 +103,9 @@ ${statePrompt}
 		return messages;
 	}
 
+	/**
+	 * 将数据库消息转为带有三种压缩级别的 HistoryEntry。
+	 */
 	private toHistoryEntry(msg: Message): HistoryEntry {
 		if (msg.role === 'user') {
 			const userMsg: ChatMessage = { role: 'user', content: msg.content };
@@ -159,6 +172,9 @@ ${statePrompt}
 		return [{ role: 'assistant', content } as ChatMessage];
 	}
 
+	/**
+	 * 从 JSON 结果字符串中安全提取行数。
+	 */
 	private extractRowCount(content: string): number | null {
 		try {
 			const raw = JSON.parse(content);
@@ -184,6 +200,9 @@ ${statePrompt}
 		return msg;
 	}
 
+	/**
+	 * 数据脱水：将庞大的查询结果集（Array/Object）转化为结构摘要，保留元数据，丢弃具体行数据。
+	 */
 	private dehydrateToolResult(content: string): string {
 		try {
 			const raw = JSON.parse(content);
@@ -208,6 +227,9 @@ ${statePrompt}
 		}
 	}
 
+	/**
+	 * 移除工具调用参数中的重负载内容（如 generate_chart 中的 data 数组）。
+	 */
 	private dehydrateToolCall(call: any): any {
 		if (call.function?.name === 'generate_chart' && call.function.arguments) {
 			try {
@@ -224,6 +246,9 @@ ${statePrompt}
 		return call;
 	}
 
+	/**
+	 * 提取消息的纯文本部分作为“紧凑级”回复。
+	 */
 	private extractCompactText(msg: Message): string {
 		if (msg.content) return msg.content;
 		if (!Array.isArray(msg.blocks)) return '';
@@ -270,6 +295,9 @@ ${statePrompt}
 		return selected;
 	}
 
+	/**
+	 * 状态映射：获取指定级别的 Token 计数。
+	 */
 	private getTokensForLevel(entry: HistoryEntry, level: CompressionLevel): number {
 		switch (level) {
 			case 'full': return entry.fullTokens;
@@ -278,6 +306,9 @@ ${statePrompt}
 		}
 	}
 
+	/**
+	 * 状态映射：获取指定级别的消息数组。
+	 */
 	private getMessagesForLevel(entry: HistoryEntry, level: CompressionLevel): ChatMessage[] {
 		switch (level) {
 			case 'full': return entry.fullMessages;

@@ -11,12 +11,20 @@ interface SchemaCacheEntry {
 
 const CACHE_TTL_MS = 60 * 1000; // 1 分钟缓存
 
+/**
+ * 管理数据库 Schema 可见性及 AI 提示词生成。
+ * 核心逻辑：过滤系统表和用户上传表，将其结构转换为 AI 可理解的文本。
+ */
 @Injectable()
 export class SchemaService {
 	private readonly cache = new Map<string, SchemaCacheEntry>();
 
 	constructor(private readonly db: DatabaseService) { }
 
+	/**
+	 * 获取用于 AI 会话的数据库结构 Prompt。
+	 * 包含权限控制：仅列出预设业务表和当前用户上传的表。
+	 */
 	async getDatabaseSchemaPrompt(datasourceId: number | null, userId: number): Promise<string> {
 		const cacheKey = `${datasourceId || 'local'}_${userId}`;
 		const cached = this.cache.get(cacheKey);
@@ -58,6 +66,9 @@ export class SchemaService {
 		return uploadedTableNames;
 	}
 
+	/**
+	 * 判断是否为内部/本地数据源。
+	 */
 	private async isInternalDs(datasourceId: number | null): Promise<boolean> {
 		if (!datasourceId) return true;
 		const rows = await this.db.query<RowDataPacket[]>(
@@ -68,6 +79,9 @@ export class SchemaService {
 		return !!(rows[0] as any).is_local;
 	}
 
+	/**
+	 * 从 information_schema 抓取物理表结构并格式化。
+	 */
 	private async fetchSchemaPromptFromLocal(allowedTables: string[], uploadedTableNames: string[]): Promise<string> {
 		const dbNameRows = await this.db.query<any[]>('SELECT DATABASE() AS db_name');
 		const dbName = dbNameRows[0]?.db_name;
@@ -165,6 +179,9 @@ export class SchemaService {
 		return rows.length > 0 ? (rows[0] as any).id : null;
 	}
 
+	/**
+	 * 将数据库行数据转换为 AI 友好的文本格式。
+	 */
 	private formatSchemaRows(rows: any[], uploadedTableNames: string[]): string {
 		if (!rows || rows.length === 0) {
 			return '当前数据库中没有可用的业务表。';
