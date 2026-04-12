@@ -10,7 +10,9 @@ import { SemanticDistillerService } from './agents/semantic-distiller.service';
 import type { SSEEvent } from './tools/base-tool';
 import type OpenAI from 'openai';
 
+// Agent 循环上限：防止 LLM 陷入无限 tool_call 循环（如反复查错 SQL 又反复修）
 const MAX_AGENT_ITERATIONS = 15;
+// 全局超时熔断：无论 Agent 处于哪个阶段，超过此时间强制终止并返回错误
 const CHAT_TIMEOUT_MS = 120_000;
 
 /**
@@ -58,6 +60,9 @@ export class ChatService {
 		const blocks: SSEEvent[] = [];
 		const turnMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
 
+		// Promise.race 实现全局超时：Agent Loop 和定时器竞争，
+		// 任何一方先完成即决定结果。这比在循环内部检查时间更可靠，
+		// 因为单次 LLM 调用本身就可能耗时很长
 		try {
 			await Promise.race([
 				this.runAgentLoop(emitter, messages, turnMessages, blocks, datasourceId, userId),
@@ -72,9 +77,11 @@ export class ChatService {
 			blocks.push(errorEvent);
 		}
 
+		// 持久化：blocks 用于前端历史回放，turnMessages 用于下次对话重建 LLM 上下文
 		await this.conversationService.addMessage(conversationId, 'assistant', '', blocks, turnMessages);
 
-		// 异步触发语义摘要蒸馏，将对话碎片转化为“中期记忆”，避免上下文爆炸
+		// Fire-and-forget：蒸馏器异步提取业务口径定义，写入 conversation.semantic_state
+		// 不 await 是因为蒸馏失败不应影响本次对话的响应
 		this.distiller.updateStateAsync(conversationId, userId, message);
 	}
 
@@ -102,8 +109,8 @@ export class ChatService {
 				stream: true,
 			});
 
-			let content = '';
-			const toolCalls: any[] = [];
+			let content = '';          // 累积本次迭代的文本输出
+			const toolCalls: any[] = []; // 按 index 稀疏存储，流式 delta 逐步拼接 arguments
 
 			for await (const chunk of stream) {
 				const delta = chunk.choices[0]?.delta;
@@ -150,7 +157,8 @@ export class ChatService {
 				}
 			}
 
-			// 检查本次迭代是否有工具调用
+			// toolCalls 是稀疏数组（按 delta.tool_calls[].index 填入），
+			// filter(Boolean) 去除 undefined 空位
 			const validToolCalls = toolCalls.filter(Boolean);
 
 			if (validToolCalls.length === 0) {
@@ -190,7 +198,8 @@ export class ChatService {
 					blocks.push(sqlBlock);
 				}
 
-				// 反射获取工具实例并执行
+				// 通过 ToolRegistry 按名称查找工具实例（类似策略模式），
+				// 新增工具只需实现 Tool 接口并注册到 ChatModule，无需修改此循环
 				const tool = this.toolRegistry.get(name);
 				let toolResult: string;
 

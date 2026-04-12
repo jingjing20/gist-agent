@@ -62,7 +62,7 @@ ${JSON.stringify(samples, null, 2)}`;
 				if (!col) continue;
 				// 长度限制
 				const newComment = String(e.comment).slice(0, 1000);
-				const esc = (s: string) => s.replace(/'/g, "\\'");
+				const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 				
 				await this.db.execute(
 					`ALTER TABLE \`${tableName}\` MODIFY \`${col.COLUMN_NAME}\` ${col.COLUMN_TYPE} COMMENT '${esc(newComment)}'`

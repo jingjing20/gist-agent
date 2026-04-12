@@ -254,7 +254,6 @@ export const useChatStore = defineStore('chat', () => {
 		activeDatasourceId.value = null;
 		isLoading.value = false;
 	}
-
 	return {
 		conversations,
 		activeConversationId,

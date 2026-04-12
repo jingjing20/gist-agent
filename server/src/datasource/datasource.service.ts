@@ -24,6 +24,14 @@ export interface UploadedTable {
 	created_at: string;
 }
 
+/**
+ * 数据源管理服务：负责数据源 CRUD、文件上传建表、权限管理。
+ * 
+ * 权限模型三层：
+ *   1. 公共 (created_by = NULL) -> 所有用户可见
+ *   2. 自建 (created_by = userId) -> 创建者全权
+ *   3. 授权 (datasource_permission 表) -> grant/revoke 管理
+ */
 @Injectable()
 export class DataSourceService {
 	constructor(
@@ -32,6 +40,9 @@ export class DataSourceService {
 		private readonly schemaEnrichmentService: SchemaEnrichmentService
 	) { }
 
+	/**
+	 * 判断用户是否有权访问数据源：公共 -> 自建 -> 被授权，三级短路
+	 */
 	async canAccess(datasourceId: number, userId: number): Promise<boolean> {
 		const rows = await this.db.query<RowDataPacket[]>(
 			'SELECT created_by FROM data_source WHERE id = ?',
@@ -138,6 +149,15 @@ export class DataSourceService {
 		this.schemaService.clearUserCache(id, userId);
 	}
 
+	/**
+	 * 文件上传建表核心流程：
+	 * 1. CREATE TABLE (动态列定义)
+	 * 2. LOAD DATA LOCAL INFILE (极速写入) -- 失败则降级为批量 INSERT
+	 * 3. ALTER TABLE 写入列注释 (原始列名 -> COMMENT)
+	 * 4. 异步触发: Schema 增强 (LLM 推断业务语义) + 推荐问题重新生成
+	 * 
+	 * 表名使用 ut_{timestamp}_{random} 格式，避免用户输入带来的注入风险
+	 */
 	async uploadTable(
 		datasourceId: number,
 		userId: number,
@@ -191,7 +211,7 @@ export class DataSourceService {
 				}
 			}
 
-			const esc = (s: string) => s.replace(/'/g, "\\'");
+			const esc = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 			await this.db.execute(`ALTER TABLE \`${tableName}\` COMMENT = '${esc(displayName)}'`);
 			for (const col of columns) {
 				const comment = col.originalName ?? col.name;

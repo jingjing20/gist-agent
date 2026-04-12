@@ -6,10 +6,18 @@ import type OpenAI from 'openai';
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
+// --- Token 预算分配常量 ---
+// 总容量 = MAX_CONTEXT_TOKENS
+//   - RESPONSE_RESERVE: 留给模型生成回复的预算
+//   - TOOLS_RESERVE: 工具定义（function calling schema）的预算
+//   - 剩余: 历史消息预算，按距离远近分配压缩级别
 const MAX_CONTEXT_TOKENS = Number(process.env.MAX_CONTEXT_TOKENS) || 32000;
 const RESPONSE_RESERVE = 4000;
 const TOOLS_RESERVE = 1500;
 
+// 时间窗口：最近 FULL_WINDOW 条保留完整 tool chain，
+// FULL_WINDOW ~ MEDIUM_WINDOW 条保留 SQL+行数+结论，
+// 超过 MEDIUM_WINDOW 的只保留纯文字摘要
 const FULL_WINDOW = 2;
 const MEDIUM_WINDOW = 6;
 

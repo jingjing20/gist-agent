@@ -44,28 +44,28 @@ export class ConversationService implements OnModuleInit {
 		` as any);
 
 		try {
-			const [cols] = await this.db.query<any[]>(
+			const cols = await this.db.query<any[]>(
 				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'user_id'",
 			);
-			if (!cols?.length) {
+			if (!cols.length) {
 				await this.db.execute('ALTER TABLE conversation ADD COLUMN user_id INT NULL AFTER id');
 			}
 		} catch { /* ignore */ }
 
 		try {
-			const [cols] = await this.db.query<any[]>(
+			const cols = await this.db.query<any[]>(
 				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'datasource_id'",
 			);
-			if (!cols?.length) {
+			if (!cols.length) {
 				await this.db.execute('ALTER TABLE conversation ADD COLUMN datasource_id INT NULL AFTER user_id');
 			}
 		} catch { /* ignore */ }
 
 		try {
-			const [cols] = await this.db.query<any[]>(
+			const cols = await this.db.query<any[]>(
 				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'semantic_state'"
 			);
-			if (!cols?.length) {
+			if (!cols.length) {
 				await this.db.execute("ALTER TABLE conversation ADD COLUMN semantic_state JSON NULL COMMENT 'Semantic Summary' AFTER title");
 			}
 		} catch { /* ignore */ }
@@ -85,19 +85,19 @@ export class ConversationService implements OnModuleInit {
 		` as any);
 
 		try {
-			const [cols] = await this.db.query<any[]>(
+			const cols = await this.db.query<any[]>(
 				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'message' AND COLUMN_NAME = 'llm_messages'",
 			);
-			if (!cols?.length) {
+			if (!cols.length) {
 				await this.db.execute('ALTER TABLE message ADD COLUMN llm_messages JSON NULL AFTER blocks');
 			}
 		} catch { /* ignore */ }
 
 		try {
-			const [indexes] = await this.db.query<any[]>(
+			const indexes = await this.db.query<any[]>(
 				"SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'message' AND INDEX_NAME = 'idx_conv_time'",
 			);
-			if (!indexes?.length) {
+			if (!indexes.length) {
 				await this.db.execute('ALTER TABLE message ADD INDEX idx_conv_time (conversation_id, created_at)');
 			}
 		} catch { /* ignore */ }
@@ -159,16 +159,8 @@ export class ConversationService implements OnModuleInit {
 		const conv = await this.findOne(id, userId);
 		if (!conv) throw new NotFoundException('对话不存在或无权删除');
 
-		const rows = await this.db.query<RowDataPacket[]>(
-			'SELECT id FROM message WHERE conversation_id = ?',
-			[id],
-		);
-		const messageIds = rows.map((r) => r.id);
-		if (messageIds.length > 0) {
-			const placeholders = messageIds.map(() => '?').join(', ');
-			await this.db.execute(`DELETE FROM message_block WHERE message_id IN (${placeholders})`, messageIds);
-			await this.db.execute('DELETE FROM message WHERE conversation_id = ?', [id]);
-		}
+		// message_block -> message -> conversation 均有 ON DELETE CASCADE，
+		// 删除 conversation 会自动级联清理关联的 message 和 message_block
 		await this.db.execute('DELETE FROM conversation WHERE id = ?', [id]);
 	}
 

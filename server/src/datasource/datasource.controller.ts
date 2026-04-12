@@ -16,6 +16,12 @@ const MAX_FILE_ROWS = 50_000;
 const NUMERIC_RE = /^-?(\d+\.?\d*|\d*\.\d+)$/;
 const THOUSAND_SEP_RE = /^-?\d{1,3}(,\d{3})+(\.\d+)?$/;
 
+/**
+ * 数据清洗：统一处理从 CSV/Excel 读入的原始值。
+ * - 清除零宽字符和 BOM 标记
+ * - 去除千分位分隔符 (如 "1,234.56" -> "1234.56")
+ * - 空白/空字符串统一为 null（避免 MySQL 存入空串导致类型推断失效）
+ */
 function normalizeValue(v: unknown): unknown {
 	if (v === null || v === undefined) return null;
 	if (typeof v === 'number') return isFinite(v) ? v : null;
@@ -36,6 +42,11 @@ function isNumeric(v: unknown): boolean {
 	return false;
 }
 
+/**
+ * 全列值扫描推断 MySQL 类型。
+ * 策略：全部非空值都是数字 -> BIGINT/DOUBLE，否则 TEXT。
+ * 宁可宽泛（TEXT）也不误判数字导致插入失败
+ */
 function inferMysqlType(values: unknown[]): string {
 	const nonNull = values.filter(v => v !== null);
 	if (nonNull.length === 0) return 'TEXT';
@@ -54,6 +65,12 @@ function coerce(value: unknown, type: string): unknown {
 	return isFinite(n) ? n : null;
 }
 
+/**
+ * 列名清洗 + 去重：
+ * 1. 特殊字符替换为下划线（保留中文）
+ * 2. 重复列名追加后缀 _1, _2...
+ * Excel/CSV 经常出现空列名或重复列名，不处理会导致 CREATE TABLE 失败
+ */
 function ensureUniqueColumnNames(rawNames: string[]): string[] {
 	const sanitize = (s: string) =>
 		(s.replace(/[^a-zA-Z0-9_\u4e00-\u9fa5]/g, '_').replace(/^_+|_+$/g, '') || 'col');

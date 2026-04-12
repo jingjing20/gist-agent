@@ -5,6 +5,7 @@ import { LlmService } from '../../llm/llm.service';
 import { RowDataPacket } from 'mysql2/promise';
 import { Parser } from 'node-sql-parser';
 
+// SQL 查询返回给前端的上限行数，通过 AST 注入 LIMIT 子句强制生效
 const MAX_ROWS = 1000;
 
 export interface QueryResult {
@@ -25,6 +26,12 @@ export class SqlExecutorAgent {
 		private readonly schemaService: SchemaService,
 	) { }
 
+	/**
+	 * 带超时的 SQL 查询执行。
+	 * 用 Promise.race 而不是 MySQL 的 MAX_EXECUTION_TIME，
+	 * 因为并非所有 MySQL 版本和语句类型都支持后者，
+	 * Promise.race 是最可靠的客户端兜底方案
+	 */
 	private async queryWithTimeout<T>(
 		sql: string,
 		datasourceId?: number | null,
@@ -38,6 +45,11 @@ export class SqlExecutorAgent {
 		]);
 	}
 
+	/**
+	 * 防线一：AST 级白名单校验。
+	 * 将 SQL 解析为 AST 后逐节点检查语句类型，仅放行只读操作。
+	 * 为什么用 AST 而不是正则：正则无法处理子查询、CTE、注释注入等绕过手段
+	 */
 	validate(sql: string, allowedTables: string[] | 'ALL' = 'ALL'): { astResult: any, parser: Parser } {
 		const parser = new Parser();
 		let astResult;
@@ -85,6 +97,11 @@ export class SqlExecutorAgent {
 		return { astResult, parser };
 	}
 
+	/**
+	 * 防线二：自动注入 LIMIT。
+	 * 针对无 LIMIT 的 SELECT，通过 AST 修改注入 LIMIT 1000。
+	 * 最终统一 sqlify 输出，既注入了约束又规范化了 SQL 格式
+	 */
 	ensureLimit(astResult: any, parser: Parser): string {
 		const astList = Array.isArray(astResult.ast) ? astResult.ast : [astResult.ast];
 		let modified = false;
@@ -126,6 +143,12 @@ export class SqlExecutorAgent {
 		});
 	}
 
+	/**
+	 * 核心决策点：区分"语法错误"和"语义错误"。
+	 * 语法错误 = LLM 的笔误，可由内部小模型静默修复。
+	 * 语义错误 = 表/字段不存在，需要完整 Schema，强行修复会编造字段导致数据灾难。
+	 * 设计原则：可修复的自动修，不可修复的暴露给上层
+	 */
 	private isSyntaxError(error: any): boolean {
 		if (!error || typeof error !== 'object') return false;
 
@@ -159,6 +182,13 @@ export class SqlExecutorAgent {
 		return cleanSql;
 	}
 
+	/**
+	 * 公开入口：执行 SQL 并返回结构化结果。
+	 * 整合三道防线 + 自愈重试循环：
+	 *   validate() -> ensureLimit() -> queryWithTimeout()
+	 *   若语法错误 -> attemptFixSql() -> 重试 (max 2 次)
+	 *   若语义错误 -> 直接向上层暴露
+	 */
 	async execute(sql: string, datasourceId?: number | null, userId?: number): Promise<QueryResult> {
 		const maxRetries = 2;
 		let currentSql = sql;

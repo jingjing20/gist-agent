@@ -2,6 +2,14 @@ import { Injectable, Logger } from '@nestjs/common';
 import { LlmService } from '../../llm/llm.service';
 import { ConversationService } from '../../conversation/conversation.service';
 
+/**
+ * 语义蒸馏器：从对话流中提取业务口径定义，持久化为 semantic_state。
+ * 
+ * 解决的问题：三层压缩记忆引擎会丢失远距消息的细节，
+ * 但用户定义的业务口径（如"活跃 = 登录且消费"）必须跨轮次保留。
+ * 蒸馏器在每轮对话结束后异步运行，将口径提取为 JSON 持久化，
+ * 下轮对话时自动注入 System Prompt，实现"长期记忆"。
+ */
 @Injectable()
 export class SemanticDistillerService {
 	private readonly logger = new Logger(SemanticDistillerService.name);
