@@ -1,0 +1,44 @@
+.npmrc
+  22e609384a102903 1
+server/src/conversation/conversation.controller.ts
+  22e609384a102903 1-2,4,10-12,33-34
+server/src/conversation/conversation.service.ts
+  22e609384a102903 47,50,56,59,65,68,88,91,97,100,162-163
+server/src/datasource/schema-enrichment.service.ts
+  22e609384a102903 65
+server/src/chat/prompt-builder.ts
+  22e609384a102903 9-13,18-20
+server/src/chat/agents/semantic-distiller.service.ts
+  22e609384a102903 5-12
+server/src/chat/agents/sql-executor.ts
+  22e609384a102903 8,29-34,48-52,100-104,146-151,185-191
+server/src/datasource/datasource.service.ts
+  22e609384a102903 27-34,43-45,152-160,214
+server/src/chat/chat.service.ts
+  22e609384a102903 13,15,63-65,80,83-84,112-113,160-161,201-202
+server/src/auth/mailer.service.ts
+  22e609384a102903 1,4-8,11-12,17-18,29-31
+server/src/datasource/datasource.controller.ts
+  22e609384a102903 19-24,45-49,68-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "0.1.9",
+  "base_commit_sha": "141bf374e5234df2dd6cac376e3d79ef43e8b193",
+  "prompts": {
+    "22e609384a102903": {
+      "agent_id": {
+        "tool": "antigravity",
+        "id": "5675425d-ee25-492b-b575-1357b5736446",
+        "model": "claude-opus-4-6",
+        "ide": "antigravity"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 614,
+      "total_deletions": 378,
+      "accepted_lines": 135,
+      "overriden_lines": 0
+    }
+  }
+}
