@@ -63,6 +63,33 @@ export const useAuthStore = defineStore('auth', () => {
 		localStorage.setItem(TOKEN_KEY, data.token);
 	}
 
+	async function updateProfile(name: string) {
+		const res = await fetch(`${API_BASE}/users/profile`, {
+			method: 'PUT',
+			headers: authHeaders(),
+			body: JSON.stringify({ name }),
+		});
+		const data = await res.json();
+		if (!res.ok) {
+			throw new Error(data.message || '更新信息失败');
+		}
+		if (user.value) {
+			user.value.name = name;
+		}
+	}
+
+	async function updatePassword(password: string) {
+		const res = await fetch(`${API_BASE}/users/password`, {
+			method: 'PUT',
+			headers: authHeaders(),
+			body: JSON.stringify({ password }),
+		});
+		const data = await res.json();
+		if (!res.ok) {
+			throw new Error(data.message || '修改密码失败');
+		}
+	}
+
 	function logout() {
 		token.value = null;
 		user.value = null;
@@ -81,5 +108,5 @@ export const useAuthStore = defineStore('auth', () => {
 		return h;
 	}
 
-	return { token, user, isLoggedIn, fetchUser, login, register, logout, authHeaders };
+	return { token, user, isLoggedIn, fetchUser, login, register, logout, authHeaders, updateProfile, updatePassword };
 });
