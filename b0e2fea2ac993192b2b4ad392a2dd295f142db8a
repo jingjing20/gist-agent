@@ -1,0 +1,100 @@
+py-server/src/chat/tools/analyze_result.py
+  72ce9a13aa6911b3 2-4,12,14-52,57-59,61-72
+py-server/src/chat/agents/semantic_distiller.py
+  72ce9a13aa6911b3 1-6,10,12-13,18-19,21,23-24,26-34,36-42,44-77,79-81,83
+py-server/src/chat/token_estimator.py
+  72ce9a13aa6911b3 1-6,9-26,29-35,38-39
+py-server/src/chat/tools/base.py
+  72ce9a13aa6911b3 1-4,6,12,14-22,28,32-33,36-38
+py-server/src/llm/service.py
+  72ce9a13aa6911b3 14
+py-server/src/app.py
+  fd61182a6cb18513 24,26
+  72ce9a13aa6911b3 1,8-11,18,20-22,25,28,31,51-53
+py-server/src/dependencies.py
+  72ce9a13aa6911b3 3,9-14
+py-server/src/user/router.py
+  72ce9a13aa6911b3 7-9,16,23-25
+py-server/src/chat/tools/generate_chart.py
+  72ce9a13aa6911b3 2-4,12,14-65,69,74-76,83-87
+py-server/src/chat/service.py
+  72ce9a13aa6911b3 1-2,8-10,15,17,21-25,30-35,37-38,40-41,44-54,56-73,77-85,87,89-92,95-102,105-106,108-125,127-128,130-132,134-136,138-139,145,148-149,152-195,197-208,210,212,214-223,226-227,230-244,246-254
+py-server/src/chat/tools/registry.py
+  72ce9a13aa6911b3 5-6,8-9,11
+py-server/src/chat/prompt_builder.py
+  72ce9a13aa6911b3 1-5,7-17,19-40,44-99,101-328
+py-server/src/datasource/service.py
+  72ce9a13aa6911b3 1-4,6,12-13,16-22,30-31,33-34,36,39-44,46,49,51-63,66-67,69-71,77-92,97-99,101-102,104,108-111,115,117,128-228,232,234-235,241,252,258-260,262-266,269-277,279-281,283-285,288-292,295-297,299-301,305-307,310-315,317-319,321-324,327-328,331
+py-server/src/chat/router.py
+  72ce9a13aa6911b3 1,4,6,10-12,15-26,30,37-41,43-44,46,48-71,74-77,79-81,88,90-93,95,97-117
+py-server/src/datasource/schemas.py
+  72ce9a13aa6911b3 12-15
+py-server/src/datasource/suggestion.py
+  72ce9a13aa6911b3 1,3-4,8-10,15,18,22,24-55,57-64,66-68,70-83,86-94,96-107,109-117
+py-server/src/datasource/router.py
+  72ce9a13aa6911b3 1-5,7,11-12,14-15,17-18,22-94,96-103,106-107,112,117,119-124,127,129-132,136,138,140,144,147,149-151,154-155,157,159,161-165,168-176,182,184,186-188,191-194,196-199,201-206,208-306,308,310-311,313-316,323,325,329-330,333,335,339,342,344,348,352,354-356,359,361,365,367-369,372,377,379
+py-server/src/chat/agents/sql_executor.py
+  72ce9a13aa6911b3 1-7,10-11,15,17,19,23-54,57-62,65-73,75-83,85-86,88,90-91,93-100,103-139,141-144,146-160,162-186,188-228
+py-server/src/chat/stream_emitter.py
+  72ce9a13aa6911b3 3,7-9,11-12,14-15,17-19,21-23,25,27
+py-server/src/conversation/service.py
+  fd61182a6cb18513 19-20
+  72ce9a13aa6911b3 2,4-5,10-13,21-41,43-65,73,76,82-105,107-110,113-117,120-125,129,132,134-137,140-143,145,147-149,151,154,156,158-176,182,185,187-191,193,196,205,207-219,221-231,233-244,246-267
+py-server/scripts/init_db.py
+  fd61182a6cb18513 108-150
+py-server/src/conversation/router.py
+  72ce9a13aa6911b3 8-10,16,24,26,29-31,33,35,38-39,42,44-45,48-49,52,54
+py-server/src/datasource/schema_enrichment.py
+  72ce9a13aa6911b3 7,13-15,19-26,29-32,35-86,88-91
+py-server/src/chat/tools/sql_query.py
+  72ce9a13aa6911b3 1,6,8,12-14,20,22-35,39-41,43-124
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "0.1.9",
+  "base_commit_sha": "b0e2fea2ac993192b2b4ad392a2dd295f142db8a",
+  "prompts": {
+    "72ce9a13aa6911b3": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "c3692134-e1e4-4b3c-bb44-43e06ae2c3b0",
+        "model": "claude-opus-4-7",
+        "ide": "cursor"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 2183,
+      "total_deletions": 1415,
+      "accepted_lines": 2114,
+      "overriden_lines": 0
+    },
+    "d110316a69e2f674": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "805c502d-945b-47d8-b70e-74714884dc97",
+        "model": "composer-2",
+        "ide": "cursor"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 1
+    },
+    "fd61182a6cb18513": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "805c502d-945b-47d8-b70e-74714884dc97",
+        "model": "claude-opus-4-7",
+        "ide": "cursor"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 93,
+      "total_deletions": 92,
+      "accepted_lines": 93,
+      "overriden_lines": 0
+    }
+  }
+}
