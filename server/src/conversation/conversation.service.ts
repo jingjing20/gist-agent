@@ -27,22 +27,11 @@ export class ConversationService implements OnModuleInit {
 	constructor(private readonly db: DatabaseService) {}
 
 	async onModuleInit() {
-		await this.ensureTables();
+		await this.ensureMigrations();
 	}
 
-	private async ensureTables() {
-		await this.db.query(`
-			CREATE TABLE IF NOT EXISTS conversation (
-				id VARCHAR(36) PRIMARY KEY,
-				user_id INT NULL COMMENT 'NULL=迁移遗留，不展示',
-				datasource_id INT NULL COMMENT '关联的数据源',
-				title VARCHAR(200) NOT NULL DEFAULT '新对话',
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-				FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
-			)
-		` as any);
-
+	// 历史库字段/索引兼容。建表在 scripts/init-db.ts 完成。
+	private async ensureMigrations() {
 		try {
 			const cols = await this.db.query<any[]>(
 				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'user_id'",
@@ -70,20 +59,6 @@ export class ConversationService implements OnModuleInit {
 			}
 		} catch { /* ignore */ }
 
-		await this.db.query(`
-			CREATE TABLE IF NOT EXISTS message (
-				id VARCHAR(36) PRIMARY KEY,
-				conversation_id VARCHAR(36) NOT NULL,
-				role ENUM('user', 'assistant') NOT NULL,
-				content TEXT,
-				blocks JSON,
-				llm_messages JSON,
-				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-				FOREIGN KEY (conversation_id) REFERENCES conversation(id) ON DELETE CASCADE,
-				INDEX idx_conv_time (conversation_id, created_at)
-			)
-		` as any);
-
 		try {
 			const cols = await this.db.query<any[]>(
 				"SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'message' AND COLUMN_NAME = 'llm_messages'",
@@ -101,19 +76,6 @@ export class ConversationService implements OnModuleInit {
 				await this.db.execute('ALTER TABLE message ADD INDEX idx_conv_time (conversation_id, created_at)');
 			}
 		} catch { /* ignore */ }
-
-		await this.db.query(`
-			CREATE TABLE IF NOT EXISTS message_block (
-				id VARCHAR(36) PRIMARY KEY,
-				message_id VARCHAR(36) NOT NULL,
-				sort_order INT NOT NULL,
-				type VARCHAR(30) NOT NULL,
-				content TEXT,
-				metadata JSON,
-				FOREIGN KEY (message_id) REFERENCES message(id) ON DELETE CASCADE,
-				INDEX idx_message_blocks (message_id, sort_order)
-			)
-		` as any);
 	}
 
 	async findAll(userId: number): Promise<Conversation[]> {

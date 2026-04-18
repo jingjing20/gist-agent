@@ -107,6 +107,49 @@ async function initDB() {
     ) COMMENT='密码重置 Token';
   `);
 
+	// conversation 表
+	await conn.query(`
+    CREATE TABLE IF NOT EXISTS conversation (
+      id VARCHAR(36) PRIMARY KEY,
+      user_id INT NULL COMMENT 'NULL=迁移遗留，不展示',
+      datasource_id INT NULL COMMENT '关联的数据源',
+      title VARCHAR(200) NOT NULL DEFAULT '新对话',
+      semantic_state JSON NULL COMMENT 'Semantic Summary',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES user(id) ON DELETE CASCADE
+    ) COMMENT='对话';
+  `);
+
+	// message 表
+	await conn.query(`
+    CREATE TABLE IF NOT EXISTS message (
+      id VARCHAR(36) PRIMARY KEY,
+      conversation_id VARCHAR(36) NOT NULL,
+      role ENUM('user', 'assistant') NOT NULL,
+      content TEXT,
+      blocks JSON,
+      llm_messages JSON,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (conversation_id) REFERENCES conversation(id) ON DELETE CASCADE,
+      INDEX idx_conv_time (conversation_id, created_at)
+    ) COMMENT='消息';
+  `);
+
+	// message_block 表
+	await conn.query(`
+    CREATE TABLE IF NOT EXISTS message_block (
+      id VARCHAR(36) PRIMARY KEY,
+      message_id VARCHAR(36) NOT NULL,
+      sort_order INT NOT NULL,
+      type VARCHAR(30) NOT NULL,
+      content TEXT,
+      metadata JSON,
+      FOREIGN KEY (message_id) REFERENCES message(id) ON DELETE CASCADE,
+      INDEX idx_message_blocks (message_id, sort_order)
+    ) COMMENT='消息块';
+  `);
+
 	// 插入本地默认数据源（幂等：只在不存在时插入）
 	await conn.query(`
     INSERT INTO data_source (name, host, port, user, password, database_name, is_local, description)
