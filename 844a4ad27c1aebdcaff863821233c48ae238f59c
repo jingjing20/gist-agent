@@ -1,0 +1,26 @@
+server/scripts/init-db.ts
+  fd61182a6cb18513 110-152
+server/src/conversation/conversation.service.ts
+  fd61182a6cb18513 30,33-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "0.1.9",
+  "base_commit_sha": "844a4ad27c1aebdcaff863821233c48ae238f59c",
+  "prompts": {
+    "fd61182a6cb18513": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "805c502d-945b-47d8-b70e-74714884dc97",
+        "model": "claude-opus-4-7",
+        "ide": "cursor"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 46,
+      "overriden_lines": 0
+    }
+  }
+}
