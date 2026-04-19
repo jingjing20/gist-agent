@@ -23,7 +23,7 @@
 <h2 align="center">Quick Demo</h2>
 
 <div align="center">
-  <video src="https://github.com/user-attachments/assets/cfb71f36-dfa8-40c1-84d2-2db81a5cd825" width="100%" autoplay loop muted playsinline>
+  <video src="https://github.com/user-attachments/assets/47fd3e74-0748-4505-822a-447fb07f992d" width="100%" autoplay loop muted playsinline>
     Your browser does not support video playback.
   </video>
   <video src="https://github.com/user-attachments/assets/c6252c3d-237f-4809-92f0-3e850702a8b5" width="100%" autoplay loop muted playsinline>
