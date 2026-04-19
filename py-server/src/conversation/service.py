@@ -107,7 +107,7 @@ class ConversationService:
     async def update_semantic_state(self, conv_id: str, state: dict) -> None:
         await self._db.execute(
             "UPDATE conversation SET semantic_state = %s WHERE id = %s",
-            (json.dumps(state, ensure_ascii=False), conv_id),
+            (json.dumps(state, ensure_ascii=False, default=str), conv_id),
         )
 
     async def remove(self, conv_id: str, user_id: int) -> None:
@@ -214,7 +214,7 @@ class ConversationService:
                 conv_id,
                 role,
                 content,
-                json.dumps(llm_messages, ensure_ascii=False),
+                json.dumps(llm_messages, ensure_ascii=False, default=str),
             ),
         )
 
@@ -228,7 +228,9 @@ class ConversationService:
                 # metadata = 除 type/content 外的所有字段（对齐 Nest rest 拆分）
                 rest = {k: v for k, v in block.items() if k not in ("type", "content")}
                 metadata_str = (
-                    json.dumps(rest, ensure_ascii=False) if rest else None
+                    json.dumps(rest, ensure_ascii=False, default=str)
+                    if rest
+                    else None
                 )
                 values.extend([block_id, msg_id, i, b_type, b_content, metadata_str])
                 placeholders.append("(%s, %s, %s, %s, %s, %s)")

@@ -12,7 +12,11 @@ class StreamEmitter:
         self._queue: asyncio.Queue[str | None] = asyncio.Queue()
 
     def send(self, event: dict[str, Any]) -> None:
-        self._queue.put_nowait(f"data: {json.dumps(event, ensure_ascii=False)}\n\n")
+        # default=str 与 Nest 的 JSON.stringify 对齐：datetime/date/Decimal 等
+        # DB 常返类型统一转字符串，否则 json.dumps 会抛 "not JSON serializable"
+        self._queue.put_nowait(
+            f"data: {json.dumps(event, ensure_ascii=False, default=str)}\n\n"
+        )
 
     def done(self) -> None:
         self.send({"type": "done"})
