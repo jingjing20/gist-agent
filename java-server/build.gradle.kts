@@ -17,7 +17,14 @@ repositories {
 	mavenCentral()
 }
 
+val springDotenvBom = "5.1.0"
+
 dependencies {
+	implementation(platform("me.paulschwarz:spring-dotenv-bom:$springDotenvBom"))
+	developmentOnly(platform("me.paulschwarz:spring-dotenv-bom:$springDotenvBom"))
+	developmentOnly("me.paulschwarz:springboot3-dotenv")
+	developmentOnly("org.springframework.boot:spring-boot-devtools")
+
 	implementation("org.springframework.boot:spring-boot-starter-web")
 	implementation("org.springframework.boot:spring-boot-starter-jdbc")
 	implementation("org.springframework.boot:spring-boot-starter-security")
@@ -47,6 +54,13 @@ dependencies {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+tasks.withType<org.springframework.boot.gradle.tasks.run.BootRun> {
+	environment(
+		"SPRINGDOTENV_DIRECTORY",
+		rootProject.projectDir.parentFile.absolutePath,
+	)
 }
 
 tasks.withType<JavaCompile> {

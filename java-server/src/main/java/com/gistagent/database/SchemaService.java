@@ -10,8 +10,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
-import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.databind.annotation.JsonNaming;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.gistagent.common.JdbcScalars;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
@@ -101,8 +101,7 @@ public class SchemaService {
 		List<Map<String, Object>> rows = jdbc.queryForList(
 				"SELECT is_local FROM data_source WHERE id = ?", datasourceId);
 		if (rows.isEmpty()) return true;
-		Object value = rows.get(0).get("is_local");
-		return value != null && ((Number) value).intValue() != 0;
+		return JdbcScalars.isTruthy(rows.get(0).get("is_local"));
 	}
 
 	private String fetchSchemaPromptFromLocal(List<String> allowed, List<String> uploaded) {
@@ -209,8 +208,9 @@ public class SchemaService {
 	private record TableInfo(String comment, boolean isUploaded, List<String> columns) {
 	}
 
-	@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
-	public record StructuredTable(String tableName, String displayName, boolean isUploaded,
+	public record StructuredTable(String tableName,
+								  @JsonProperty("display_name") String displayName,
+								  boolean isUploaded,
 								  List<StructuredField> fields) {
 	}
 

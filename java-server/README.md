@@ -55,6 +55,8 @@ com.gistagent/
 # 确保 MySQL 已运行，数据库已通过 pnpm run init-db 初始化
 
 # 在项目根目录 .env 中配置环境变量，然后：
+# bootRun 会设置 SPRINGDOTENV_DIRECTORY 指向仓库根，供 spring-dotenv 5.x（springboot3-dotenv）加载 .env。
+# 打成的可执行 jar 不含 dotenv；生产环境请用真实环境变量。
 cd java-server
 ./gradlew bootRun
 # 服务启动在 http://localhost:3000/api
