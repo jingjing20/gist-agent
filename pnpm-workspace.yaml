@@ -1,6 +1,7 @@
 packages:
   - 'server'
   - 'web'
-onlyBuiltDependencies:
-  - "@nestjs/core"
-  - esbuild
+allowBuilds:
+  '@nestjs/core': true
+  bcrypt: true
+  esbuild: true
