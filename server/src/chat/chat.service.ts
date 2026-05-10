@@ -1,4 +1,4 @@
-import { Injectable, ForbiddenException } from '@nestjs/common';
+import { Injectable, ForbiddenException, Logger } from '@nestjs/common';
 import { Response } from 'express';
 import { ConversationService } from '../conversation/conversation.service';
 import { DataSourceService } from '../datasource/datasource.service';
@@ -14,12 +14,16 @@ import type OpenAI from 'openai';
 const MAX_AGENT_ITERATIONS = 15;
 // 全局超时熔断：无论 Agent 处于哪个阶段，超过此时间强制终止并返回错误
 const CHAT_TIMEOUT_MS = 120_000;
+// 排查厂商流式 tool_call 协议差异时打开（DEBUG_TOOL_CALL_DELTA=1），生产环境关闭
+const DEBUG_TOOL_CALL_DELTA = process.env.DEBUG_TOOL_CALL_DELTA === '1';
 
 /**
  * 对话核心服务：编排 LLM 思考流程、管理上下文、触发工具执行并实时推送结果。
  */
 @Injectable()
 export class ChatService {
+	private readonly logger = new Logger(ChatService.name);
+
 	constructor(
 		private readonly conversationService: ConversationService,
 		private readonly datasourceService: DataSourceService,
@@ -123,6 +127,12 @@ export class ChatService {
 
 				if (delta.tool_calls) {
 					for (const tc of delta.tool_calls) {
+						if (DEBUG_TOOL_CALL_DELTA) {
+							const argsLen = tc.function?.arguments?.length ?? 0;
+							this.logger.log(
+								`[tool_call delta] idx=${tc.index} id=${tc.id ?? 'undef'} name=${tc.function?.name ?? 'undef'} args+=${argsLen}`,
+							);
+						}
 						if (!toolCalls[tc.index]) {
 							const name = tc.function?.name || '';
 							toolCalls[tc.index] = {
@@ -136,10 +146,6 @@ export class ChatService {
 							const callLog: SSEEvent = { type: 'log', title, content };
 							emitter.send(callLog);
 							blocks.push(callLog);
-
-							if (name === 'generate_chart') {
-								emitter.send({ type: 'chart_loading' });
-							}
 						}
 						if (tc.function?.arguments) {
 							toolCalls[tc.index].function.arguments += tc.function.arguments;

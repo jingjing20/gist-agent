@@ -42,6 +42,9 @@ public class ChatService {
 
 	private static final int MAX_AGENT_ITERATIONS = 15;
 	private static final long CHAT_TIMEOUT_MS = 120_000L;
+	// 排查厂商流式 tool_call 协议差异时打开（DEBUG_TOOL_CALL_DELTA=1），生产环境关闭
+	private static final boolean DEBUG_TOOL_CALL_DELTA =
+			"1".equals(System.getenv("DEBUG_TOOL_CALL_DELTA"));
 
 	private final ConversationService conversationService;
 	private final DataSourceService datasourceService;
@@ -262,6 +265,13 @@ public class ChatService {
 									Map<Long, ToolCallAccumulator> accumulators,
 									StreamEmitter emitter,
 									List<SseEvent> blocks) {
+		if (DEBUG_TOOL_CALL_DELTA) {
+			String dbgName = tc.function().flatMap(f -> f.name()).orElse("undef");
+			String dbgId = tc.id().orElse("undef");
+			int dbgArgsLen = tc.function().flatMap(f -> f.arguments()).map(String::length).orElse(0);
+			log.info("[tool_call delta] idx={} id={} name={} args+={}",
+					tc.index(), dbgId, dbgName, dbgArgsLen);
+		}
 		long index = tc.index();
 		final ToolCallAccumulator acc = accumulators.computeIfAbsent(index, k -> {
 			String name = tc.function().flatMap(f -> f.name()).orElse("");
@@ -274,9 +284,6 @@ public class ChatService {
 			emitter.send(callLog);
 			blocks.add(callLog);
 
-			if ("generate_chart".equals(name)) {
-				emitter.send(SseEvent.of("chart_loading"));
-			}
 			return created;
 		});
 		tc.id().ifPresent(id -> {

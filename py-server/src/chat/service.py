@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 from typing import Any
 
 from fastapi import HTTPException
@@ -22,6 +23,8 @@ logger = logging.getLogger(__name__)
 MAX_AGENT_ITERATIONS = 15
 # 全局超时熔断：无论 Agent 处于哪阶段，超过即强制终止
 CHAT_TIMEOUT_SECONDS = 120
+# 排查厂商流式 tool_call 协议差异时打开（DEBUG_TOOL_CALL_DELTA=1），生产环境关闭
+DEBUG_TOOL_CALL_DELTA = os.getenv("DEBUG_TOOL_CALL_DELTA") == "1"
 
 
 class ChatService:
@@ -140,6 +143,19 @@ class ChatService:
 
                 if delta.tool_calls:
                     for tc in delta.tool_calls:
+                        if DEBUG_TOOL_CALL_DELTA:
+                            args_len = (
+                                len(tc.function.arguments)
+                                if tc.function and tc.function.arguments
+                                else 0
+                            )
+                            tc_name = (
+                                tc.function.name if tc.function and tc.function.name else "undef"
+                            )
+                            logger.info(
+                                f"[tool_call delta] idx={tc.index} id={tc.id or 'undef'} "
+                                f"name={tc_name} args+={args_len}"
+                            )
                         idx = tc.index
                         if idx not in tool_calls:
                             name = (tc.function.name if tc.function else "") or ""
@@ -166,9 +182,6 @@ class ChatService:
                             }
                             emitter.send(call_log)
                             blocks.append(call_log)
-
-                            if name == "generate_chart":
-                                emitter.send({"type": "chart_loading"})
 
                         if tc.function and tc.function.arguments:
                             tool_calls[idx]["function"]["arguments"] += (

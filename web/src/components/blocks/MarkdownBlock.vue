@@ -1,5 +1,5 @@
 <template>
-  <div class="markdown-block" v-html="renderedHTML"></div>
+  <div v-if="renderedHTML" class="markdown-block" v-html="renderedHTML"></div>
 </template>
 
 <script setup lang="ts">

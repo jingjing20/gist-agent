@@ -3,6 +3,7 @@ package com.gistagent.chat.tools;
 import java.util.List;
 import java.util.Map;
 
+import com.gistagent.chat.SseEvent;
 import com.openai.models.chat.completions.ChatCompletionTool;
 
 import org.springframework.stereotype.Component;
@@ -54,6 +55,10 @@ public class AnalyzeResultTool implements Tool {
 	public ToolExecutionResult execute(Map<String, Object> args, ToolContext ctx) {
 		boolean needsChart = Boolean.TRUE.equals(args.get("needsChart"));
 		if (needsChart) {
+			// 在此处提前预告图表，前端立即渲染骨架屏；
+			// 真实窗口期 = 下一轮 LLM 生成 generate_chart arguments 的耗时（通常数秒～数十秒）。
+			// 不能等到收到 generate_chart 的 tool_call delta 才发——非流式厂商一次性返回时窗口会被压成 0。
+			ctx.emitter().send(SseEvent.of("chart_loading"));
 			Object chartType = args.getOrDefault("chartType", "");
 			Object chartTitle = args.getOrDefault("chartTitle", "");
 			return ToolExecutionResult.of(

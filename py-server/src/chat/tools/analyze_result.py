@@ -55,9 +55,13 @@ class AnalyzeResultTool(Tool):
         }
 
     async def execute(
-        self, args: dict[str, Any], _ctx: ToolContext
+        self, args: dict[str, Any], ctx: ToolContext
     ) -> ToolExecutionResult:
         if args.get("needsChart"):
+            # 在此处提前预告图表，前端立即渲染骨架屏；
+            # 真实窗口期 = 下一轮 LLM 生成 generate_chart arguments 的耗时（通常数秒～数十秒）。
+            # 不能等到收到 generate_chart 的 tool_call delta 才发——非流式厂商一次性返回时窗口会被压成 0。
+            ctx.emitter.send({"type": "chart_loading"})
             return ToolExecutionResult(
                 tool_result=(
                     f"图表区域已就绪，请立即调用 generate_chart 提供完整数据"
