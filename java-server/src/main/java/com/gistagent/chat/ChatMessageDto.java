@@ -11,25 +11,34 @@ public record ChatMessageDto(
 		String role,                    // system / user / assistant / tool
 		String content,
 		List<ToolCallDto> toolCalls,    // 仅 assistant 可能有
-		String toolCallId               // 仅 tool 消息有
+		String toolCallId,              // 仅 tool 消息有
+		String reasoningContent         // thinking 模式（DeepSeek / Moonshot 等）
 ) {
+	public ChatMessageDto(String role, String content, List<ToolCallDto> toolCalls, String toolCallId) {
+		this(role, content, toolCalls, toolCallId, null);
+	}
+
 	public static ChatMessageDto system(String content) {
-		return new ChatMessageDto("system", content, null, null);
+		return new ChatMessageDto("system", content, null, null, null);
 	}
 
 	public static ChatMessageDto user(String content) {
-		return new ChatMessageDto("user", content, null, null);
+		return new ChatMessageDto("user", content, null, null, null);
 	}
 
 	public static ChatMessageDto assistant(String content) {
-		return new ChatMessageDto("assistant", content, null, null);
+		return new ChatMessageDto("assistant", content, null, null, null);
 	}
 
 	public static ChatMessageDto assistant(String content, List<ToolCallDto> toolCalls) {
-		return new ChatMessageDto("assistant", content, toolCalls, null);
+		return new ChatMessageDto("assistant", content, toolCalls, null, null);
+	}
+
+	public static ChatMessageDto assistant(String content, List<ToolCallDto> toolCalls, String reasoningContent) {
+		return new ChatMessageDto("assistant", content, toolCalls, null, reasoningContent);
 	}
 
 	public static ChatMessageDto tool(String toolCallId, String content) {
-		return new ChatMessageDto("tool", content, null, toolCallId);
+		return new ChatMessageDto("tool", content, null, toolCallId, null);
 	}
 }

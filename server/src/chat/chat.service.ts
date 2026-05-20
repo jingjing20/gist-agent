@@ -13,7 +13,7 @@ import type OpenAI from 'openai';
 // Agent 循环上限：防止 LLM 陷入无限 tool_call 循环（如反复查错 SQL 又反复修）
 const MAX_AGENT_ITERATIONS = 15;
 // 全局超时熔断：无论 Agent 处于哪个阶段，超过此时间强制终止并返回错误
-const CHAT_TIMEOUT_MS = 120_000;
+const CHAT_TIMEOUT_MS = 300_000;
 // 排查厂商流式 tool_call 协议差异时打开（DEBUG_TOOL_CALL_DELTA=1），生产环境关闭
 const DEBUG_TOOL_CALL_DELTA = process.env.DEBUG_TOOL_CALL_DELTA === '1';
 
@@ -75,8 +75,14 @@ export class ChatService {
 				),
 			]);
 			emitter.done();
-		} catch (err: any) {
-			const errorEvent: SSEEvent = { type: 'error', content: err.message };
+		} catch (err: unknown) {
+			const msg = err instanceof Error ? err.message : String(err);
+			const stack = err instanceof Error ? err.stack : undefined;
+			this.logger.error(
+				`handleChat failed conversationId=${conversationId} userId=${userId}: ${msg}`,
+				stack,
+			);
+			const errorEvent: SSEEvent = { type: 'error', content: msg };
 			emitter.send(errorEvent);
 			blocks.push(errorEvent);
 		}
@@ -113,12 +119,17 @@ export class ChatService {
 				stream: true,
 			});
 
-			let content = '';          // 累积本次迭代的文本输出
+			let content = '';           // 累积本次迭代的文本输出
+			let reasoningContent = '';  // thinking 模式下的推理链（DeepSeek / Moonshot 等）
 			const toolCalls: any[] = []; // 按 index 稀疏存储，流式 delta 逐步拼接 arguments
 
 			for await (const chunk of stream) {
-				const delta = chunk.choices[0]?.delta;
+				const delta = chunk.choices[0]?.delta as any;
 				if (!delta) continue;
+
+				if (delta.reasoning_content) {
+					reasoningContent += delta.reasoning_content;
+				}
 
 				if (delta.content) {
 					content += delta.content;
@@ -169,7 +180,8 @@ export class ChatService {
 
 			if (validToolCalls.length === 0) {
 				if (content) {
-					const msg: OpenAI.Chat.Completions.ChatCompletionMessageParam = { role: 'assistant', content };
+					const msg: any = { role: 'assistant', content };
+					if (reasoningContent) msg.reasoning_content = reasoningContent;
 					messages.push(msg);
 					turnMessages.push(msg);
 				}
@@ -181,6 +193,7 @@ export class ChatService {
 				tool_calls: validToolCalls.map((tc) => ({ ...tc, type: 'function' })),
 			};
 			if (content) assistantMsg.content = content;
+			if (reasoningContent) assistantMsg.reasoning_content = reasoningContent;
 			messages.push(assistantMsg);
 			turnMessages.push(assistantMsg);
 

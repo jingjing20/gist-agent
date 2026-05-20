@@ -44,6 +44,9 @@ public final class TokenEstimator {
 		if (msg.toolCallId() != null) {
 			base += estimateTokens(msg.toolCallId());
 		}
+		if (msg.reasoningContent() != null && !msg.reasoningContent().isEmpty()) {
+			base += estimateTokens(msg.reasoningContent());
+		}
 		return base;
 	}
 

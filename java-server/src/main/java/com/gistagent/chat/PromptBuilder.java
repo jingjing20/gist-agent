@@ -80,13 +80,13 @@ public class PromptBuilder {
 				+ schemaPrompt + "\n"
 				+ statePrompt + "\n"
 				+ "## 工作方式\n"
-				+ "你以 ReAct 循环工作：思考 → 调用工具 → 观察结果 → 决定下一步。\n\n"
+				+ "你以 ReAct 循环工作：思考 → 输出意图 → 调用工具 → 输出观察 → 决定下一步。\n\n"
 				+ "- 与数据无关的问题（打招呼、询问能力、闲聊）直接用文字回答，不要查库。\n"
-				+ "- 需要数据时调用 execute_sql_query；当一次查询不足以回答（需先看样本、再做聚合、或交叉验证），可多次调用。\n"
-				+ "- 拿到数据后调用 analyze_result 判断是否需要图表；仅当 needsChart=true 时再调用 generate_chart，其 series/xAxis 必须严格来自 SQL 结果，不得编造。\n"
-				+ "- 所有工具调用结束后，再输出最终的文字总结作为本轮回复。\n\n"
+				+ "- 每次调用工具前，先用一句话说明你打算做什么（如"我来查一下最近30天各平台的日活数据"）。\n"
+				+ "- 需要数据时调用 execute_sql_query；当一次查询不足以回答（需先看样本、再做聚合、或交叉验证），可多次调用，每次调用前都先说明意图。\n"
+				+ "- 拿到工具结果后，用一句话说明你观察到什么或下一步打算做什么（如"数据已拿到63条，接下来分析趋势"）。\n"
+				+ "- 拿到数据后调用 analyze_result 判断是否需要图表；仅当 needsChart=true 时再调用 generate_chart，其 series/xAxis 必须严格来自 SQL 结果，不得编造。\n\n"
 				+ "## 输出要求\n"
-				+ "- 直接给结论，不复述工具调用过程，不重复表格里已经能看到的明细。\n"
 				+ "- 关键数字加粗；多结论用要点列出，避免长段落。\n"
 				+ "- SQL 报错或结果为空时，如实说明现象并给出可能原因或下一步建议，绝不编造数据填补。";
 	}
@@ -213,12 +213,13 @@ public class PromptBuilder {
 	private static ChatMessageDto dehydrateMessage(ChatMessageDto msg) {
 		if ("tool".equals(msg.role()) && msg.content() != null) {
 			return new ChatMessageDto(msg.role(), dehydrateToolResult(msg.content()),
-					msg.toolCalls(), msg.toolCallId());
+					msg.toolCalls(), msg.toolCallId(), msg.reasoningContent());
 		}
 		if ("assistant".equals(msg.role()) && msg.toolCalls() != null) {
 			List<ToolCallDto> dehydrated = msg.toolCalls().stream()
 					.map(PromptBuilder::dehydrateToolCall).toList();
-			return new ChatMessageDto(msg.role(), msg.content(), dehydrated, msg.toolCallId());
+			return new ChatMessageDto(msg.role(), msg.content(), dehydrated, msg.toolCallId(),
+					msg.reasoningContent());
 		}
 		return msg;
 	}

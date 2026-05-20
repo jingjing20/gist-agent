@@ -11,6 +11,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gistagent.chat.agents.SemanticDistillerService;
 import com.gistagent.chat.tools.Tool;
@@ -115,7 +116,8 @@ public class ChatService {
 			reportError(emitter, blocks, "分析超时，请尝试简化问题后重试");
 		} catch (ExecutionException e) {
 			Throwable cause = e.getCause() == null ? e : e.getCause();
-			log.warn("agent loop failed: {}", cause.getMessage(), cause);
+			log.error("handleChat failed conversationId={} userId={}: {}",
+					conversationId, userId, cause.getMessage(), cause);
 			reportError(emitter, blocks, cause.getMessage() == null ? "服务异常" : cause.getMessage());
 		} catch (InterruptedException e) {
 			Thread.currentThread().interrupt();
@@ -156,6 +158,7 @@ public class ChatService {
 			ChatCompletionCreateParams params = buildParams(messages);
 
 			StringBuilder content = new StringBuilder();
+			StringBuilder reasoningContent = new StringBuilder();
 			Map<Long, ToolCallAccumulator> accumulators = new LinkedHashMap<>();
 
 			try (StreamResponse<ChatCompletionChunk> stream =
@@ -163,6 +166,8 @@ public class ChatService {
 				stream.stream().forEach(chunk -> {
 					if (chunk.choices().isEmpty()) return;
 					var delta = chunk.choices().get(0).delta();
+
+					appendReasoningDelta(delta, reasoningContent);
 
 					delta.content().ifPresent(text -> {
 						if (text.isEmpty()) return;
@@ -191,7 +196,9 @@ public class ChatService {
 			List<ToolCallAccumulator> validCalls = new ArrayList<>(accumulators.values());
 			if (validCalls.isEmpty()) {
 				if (content.length() > 0) {
-					ChatMessageDto finalMsg = ChatMessageDto.assistant(content.toString());
+					String reasoning = reasoningContent.length() > 0 ? reasoningContent.toString() : null;
+					ChatMessageDto finalMsg = ChatMessageDto.assistant(
+							content.toString(), null, reasoning);
 					messages.add(finalMsg);
 					turnMessages.add(finalMsg);
 				}
@@ -202,8 +209,9 @@ public class ChatService {
 			for (ToolCallAccumulator acc : validCalls) {
 				callDtos.add(new ToolCallDto(acc.id, acc.name, acc.arguments.toString()));
 			}
+			String reasoning = reasoningContent.length() > 0 ? reasoningContent.toString() : null;
 			ChatMessageDto assistantMsg = ChatMessageDto.assistant(
-					content.length() > 0 ? content.toString() : null, callDtos);
+					content.length() > 0 ? content.toString() : null, callDtos, reasoning);
 			messages.add(assistantMsg);
 			turnMessages.add(assistantMsg);
 
@@ -248,6 +256,20 @@ public class ChatService {
 				messages.add(toolMsg);
 				turnMessages.add(toolMsg);
 			}
+		}
+	}
+
+	/** 从流式 delta 提取厂商扩展字段 reasoning_content（thinking 模式）。 */
+	private void appendReasoningDelta(Object delta, StringBuilder reasoningContent) {
+		if (delta == null) return;
+		try {
+			JsonNode node = mapper.valueToTree(delta);
+			JsonNode rc = node.get("reasoning_content");
+			if (rc == null || rc.isNull()) return;
+			String piece = rc.isTextual() ? rc.asText() : rc.toString();
+			if (!piece.isEmpty()) reasoningContent.append(piece);
+		} catch (Exception ignored) {
+			// 非 thinking 模型无此字段
 		}
 	}
 

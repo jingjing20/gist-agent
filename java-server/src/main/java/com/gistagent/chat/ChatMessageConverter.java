@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+import com.openai.core.JsonValue;
 import com.openai.models.chat.completions.ChatCompletionAssistantMessageParam;
 import com.openai.models.chat.completions.ChatCompletionMessageFunctionToolCall;
 import com.openai.models.chat.completions.ChatCompletionMessageParam;
@@ -57,6 +58,9 @@ public class ChatMessageConverter {
 						));
 					}
 				}
+				if (msg.reasoningContent() != null && !msg.reasoningContent().isEmpty()) {
+					b.putAdditionalProperty("reasoning_content", JsonValue.from(msg.reasoningContent()));
+				}
 				yield ChatCompletionMessageParam.ofAssistant(b.build());
 			}
 			case "tool" -> ChatCompletionMessageParam.ofTool(
@@ -92,6 +96,9 @@ public class ChatMessageConverter {
 				calls.add(call);
 			}
 			out.put("tool_calls", calls);
+		}
+		if (msg.reasoningContent() != null && !msg.reasoningContent().isEmpty()) {
+			out.put("reasoning_content", msg.reasoningContent());
 		}
 		return out;
 	}
@@ -134,7 +141,8 @@ public class ChatMessageConverter {
 					));
 				}
 			}
-			out.add(new ChatMessageDto(role, content, calls, toolCallId));
+			String reasoningContent = asString(mm.get("reasoning_content"));
+			out.add(new ChatMessageDto(role, content, calls, toolCallId, reasoningContent));
 		}
 		return out;
 	}

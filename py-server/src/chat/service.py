@@ -94,7 +94,13 @@ class ChatService:
             blocks.append(err_event)
             emitter.end()
         except Exception as e:
-            logger.error(f"Agent loop failed: {e}", exc_info=True)
+            logger.error(
+                "handleChat failed conversationId=%s userId=%s: %s",
+                conversation_id,
+                user_id,
+                e,
+                exc_info=True,
+            )
             err_event = {"type": "error", "content": str(e)}
             emitter.send(err_event)
             blocks.append(err_event)
@@ -128,6 +134,7 @@ class ChatService:
             )
 
             content = ""
+            reasoning_content = ""
             tool_calls: dict[int, dict[str, Any]] = {}
 
             async for chunk in stream:
@@ -136,6 +143,10 @@ class ChatService:
                 delta = chunk.choices[0].delta
                 if not delta:
                     continue
+
+                rc = getattr(delta, "reasoning_content", None)
+                if rc:
+                    reasoning_content += rc
 
                 if delta.content:
                     content += delta.content
@@ -202,7 +213,9 @@ class ChatService:
 
             if not valid_calls:
                 if content:
-                    msg = {"role": "assistant", "content": content}
+                    msg: dict[str, Any] = {"role": "assistant", "content": content}
+                    if reasoning_content:
+                        msg["reasoning_content"] = reasoning_content
                     messages.append(msg)
                     turn_messages.append(msg)
                 break
@@ -213,6 +226,8 @@ class ChatService:
             }
             if content:
                 assistant_msg["content"] = content
+            if reasoning_content:
+                assistant_msg["reasoning_content"] = reasoning_content
             messages.append(assistant_msg)
             turn_messages.append(assistant_msg)
 
