@@ -30,14 +30,14 @@
 </template>
 
 <script setup lang="ts">
-import { type Component } from 'vue';
-import ThinkingBlock from './blocks/ThinkingBlock.vue';
-import SqlBlock from './blocks/SqlBlock.vue';
-import TableBlock from './blocks/TableBlock.vue';
-import MarkdownBlock from './blocks/MarkdownBlock.vue';
-import LogBlock from './blocks/LogBlock.vue';
-import ChartBlock from './blocks/ChartBlock.vue';
-import type { MessageBlock, ChatMessage } from '../types';
+import { type Component } from "vue";
+import ThinkingBlock from "./blocks/ThinkingBlock.vue";
+import SqlBlock from "./blocks/SqlBlock.vue";
+import TableBlock from "./blocks/TableBlock.vue";
+import MarkdownBlock from "./blocks/MarkdownBlock.vue";
+import LogBlock from "./blocks/LogBlock.vue";
+import ChartBlock from "./blocks/ChartBlock.vue";
+import type { MessageBlock, ChatMessage } from "../types";
 
 const props = defineProps<{
   msg: ChatMessage;
@@ -58,20 +58,24 @@ function blockComponent(type: string): Component {
   return blockMap[type] || MarkdownBlock;
 }
 
-function blockProps(block: MessageBlock, index: number = -1): Record<string, unknown> {
-  if (block.type === 'log') {
+function blockProps(
+  block: MessageBlock,
+  index: number = -1,
+): Record<string, unknown> {
+  if (block.type === "log") {
     const isLast = props.msg.blocks && index === props.msg.blocks.length - 1;
-    return { 
-      title: block.title, 
+    return {
+      title: block.title,
       content: block.content,
-      isLoading: props.isStreaming && isLast
+      isLoading: props.isStreaming && isLast,
     };
   }
-  if (block.type === 'chart') {
+  if (block.type === "chart") {
     return { chartData: block.chartData };
   }
   return {
-    content: block.type === 'error' ? `**错误:** ${block.content}` : block.content,
+    content:
+      block.type === "error" ? `**错误:** ${block.content}` : block.content,
     columns: block.columns,
     rows: block.rows,
     rowCount: block.rowCount,
@@ -166,11 +170,23 @@ function blockProps(block: MessageBlock, index: number = -1): Record<string, unk
   opacity: 0.6;
 }
 
-.streaming-indicator .dot:nth-child(2) { animation-delay: 0.2s; }
-.streaming-indicator .dot:nth-child(3) { animation-delay: 0.4s; }
+.streaming-indicator .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.streaming-indicator .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
 
 @keyframes streaming-pulse {
-  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
-  40% { opacity: 1; transform: scale(1.1); }
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.1);
+  }
 }
 </style>

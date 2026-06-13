@@ -1,4 +1,3 @@
 package com.gistagent.datasource.dto;
 
-public record GrantRequest(Long userId) {
-}
+public record GrantRequest(Long userId) {}

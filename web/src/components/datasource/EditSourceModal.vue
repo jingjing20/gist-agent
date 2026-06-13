@@ -13,18 +13,24 @@
           </div>
           <div class="form-group">
             <label>描 述</label>
-            <textarea v-model="form.description" placeholder="请输入数据源描述（可选）" rows="3"></textarea>
+            <textarea
+              v-model="form.description"
+              placeholder="请输入数据源描述（可选）"
+              rows="3"
+            ></textarea>
           </div>
           <div v-if="error" class="da-error-msg">{{ error }}</div>
         </div>
         <div class="modal-footer">
-          <button class="btn-da-ghost" @click="emit('update:modelValue', null)">取消</button>
+          <button class="btn-da-ghost" @click="emit('update:modelValue', null)">
+            取消
+          </button>
           <button
             class="btn-da-primary"
             :disabled="!form.name || submitting"
             @click="handleSubmit"
           >
-            {{ submitting ? '保存中...' : '保存修改' }}
+            {{ submitting ? "保存中..." : "保存修改" }}
           </button>
         </div>
       </div>
@@ -33,8 +39,8 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
-import type { DataSource } from '../../stores/datasource';
+import { reactive, watch } from "vue";
+import type { DataSource } from "../../stores/datasource";
 
 const props = defineProps<{
   modelValue: DataSource | null;
@@ -43,25 +49,29 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: DataSource | null): void;
-  (e: 'submit', form: { name: string; description: string }): void;
+  (e: "update:modelValue", value: DataSource | null): void;
+  (e: "submit", form: { name: string; description: string }): void;
 }>();
 
 const form = reactive({
-  name: '',
-  description: '',
+  name: "",
+  description: "",
 });
 
-watch(() => props.modelValue, (newVal) => {
-  if (newVal) {
-    form.name = newVal.name;
-    form.description = newVal.description || '';
-  }
-}, { immediate: true });
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (newVal) {
+      form.name = newVal.name;
+      form.description = newVal.description || "";
+    }
+  },
+  { immediate: true },
+);
 
 function handleSubmit() {
   if (form.name) {
-    emit('submit', { ...form });
+    emit("submit", { ...form });
   }
 }
 </script>
@@ -80,8 +90,14 @@ function handleSubmit() {
 }
 
 @keyframes modal-pop {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .modal h3 {
@@ -104,7 +120,8 @@ function handleSubmit() {
   margin-bottom: 8px;
 }
 
-.form-group input, .form-group textarea {
+.form-group input,
+.form-group textarea {
   width: 100%;
   background: var(--da-card);
   border: 1px solid var(--da-border);
@@ -118,7 +135,8 @@ function handleSubmit() {
   resize: none;
 }
 
-.form-group input:focus, .form-group textarea:focus {
+.form-group input:focus,
+.form-group textarea:focus {
   border-color: var(--da-primary);
   background: rgba(14, 165, 233, 0.05);
 }
@@ -146,7 +164,10 @@ function handleSubmit() {
   cursor: pointer;
 }
 
-.btn-da-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-da-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .btn-da-ghost {
   background: var(--da-card);

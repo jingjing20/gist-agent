@@ -27,15 +27,28 @@
 
       <div class="header-user">
         <div class="user-dropdown" ref="dropdownRef" @click="toggleDropdown">
-          <img class="user-avatar" src="https://api.dicebear.com/7.x/notionists/svg?seed=GistAgent" alt="avatar" />
-          <span class="user-name">{{ authStore.user?.name || authStore.user?.email }}</span>
+          <img
+            class="user-avatar"
+            src="https://api.dicebear.com/7.x/notionists/svg?seed=GistAgent"
+            alt="avatar"
+          />
+          <span class="user-name">{{
+            authStore.user?.name || authStore.user?.email
+          }}</span>
 
           <div v-show="showDropdown" class="dropdown-menu">
             <div class="dropdown-item" @click="openProfileModal">个人信息</div>
             <div class="dropdown-item" @click="openPasswordModal">修改密码</div>
-            <a href="https://github.com/jingjing20/gist-agent" target="_blank" class="dropdown-item link-item">github 地址</a>
+            <a
+              href="https://github.com/jingjing20/gist-agent"
+              target="_blank"
+              class="dropdown-item link-item"
+              >github 地址</a
+            >
             <div class="dropdown-divider"></div>
-            <div class="dropdown-item text-danger" @click="handleLogout">退出登录</div>
+            <div class="dropdown-item text-danger" @click="handleLogout">
+              退出登录
+            </div>
           </div>
         </div>
       </div>
@@ -45,38 +58,63 @@
     </div>
 
     <!-- 个人信息弹框 -->
-    <div v-if="profileModalVisible" class="modal-overlay" @click.self="profileModalVisible = false">
+    <div
+      v-if="profileModalVisible"
+      class="modal-overlay"
+      @click.self="profileModalVisible = false"
+    >
       <div class="modal-content">
         <h3>个人信息</h3>
         <div class="form-item">
           <label>邮箱</label>
-          <input type="text" :value="authStore.user?.email" disabled class="disabled-input" />
+          <input
+            type="text"
+            :value="authStore.user?.email"
+            disabled
+            class="disabled-input"
+          />
         </div>
         <div class="form-item">
           <label>用户名</label>
           <input type="text" v-model="profileForm.name" />
         </div>
         <div class="modal-actions">
-          <button class="btn-cancel" @click="profileModalVisible = false">取消</button>
+          <button class="btn-cancel" @click="profileModalVisible = false">
+            取消
+          </button>
           <button class="btn-primary" @click="submitProfile">保存</button>
         </div>
       </div>
     </div>
 
     <!-- 修改密码弹框 -->
-    <div v-if="passwordModalVisible" class="modal-overlay" @click.self="passwordModalVisible = false">
+    <div
+      v-if="passwordModalVisible"
+      class="modal-overlay"
+      @click.self="passwordModalVisible = false"
+    >
       <div class="modal-content">
         <h3>修改密码</h3>
         <div class="form-item">
           <label>新密码</label>
-          <input type="password" v-model="passwordForm.password" placeholder="请输入新密码" />
+          <input
+            type="password"
+            v-model="passwordForm.password"
+            placeholder="请输入新密码"
+          />
         </div>
         <div class="form-item">
           <label>确认新密码</label>
-          <input type="password" v-model="passwordForm.confirmPassword" placeholder="请确认新密码" />
+          <input
+            type="password"
+            v-model="passwordForm.confirmPassword"
+            placeholder="请确认新密码"
+          />
         </div>
         <div class="modal-actions">
-          <button class="btn-cancel" @click="passwordModalVisible = false">取消</button>
+          <button class="btn-cancel" @click="passwordModalVisible = false">
+            取消
+          </button>
           <button class="btn-primary" @click="submitPassword">提交</button>
         </div>
       </div>
@@ -85,11 +123,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, onUnmounted } from 'vue';
-import { useRouter, useRoute } from 'vue-router';
-import { useDataSourceStore } from '../stores/datasource';
-import { useAuthStore } from '../stores/auth';
-import { useToastStore } from '../stores/toast';
+import { computed, ref, reactive, onMounted, onUnmounted } from "vue";
+import { useRouter, useRoute } from "vue-router";
+import { useDataSourceStore } from "../stores/datasource";
+import { useAuthStore } from "../stores/auth";
+import { useToastStore } from "../stores/toast";
 
 const router = useRouter();
 const route = useRoute();
@@ -97,12 +135,12 @@ const dsStore = useDataSourceStore();
 const authStore = useAuthStore();
 const toast = useToastStore();
 
-const activeTab = computed<'chat' | 'datasource'>(() =>
-  route.name === 'datasource' ? 'datasource' : 'chat',
+const activeTab = computed<"chat" | "datasource">(() =>
+  route.name === "datasource" ? "datasource" : "chat",
 );
 
 function goToDataSource() {
-  router.push('/datasource');
+  router.push("/datasource");
   dsStore.fetchAll();
 }
 
@@ -123,61 +161,61 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 onMounted(() => {
-  document.addEventListener('click', handleClickOutside);
+  document.addEventListener("click", handleClickOutside);
 });
 
 onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside);
+  document.removeEventListener("click", handleClickOutside);
 });
 
-const profileForm = reactive({ name: '' });
-const passwordForm = reactive({ password: '', confirmPassword: '' });
+const profileForm = reactive({ name: "" });
+const passwordForm = reactive({ password: "", confirmPassword: "" });
 
 function openProfileModal() {
   showDropdown.value = false;
-  profileForm.name = authStore.user?.name || '';
+  profileForm.name = authStore.user?.name || "";
   profileModalVisible.value = true;
 }
 
 function openPasswordModal() {
   showDropdown.value = false;
-  passwordForm.password = '';
-  passwordForm.confirmPassword = '';
+  passwordForm.password = "";
+  passwordForm.confirmPassword = "";
   passwordModalVisible.value = true;
 }
 
 async function submitProfile() {
-  if (!profileForm.name.trim()) return toast.error('用户名不能为空');
+  if (!profileForm.name.trim()) return toast.error("用户名不能为空");
   try {
     await authStore.updateProfile(profileForm.name);
-    toast.success('个人信息已更新');
+    toast.success("个人信息已更新");
     profileModalVisible.value = false;
   } catch (err: any) {
-    toast.error(err.message || '更新失败');
+    toast.error(err.message || "更新失败");
   }
 }
 
 async function submitPassword() {
   if (!passwordForm.password || passwordForm.password.length < 6) {
-    return toast.error('密码至少需要 6 个字符');
+    return toast.error("密码至少需要 6 个字符");
   }
   if (passwordForm.password !== passwordForm.confirmPassword) {
-    return toast.error('两次输入的密码不一致');
+    return toast.error("两次输入的密码不一致");
   }
   try {
     await authStore.updatePassword(passwordForm.password);
-    toast.success('密码修改成功');
+    toast.success("密码修改成功");
     passwordModalVisible.value = false;
   } catch (err: any) {
-    toast.error(err.message || '修改密码失败');
+    toast.error(err.message || "修改密码失败");
   }
 }
 
 function handleLogout() {
   showDropdown.value = false;
   authStore.logout();
-  toast.info('已退出登录');
-  router.push('/login');
+  toast.info("已退出登录");
+  router.push("/login");
 }
 </script>
 
@@ -261,7 +299,7 @@ function handleLogout() {
 }
 
 .tab-btn::after {
-  content: '';
+  content: "";
   position: absolute;
   bottom: 0;
   left: 20px;
@@ -413,7 +451,8 @@ function handleLogout() {
   margin-top: 24px;
 }
 
-.btn-cancel, .btn-primary {
+.btn-cancel,
+.btn-primary {
   padding: 8px 16px;
   border-radius: 6px;
   font-size: 14px;

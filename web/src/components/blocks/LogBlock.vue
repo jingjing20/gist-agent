@@ -7,7 +7,11 @@
       </div>
       <span class="title">{{ title }}</span>
       <div class="header-right">
-        <i class="fas fa-chevron-down toggle-icon" :class="{ 'is-flipped': !collapsed }" v-if="!isLoading"></i>
+        <i
+          class="fas fa-chevron-down toggle-icon"
+          :class="{ 'is-flipped': !collapsed }"
+          v-if="!isLoading"
+        ></i>
       </div>
     </div>
     <div v-show="!collapsed" class="log-content no-scrollbar">
@@ -17,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref } from "vue";
 
 defineProps<{
   title?: string;
@@ -92,8 +96,13 @@ const collapsed = ref(true);
 }
 
 @keyframes log-pulse {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
+  }
 }
 
 .toggle-icon {
@@ -117,12 +126,17 @@ const collapsed = ref(true);
 
 .log-content pre {
   margin: 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: "JetBrains Mono", monospace;
   white-space: pre-wrap;
   word-wrap: break-word;
   line-height: 1.5;
 }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 </style>

@@ -1,14 +1,13 @@
 <template>
   <Transition name="toast-fade">
-    <div 
-      class="toast-item" 
-      :class="['toast-' + type]"
-      role="alert"
-    >
+    <div class="toast-item" :class="['toast-' + type]" role="alert">
       <div class="toast-icon">
         <i v-if="type === 'success'" class="fas fa-check-circle"></i>
         <i v-else-if="type === 'error'" class="fas fa-exclamation-circle"></i>
-        <i v-else-if="type === 'warning'" class="fas fa-exclamation-triangle"></i>
+        <i
+          v-else-if="type === 'warning'"
+          class="fas fa-exclamation-triangle"
+        ></i>
         <i v-else class="fas fa-info-circle"></i>
       </div>
       <div class="toast-content">
@@ -22,14 +21,14 @@
 </template>
 
 <script setup lang="ts">
-import type { ToastType } from '../../stores/toast';
+import type { ToastType } from "../../stores/toast";
 
 defineProps<{
   type: ToastType;
   message: string;
 }>();
 
-defineEmits(['close']);
+defineEmits(["close"]);
 </script>
 
 <style scoped>
@@ -54,7 +53,7 @@ defineEmits(['close']);
 }
 
 .toast-item::before {
-  content: '';
+  content: "";
   position: absolute;
   left: 0;
   top: 0;
@@ -62,20 +61,36 @@ defineEmits(['close']);
   width: 4px;
 }
 
-.toast-success::before { background: #10b981; }
-.toast-error::before { background: #ef4444; }
-.toast-warning::before { background: #f59e0b; }
-.toast-info::before { background: #3b82f6; }
+.toast-success::before {
+  background: #10b981;
+}
+.toast-error::before {
+  background: #ef4444;
+}
+.toast-warning::before {
+  background: #f59e0b;
+}
+.toast-info::before {
+  background: #3b82f6;
+}
 
 .toast-icon {
   font-size: 18px;
   flex-shrink: 0;
 }
 
-.toast-success .toast-icon { color: #10b981; }
-.toast-error .toast-icon { color: #ef4444; }
-.toast-warning .toast-icon { color: #f59e0b; }
-.toast-info .toast-icon { color: #3b82f6; }
+.toast-success .toast-icon {
+  color: #10b981;
+}
+.toast-error .toast-icon {
+  color: #ef4444;
+}
+.toast-warning .toast-icon {
+  color: #f59e0b;
+}
+.toast-info .toast-icon {
+  color: #3b82f6;
+}
 
 .toast-content {
   flex: 1;

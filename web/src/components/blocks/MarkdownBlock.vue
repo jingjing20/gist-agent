@@ -3,13 +3,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { marked } from 'marked';
+import { computed } from "vue";
+import { marked } from "marked";
 
 const props = defineProps<{ content?: string }>();
 
 const renderedHTML = computed(() => {
-  if (!props.content) return '';
+  if (!props.content) return "";
   return marked.parse(props.content, { async: false }) as string;
 });
 </script>
@@ -49,7 +49,7 @@ const renderedHTML = computed(() => {
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 13px;
-  font-family: 'JetBrains Mono', 'SF Mono', monospace;
+  font-family: "JetBrains Mono", "SF Mono", monospace;
   color: var(--da-primary);
 }
 </style>

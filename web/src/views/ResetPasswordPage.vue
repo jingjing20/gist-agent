@@ -30,14 +30,24 @@
             <div class="input-group">
               <div class="input-wrapper">
                 <i class="fas fa-lock"></i>
-                <input v-model="password" type="password" placeholder="输入新密码" required />
+                <input
+                  v-model="password"
+                  type="password"
+                  placeholder="输入新密码"
+                  required
+                />
               </div>
             </div>
 
             <div class="input-group">
               <div class="input-wrapper">
                 <i class="fas fa-check-circle"></i>
-                <input v-model="confirmPassword" type="password" placeholder="再次输入确认" required />
+                <input
+                  v-model="confirmPassword"
+                  type="password"
+                  placeholder="再次输入确认"
+                  required
+                />
               </div>
             </div>
 
@@ -48,7 +58,9 @@
 
             <button type="submit" class="btn-primary" :disabled="loading">
               <span v-if="!loading">确认修改密码</span>
-              <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 处理中...</span>
+              <span v-else class="loading-spinner"
+                ><i class="fas fa-spinner fa-spin"></i> 处理中...</span
+              >
             </button>
           </form>
 
@@ -62,45 +74,45 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRoute, useRouter } from 'vue-router';
-import { apiFetch } from '../api';
-import { useToastStore } from '../stores/toast';
+import { ref } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { apiFetch } from "../api";
+import { useToastStore } from "../stores/toast";
 
 const route = useRoute();
 const router = useRouter();
 const toast = useToastStore();
-const password = ref('');
-const confirmPassword = ref('');
+const password = ref("");
+const confirmPassword = ref("");
 const loading = ref(false);
-const error = ref('');
+const error = ref("");
 
 async function handleSubmit() {
   if (password.value !== confirmPassword.value) {
-    error.value = '两次输入的密码不一致';
+    error.value = "两次输入的密码不一致";
     return;
   }
   const token = route.query.token as string;
   if (!token) {
-    error.value = '无效的重置链接';
+    error.value = "无效的重置链接";
     return;
   }
   loading.value = true;
-  error.value = '';
+  error.value = "";
   try {
-    const res = await apiFetch('/auth/reset-password', {
-      method: 'POST',
+    const res = await apiFetch("/auth/reset-password", {
+      method: "POST",
       body: JSON.stringify({ token, password: password.value }),
     });
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.message || '重置失败');
+      throw new Error(data.message || "重置失败");
     }
-    toast.success('密码重置成功，请登录');
-    router.replace('/login');
+    toast.success("密码重置成功，请登录");
+    router.replace("/login");
   } catch (e: any) {
     error.value = e.message;
-    toast.error('重置密码失败: ' + error.value);
+    toast.error("重置密码失败: " + error.value);
   } finally {
     loading.value = false;
   }
@@ -114,7 +126,7 @@ async function handleSubmit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-image: url('../assets/images/auth_bg.png');
+  background-image: url("../assets/images/auth_bg.png");
   background-size: cover;
   background-position: center;
   overflow: hidden;
@@ -144,13 +156,18 @@ async function handleSubmit() {
 }
 
 .branding::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 10%;
   right: 0;
   bottom: 10%;
   width: 1px;
-  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
 }
 
 .branding-content {
@@ -288,7 +305,11 @@ async function handleSubmit() {
 }
 
 @media (max-width: 1100px) {
-  .branding { display: none; }
-  .form-panel { flex: 1; }
+  .branding {
+    display: none;
+  }
+  .form-panel {
+    flex: 1;
+  }
 }
 </style>

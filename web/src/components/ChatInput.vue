@@ -30,14 +30,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, onMounted } from 'vue';
-import { useChatStore } from '../stores/chat';
-import { useDataSourceStore } from '../stores/datasource';
+import { ref, nextTick, onMounted } from "vue";
+import { useChatStore } from "../stores/chat";
+import { useDataSourceStore } from "../stores/datasource";
 
 const chatStore = useChatStore();
 const dsStore = useDataSourceStore();
 
-const inputText = ref('');
+const inputText = ref("");
 const textareaRef = ref<HTMLTextAreaElement>();
 
 onMounted(async () => {
@@ -49,17 +49,17 @@ onMounted(async () => {
 function autoResize() {
   const el = textareaRef.value;
   if (!el) return;
-  el.style.height = 'auto';
-  el.style.height = Math.min(el.scrollHeight, 150) + 'px';
+  el.style.height = "auto";
+  el.style.height = Math.min(el.scrollHeight, 150) + "px";
 }
 
 function handleSubmit(e?: Event) {
   e?.preventDefault();
   const text = inputText.value.trim();
   if (!text || chatStore.isLoading) return;
-  inputText.value = '';
+  inputText.value = "";
   nextTick(() => {
-    if (textareaRef.value) textareaRef.value.style.height = 'auto';
+    if (textareaRef.value) textareaRef.value.style.height = "auto";
   });
   chatStore.sendMessage(text);
 }

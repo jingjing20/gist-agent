@@ -29,7 +29,12 @@
             <div class="input-group">
               <div class="input-wrapper">
                 <i class="far fa-envelope"></i>
-                <input v-model="email" type="email" placeholder="输入注册邮箱" required />
+                <input
+                  v-model="email"
+                  type="email"
+                  placeholder="输入注册邮箱"
+                  required
+                />
               </div>
             </div>
 
@@ -43,9 +48,15 @@
               重置链接已发送到邮箱
             </div>
 
-            <button type="submit" class="btn-primary" :disabled="loading || success">
+            <button
+              type="submit"
+              class="btn-primary"
+              :disabled="loading || success"
+            >
               <span v-if="!loading">发送重置链接</span>
-              <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 发送中...</span>
+              <span v-else class="loading-spinner"
+                ><i class="fas fa-spinner fa-spin"></i> 发送中...</span
+              >
             </button>
           </form>
 
@@ -59,33 +70,36 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { apiFetch } from '../api';
-import { useToastStore } from '../stores/toast';
+import { ref } from "vue";
+import { apiFetch } from "../api";
+import { useToastStore } from "../stores/toast";
 
-const email = ref('');
+const email = ref("");
 const loading = ref(false);
-const error = ref('');
+const error = ref("");
 const success = ref(false);
 const toast = useToastStore();
 
 async function handleSubmit() {
   loading.value = true;
-  error.value = '';
+  error.value = "";
   try {
-    const res = await apiFetch('/auth/request-reset', {
-      method: 'POST',
-      body: JSON.stringify({ email: email.value, origin: window.location.origin }),
+    const res = await apiFetch("/auth/request-reset", {
+      method: "POST",
+      body: JSON.stringify({
+        email: email.value,
+        origin: window.location.origin,
+      }),
     });
     if (!res.ok) {
       const data = await res.json();
-      throw new Error(data.message || '发送失败');
+      throw new Error(data.message || "发送失败");
     }
     success.value = true;
-    toast.success('重置邮件已发送');
+    toast.success("重置邮件已发送");
   } catch (e: any) {
     error.value = e.message;
-    toast.error('重置请求失败: ' + error.value);
+    toast.error("重置请求失败: " + error.value);
   } finally {
     loading.value = false;
   }
@@ -99,7 +113,7 @@ async function handleSubmit() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-image: url('../assets/images/auth_bg.png');
+  background-image: url("../assets/images/auth_bg.png");
   background-size: cover;
   background-position: center;
   overflow: hidden;
@@ -131,13 +145,18 @@ async function handleSubmit() {
 }
 
 .branding::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 10%;
   right: 0;
   bottom: 10%;
   width: 1px;
-  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
 }
 
 .branding-content {
@@ -211,7 +230,6 @@ async function handleSubmit() {
 .form-header {
   margin-bottom: 40px;
 }
-
 
 .form-header h3 {
   font-size: 24px;
@@ -308,8 +326,15 @@ async function handleSubmit() {
 }
 
 @media (max-width: 1100px) {
-  .branding { display: none; }
-  .form-panel { flex: 1; }
-  .glass-card { max-width: 500px; min-height: auto; }
+  .branding {
+    display: none;
+  }
+  .form-panel {
+    flex: 1;
+  }
+  .glass-card {
+    max-width: 500px;
+    min-height: auto;
+  }
 }
 </style>

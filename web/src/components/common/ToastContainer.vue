@@ -1,8 +1,8 @@
 <template>
   <Teleport to="body">
     <div class="toast-container">
-      <ToastItem 
-        v-for="toast in toastStore.toasts" 
+      <ToastItem
+        v-for="toast in toastStore.toasts"
         :key="toast.id"
         :type="toast.type"
         :message="toast.message"
@@ -13,8 +13,8 @@
 </template>
 
 <script setup lang="ts">
-import { useToastStore } from '../../stores/toast';
-import ToastItem from './ToastItem.vue';
+import { useToastStore } from "../../stores/toast";
+import ToastItem from "./ToastItem.vue";
 
 const toastStore = useToastStore();
 </script>

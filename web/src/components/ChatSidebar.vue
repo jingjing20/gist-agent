@@ -18,7 +18,10 @@
         :class="{ active: conv.id === store.activeConversationId }"
         @click="store.selectConversation(conv.id)"
       >
-        <div class="active-indicator" v-if="conv.id === store.activeConversationId"></div>
+        <div
+          class="active-indicator"
+          v-if="conv.id === store.activeConversationId"
+        ></div>
         <span class="conv-title" :title="conv.title">{{ conv.title }}</span>
         <div class="conv-actions">
           <button
@@ -48,17 +51,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { useChatStore } from '../stores/chat';
-import { useToastStore } from '../stores/toast';
-import ConfirmModal from './ConfirmModal.vue';
+import { ref, onMounted } from "vue";
+import { useChatStore } from "../stores/chat";
+import { useToastStore } from "../stores/toast";
+import ConfirmModal from "./ConfirmModal.vue";
 
 defineProps<{
   collapsed: boolean;
 }>();
 
 const emit = defineEmits<{
-  (e: 'collapse'): void;
+  (e: "collapse"): void;
 }>();
 
 const store = useChatStore();
@@ -73,9 +76,9 @@ async function executeDelete() {
   if (deletingConvId.value) {
     try {
       await store.deleteConversation(deletingConvId.value);
-      toast.success('对话已删除');
+      toast.success("对话已删除");
     } catch (e: any) {
-      toast.error('删除对话失败: ' + e.message);
+      toast.error("删除对话失败: " + e.message);
     }
     deletingConvId.value = null;
   }
@@ -252,6 +255,11 @@ onMounted(() => {
   font-style: italic;
 }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 </style>

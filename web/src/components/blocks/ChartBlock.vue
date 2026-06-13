@@ -3,7 +3,12 @@
     <div v-if="!chartData" class="chart-skeleton">
       <div class="skeleton-title"></div>
       <div class="skeleton-body">
-        <div class="skeleton-bar" v-for="n in 5" :key="n" :style="{ height: barHeights[n - 1] }"></div>
+        <div
+          class="skeleton-bar"
+          v-for="n in 5"
+          :key="n"
+          :style="{ height: barHeights[n - 1] }"
+        ></div>
       </div>
       <div class="skeleton-axis"></div>
     </div>
@@ -12,33 +17,48 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import * as echarts from 'echarts/core';
-import { BarChart, LineChart, PieChart, ScatterChart, RadarChart, FunnelChart } from 'echarts/charts';
+import { ref, onMounted, onUnmounted, watch, nextTick } from "vue";
+import * as echarts from "echarts/core";
+import {
+  BarChart,
+  LineChart,
+  PieChart,
+  ScatterChart,
+  RadarChart,
+  FunnelChart,
+} from "echarts/charts";
 import {
   TitleComponent,
   TooltipComponent,
   GridComponent,
   LegendComponent,
-} from 'echarts/components';
-import { CanvasRenderer } from 'echarts/renderers';
-import type { ChartData } from '../../types';
+} from "echarts/components";
+import { CanvasRenderer } from "echarts/renderers";
+import type { ChartData } from "../../types";
 
 echarts.use([
-  BarChart, LineChart, PieChart, ScatterChart, RadarChart, FunnelChart,
-  TitleComponent, TooltipComponent, GridComponent, LegendComponent,
+  BarChart,
+  LineChart,
+  PieChart,
+  ScatterChart,
+  RadarChart,
+  FunnelChart,
+  TitleComponent,
+  TooltipComponent,
+  GridComponent,
+  LegendComponent,
   CanvasRenderer,
 ]);
 
 // Updated to match Gist Agent New Theme (Sky/Blue/Violet)
 const COLORS = [
-  '#0ea5e9', // da-primary (Sky-500)
-  '#8b5cf6', // da-gradient-start (Violet-500)
-  '#3b82f6', // da-gradient-end (Blue-500)
-  '#10b981', // Emerald-500
-  '#f59e0b', // Amber-500
-  '#ec4899', // Pink-500
-  '#ef4444', // Red-500
+  "#0ea5e9", // da-primary (Sky-500)
+  "#8b5cf6", // da-gradient-start (Violet-500)
+  "#3b82f6", // da-gradient-end (Blue-500)
+  "#10b981", // Emerald-500
+  "#f59e0b", // Amber-500
+  "#ec4899", // Pink-500
+  "#ef4444", // Red-500
 ];
 
 const props = defineProps<{
@@ -46,77 +66,82 @@ const props = defineProps<{
 }>();
 
 const chartRef = ref<HTMLElement>();
-const barHeights = ['60%', '85%', '45%', '70%', '55%'];
+const barHeights = ["60%", "85%", "45%", "70%", "55%"];
 let chart: echarts.ECharts | null = null;
 
 function buildOption(data: ChartData): Record<string, unknown> {
-  const isPie = data.chartType === 'pie';
-  const isFunnel = data.chartType === 'funnel';
-  const isRadar = data.chartType === 'radar';
+  const isPie = data.chartType === "pie";
+  const isFunnel = data.chartType === "funnel";
+  const isRadar = data.chartType === "radar";
 
   const base: Record<string, unknown> = {
     title: {
       text: data.title,
-      left: 'center',
+      left: "center",
       top: 10,
-      textStyle: { 
-        color: '#e2e8f0', // da-text-main
-        fontSize: 15, 
-        fontWeight: 600 
+      textStyle: {
+        color: "#e2e8f0", // da-text-main
+        fontSize: 15,
+        fontWeight: 600,
       },
     },
     tooltip: {
-      trigger: isPie ? 'item' : 'axis',
-      backgroundColor: 'rgba(26, 31, 46, 0.95)', // da-chart-bg / panel based
-      borderColor: 'rgba(14, 165, 233, 0.4)', // da-primary-alpha
+      trigger: isPie ? "item" : "axis",
+      backgroundColor: "rgba(26, 31, 46, 0.95)", // da-chart-bg / panel based
+      borderColor: "rgba(14, 165, 233, 0.4)", // da-primary-alpha
       borderWidth: 1,
-      textStyle: { color: '#e2e8f0', fontSize: 12 },
+      textStyle: { color: "#e2e8f0", fontSize: 12 },
       padding: [10, 14],
       borderRadius: 8,
       shadowBlur: 10,
-      shadowColor: 'rgba(0, 0, 0, 0.3)',
+      shadowColor: "rgba(0, 0, 0, 0.3)",
     },
     color: COLORS,
   };
 
   if (isPie || isFunnel) {
-    const chartData = data.series[0]?.data.map((val, i) => ({
-      name: data.xAxis?.[i] ?? data.series[0]?.name ?? `${i}`,
-      value: val,
-    })) ?? [];
+    const chartData =
+      data.series[0]?.data.map((val, i) => ({
+        name: data.xAxis?.[i] ?? data.series[0]?.name ?? `${i}`,
+        value: val,
+      })) ?? [];
 
     if (isPie) {
-      base.series = [{
-        type: 'pie',
-        radius: ['45%', '70%'],
-        center: ['50%', '55%'],
-        itemStyle: { 
-          borderRadius: 8, 
-          borderColor: '#1a1f2e', // da-chart-bg
-          borderWidth: 2 
-        },
-        label: { color: '#94a3b8', fontSize: 12 },
-        emphasis: {
-          label: { fontSize: 14, fontWeight: 'bold' },
-          itemStyle: { 
-            shadowBlur: 15, 
-            shadowColor: 'rgba(14, 165, 233, 0.4)' // da-primary shadow
+      base.series = [
+        {
+          type: "pie",
+          radius: ["45%", "70%"],
+          center: ["50%", "55%"],
+          itemStyle: {
+            borderRadius: 8,
+            borderColor: "#1a1f2e", // da-chart-bg
+            borderWidth: 2,
           },
+          label: { color: "#94a3b8", fontSize: 12 },
+          emphasis: {
+            label: { fontSize: 14, fontWeight: "bold" },
+            itemStyle: {
+              shadowBlur: 15,
+              shadowColor: "rgba(14, 165, 233, 0.4)", // da-primary shadow
+            },
+          },
+          data: chartData,
         },
-        data: chartData,
-      }];
+      ];
     } else {
-      base.series = [{
-        type: 'funnel',
-        left: '10%',
-        width: '80%',
-        label: { color: '#94a3b8', fontSize: 12 },
-        itemStyle: { 
-          borderColor: '#1a1f2e',
-          borderWidth: 2 
+      base.series = [
+        {
+          type: "funnel",
+          left: "10%",
+          width: "80%",
+          label: { color: "#94a3b8", fontSize: 12 },
+          itemStyle: {
+            borderColor: "#1a1f2e",
+            borderWidth: 2,
+          },
+          data: chartData,
         },
-        data: chartData,
-      }];
+      ];
     }
     return base;
   }
@@ -125,58 +150,60 @@ function buildOption(data: ChartData): Record<string, unknown> {
     const indicators = (data.xAxis ?? []).map((name) => ({ name }));
     base.radar = {
       indicator: indicators,
-      axisName: { color: '#94a3b8', padding: [3, 5] },
-      splitLine: { lineStyle: { color: 'rgba(51, 58, 77, 0.4)' } },
+      axisName: { color: "#94a3b8", padding: [3, 5] },
+      splitLine: { lineStyle: { color: "rgba(51, 58, 77, 0.4)" } },
       splitArea: { show: false },
-      axisLine: { lineStyle: { color: 'rgba(51, 58, 77, 0.4)' } },
+      axisLine: { lineStyle: { color: "rgba(51, 58, 77, 0.4)" } },
     };
 
-    base.series = [{
-      type: 'radar',
-      symbol: 'circle',
-      symbolSize: 6,
-      lineStyle: { width: 2 },
-      areaStyle: { opacity: 0.2 },
-      data: data.series.map(s => ({
-        name: s.name,
-        value: s.data
-      }))
-    }];
-    
+    base.series = [
+      {
+        type: "radar",
+        symbol: "circle",
+        symbolSize: 6,
+        lineStyle: { width: 2 },
+        areaStyle: { opacity: 0.2 },
+        data: data.series.map((s) => ({
+          name: s.name,
+          value: s.data,
+        })),
+      },
+    ];
+
     if (data.series.length > 1) {
       base.legend = {
         top: 40,
-        textStyle: { color: '#94a3b8', fontSize: 12 },
+        textStyle: { color: "#94a3b8", fontSize: 12 },
       };
     }
     return base;
   }
 
   base.grid = {
-    left: 15, 
-    right: 15, 
-    bottom: 10, 
+    left: 15,
+    right: 15,
+    bottom: 10,
     top: data.series.length > 1 ? 85 : 55,
     containLabel: true,
   };
-  
+
   base.xAxis = {
-    type: 'category',
+    type: "category",
     data: data.xAxis ?? [],
-    axisLabel: { color: '#94a3b8', fontSize: 11, margin: 12 },
-    axisLine: { lineStyle: { color: '#333a4d' } }, // da-border
+    axisLabel: { color: "#94a3b8", fontSize: 11, margin: 12 },
+    axisLine: { lineStyle: { color: "#333a4d" } }, // da-border
     axisTick: { show: false },
     splitLine: { show: false },
   };
-  
+
   base.yAxis = {
-    type: 'value',
-    axisLabel: { color: '#94a3b8', fontSize: 11 },
-    splitLine: { 
-      lineStyle: { 
-        color: 'rgba(51, 58, 77, 0.4)', // da-border light alpha
-        type: 'dashed' 
-      } 
+    type: "value",
+    axisLabel: { color: "#94a3b8", fontSize: 11 },
+    splitLine: {
+      lineStyle: {
+        color: "rgba(51, 58, 77, 0.4)", // da-border light alpha
+        type: "dashed",
+      },
     },
   };
 
@@ -186,8 +213,8 @@ function buildOption(data: ChartData): Record<string, unknown> {
       itemGap: 15,
       itemWidth: 10,
       itemHeight: 10,
-      icon: 'circle',
-      textStyle: { color: '#94a3b8', fontSize: 12 },
+      icon: "circle",
+      textStyle: { color: "#94a3b8", fontSize: 12 },
     };
   }
 
@@ -198,28 +225,28 @@ function buildOption(data: ChartData): Record<string, unknown> {
       data: s.data,
     };
 
-    if (data.chartType === 'line') {
+    if (data.chartType === "line") {
       seriesBase.smooth = true;
-      seriesBase.symbol = 'circle';
+      seriesBase.symbol = "circle";
       seriesBase.symbolSize = 8;
       seriesBase.lineStyle = { width: 3 };
       seriesBase.areaStyle = {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: COLORS[i % COLORS.length] + '33' },
-          { offset: 1, color: COLORS[i % COLORS.length] + '00' },
+          { offset: 0, color: COLORS[i % COLORS.length] + "33" },
+          { offset: 1, color: COLORS[i % COLORS.length] + "00" },
         ]),
       };
     }
 
-    if (data.chartType === 'bar') {
+    if (data.chartType === "bar") {
       seriesBase.barMaxWidth = 32;
-      seriesBase.itemStyle = { 
+      seriesBase.itemStyle = {
         borderRadius: [6, 6, 0, 0],
         // Gradient for bars
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: COLORS[i % COLORS.length] },
-          { offset: 1, color: COLORS[i % COLORS.length] + 'aa' },
-        ])
+          { offset: 1, color: COLORS[i % COLORS.length] + "aa" },
+        ]),
       };
     }
 
@@ -232,7 +259,7 @@ function buildOption(data: ChartData): Record<string, unknown> {
 function renderChart() {
   if (!chartRef.value || !props.chartData) return;
   if (!chart) {
-    chart = echarts.init(chartRef.value, undefined, { renderer: 'canvas' });
+    chart = echarts.init(chartRef.value, undefined, { renderer: "canvas" });
   }
   chart.setOption(buildOption(props.chartData), true);
 }
@@ -243,15 +270,19 @@ function handleResize() {
 
 onMounted(() => {
   renderChart();
-  window.addEventListener('resize', handleResize);
+  window.addEventListener("resize", handleResize);
 });
 
-watch(() => props.chartData, () => {
-  nextTick(renderChart);
-}, { deep: true });
+watch(
+  () => props.chartData,
+  () => {
+    nextTick(renderChart);
+  },
+  { deep: true },
+);
 
 onUnmounted(() => {
-  window.removeEventListener('resize', handleResize);
+  window.removeEventListener("resize", handleResize);
   chart?.dispose();
   chart = null;
 });
@@ -309,10 +340,22 @@ onUnmounted(() => {
   animation: shimmer 1.8s infinite ease-in-out;
 }
 
-.skeleton-bar:nth-child(2) { animation-delay: 0.15s; background: rgba(139, 92, 246, 0.08); }
-.skeleton-bar:nth-child(3) { animation-delay: 0.3s; background: rgba(59, 130, 246, 0.08); }
-.skeleton-bar:nth-child(4) { animation-delay: 0.45s; background: rgba(14, 165, 233, 0.08); }
-.skeleton-bar:nth-child(5) { animation-delay: 0.6s; background: rgba(139, 92, 246, 0.08); }
+.skeleton-bar:nth-child(2) {
+  animation-delay: 0.15s;
+  background: rgba(139, 92, 246, 0.08);
+}
+.skeleton-bar:nth-child(3) {
+  animation-delay: 0.3s;
+  background: rgba(59, 130, 246, 0.08);
+}
+.skeleton-bar:nth-child(4) {
+  animation-delay: 0.45s;
+  background: rgba(14, 165, 233, 0.08);
+}
+.skeleton-bar:nth-child(5) {
+  animation-delay: 0.6s;
+  background: rgba(139, 92, 246, 0.08);
+}
 
 .skeleton-axis {
   width: 100%;
@@ -322,7 +365,14 @@ onUnmounted(() => {
 }
 
 @keyframes shimmer {
-  0%, 100% { opacity: 0.3; transform: scaleY(0.98); }
-  50% { opacity: 0.8; transform: scaleY(1); }
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scaleY(0.98);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scaleY(1);
+  }
 }
 </style>

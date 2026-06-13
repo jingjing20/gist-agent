@@ -9,12 +9,12 @@
         <p class="modal-desc">{{ desc }}</p>
         <div class="modal-footer">
           <button class="btn btn-ghost" @click="handleCancel">取消</button>
-          <button 
-            class="btn btn-danger" 
-            @click="handleConfirm" 
+          <button
+            class="btn btn-danger"
+            @click="handleConfirm"
             :disabled="loading"
           >
-            {{ loading ? (loadingText || '处理中...') : (confirmText || '确认') }}
+            {{ loading ? loadingText || "处理中..." : confirmText || "确认" }}
           </button>
         </div>
       </div>
@@ -33,18 +33,18 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void;
-  (e: 'confirm'): void;
-  (e: 'cancel'): void;
+  (e: "update:modelValue", value: boolean): void;
+  (e: "confirm"): void;
+  (e: "cancel"): void;
 }>();
 
 function handleCancel() {
-  emit('update:modelValue', false);
-  emit('cancel');
+  emit("update:modelValue", false);
+  emit("cancel");
 }
 
 function handleConfirm() {
-  emit('confirm');
+  emit("confirm");
 }
 </script>
 
@@ -63,8 +63,14 @@ function handleConfirm() {
 }
 
 @keyframes modal-pop {
-  from { opacity: 0; transform: scale(0.95) translateY(10px); }
-  to { opacity: 1; transform: scale(1) translateY(0); }
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .modal-title {

@@ -1,16 +1,18 @@
 <template>
   <div class="ds-card">
     <div class="card-gradient" :class="ds.is_local ? 'local' : 'file'"></div>
-    
+
     <div class="card-body">
       <div class="ds-type-label">
         <i :class="ds.is_local ? 'fas fa-database' : 'fas fa-file-csv'"></i>
-        {{ ds.is_local ? '公共数据库' : '文件数据源' }}
+        {{ ds.is_local ? "公共数据库" : "文件数据源" }}
       </div>
-      
+
       <h3 class="ds-name-title" :title="ds.name">{{ ds.name }}</h3>
-      <p class="ds-desc" :title="ds.description || '无描述'">{{ ds.description || '通过文件上传创建的数据分析源' }}</p>
-      
+      <p class="ds-desc" :title="ds.description || '无描述'">
+        {{ ds.description || "通过文件上传创建的数据分析源" }}
+      </p>
+
       <div class="ds-info-rows">
         <div class="info-row">
           <span class="label">最后更新</span>
@@ -25,41 +27,41 @@
 
     <div class="card-footer">
       <div class="action-buttons">
-        <button 
-          v-if="!ds.is_local && isCreator" 
-          class="action-btn" 
-          @click="emit('edit', ds)" 
+        <button
+          v-if="!ds.is_local && isCreator"
+          class="action-btn"
+          @click="emit('edit', ds)"
           title="编辑信息"
         >
           <i class="fas fa-edit"></i>
         </button>
-        <button 
-          v-if="!ds.is_local" 
-          class="action-btn" 
-          @click="emit('upload', ds)" 
+        <button
+          v-if="!ds.is_local"
+          class="action-btn"
+          @click="emit('upload', ds)"
           title="上传文件"
         >
           <i class="fas fa-upload"></i>
         </button>
-        <button 
-          v-if="!ds.is_local && isCreator" 
-          class="action-btn" 
-          @click="emit('grant', ds)" 
+        <button
+          v-if="!ds.is_local && isCreator"
+          class="action-btn"
+          @click="emit('grant', ds)"
           title="授权管理"
         >
           <i class="fas fa-user-shield"></i>
         </button>
-        <button 
-          class="action-btn" 
-          @click="emit('view-tables', ds)" 
+        <button
+          class="action-btn"
+          @click="emit('view-tables', ds)"
           title="查看数据表"
         >
           <i class="fas fa-table"></i>
         </button>
-        <button 
-          v-if="!ds.is_local && isCreator" 
-          class="action-btn delete" 
-          @click="emit('delete', ds.id)" 
+        <button
+          v-if="!ds.is_local && isCreator"
+          class="action-btn delete"
+          @click="emit('delete', ds.id)"
           title="删除数据源"
         >
           <i class="fas fa-trash"></i>
@@ -70,20 +72,20 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
-import { useAuthStore } from '../../stores/auth';
-import type { DataSource } from '../../stores/datasource';
+import { computed } from "vue";
+import { useAuthStore } from "../../stores/auth";
+import type { DataSource } from "../../stores/datasource";
 
 const props = defineProps<{
   ds: DataSource;
 }>();
 
 const emit = defineEmits<{
-  (e: 'upload', ds: DataSource): void;
-  (e: 'edit', ds: DataSource): void;
-  (e: 'grant', ds: DataSource): void;
-  (e: 'view-tables', ds: DataSource): void;
-  (e: 'delete', id: number): void;
+  (e: "upload", ds: DataSource): void;
+  (e: "edit", ds: DataSource): void;
+  (e: "grant", ds: DataSource): void;
+  (e: "view-tables", ds: DataSource): void;
+  (e: "delete", id: number): void;
 }>();
 
 const authStore = useAuthStore();
@@ -93,16 +95,16 @@ const isCreator = computed(() => {
 });
 
 const ownerName = computed(() => {
-  if (props.ds.is_local) return 'System';
-  if (isCreator.value) return `${props.ds.creator_name || '我'} (我)`;
-  return props.ds.creator_name || '未知用户';
+  if (props.ds.is_local) return "System";
+  if (isCreator.value) return `${props.ds.creator_name || "我"} (我)`;
+  return props.ds.creator_name || "未知用户";
 });
 
 const formattedDate = computed(() => {
   const dateStr = props.ds.created_at;
-  if (!dateStr) return '-';
+  if (!dateStr) return "-";
   const date = new Date(dateStr);
-  return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')}`;
+  return `${date.getMonth() + 1}/${date.getDate()} ${date.getHours()}:${String(date.getMinutes()).padStart(2, "0")}`;
 });
 </script>
 
@@ -128,8 +130,12 @@ const formattedDate = computed(() => {
   height: 4px;
   width: 100%;
 }
-.card-gradient.local { background: linear-gradient(90deg, #8b5cf6, #3b82f6); }
-.card-gradient.file { background: linear-gradient(90deg, #0ea5e9, #22d3ee); }
+.card-gradient.local {
+  background: linear-gradient(90deg, #8b5cf6, #3b82f6);
+}
+.card-gradient.file {
+  background: linear-gradient(90deg, #0ea5e9, #22d3ee);
+}
 
 .card-body {
   padding: 24px;
@@ -185,8 +191,13 @@ const formattedDate = computed(() => {
   font-size: 12px;
 }
 
-.info-row .label { color: var(--da-text-muted); }
-.info-row .value { color: var(--da-text-main); font-weight: 500; }
+.info-row .label {
+  color: var(--da-text-muted);
+}
+.info-row .value {
+  color: var(--da-text-main);
+  font-weight: 500;
+}
 
 .card-footer {
   padding: 16px 24px;

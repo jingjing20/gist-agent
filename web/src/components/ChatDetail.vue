@@ -3,16 +3,30 @@
     <template v-if="store.activeConversation">
       <div class="chat-header">
         <div class="header-left">
-          <button v-if="sidebarCollapsed" class="toolbar-btn" @click="emit('open-sidebar')" title="展开侧边栏">
+          <button
+            v-if="sidebarCollapsed"
+            class="toolbar-btn"
+            @click="emit('open-sidebar')"
+            title="展开侧边栏"
+          >
             <i class="fas fa-angle-double-right"></i>
           </button>
           <h2 class="chat-title">{{ store.activeConversation.title }}</h2>
         </div>
-        <button v-if="!drawerOpen" class="toolbar-btn" @click="emit('toggle-drawer')" title="展开数据源上下文">
+        <button
+          v-if="!drawerOpen"
+          class="toolbar-btn"
+          @click="emit('toggle-drawer')"
+          title="展开数据源上下文"
+        >
           <i class="fas fa-database text-da-primary"></i>
         </button>
       </div>
-      <div class="message-list no-scrollbar" ref="messageListRef" @scroll="handleScroll">
+      <div
+        class="message-list no-scrollbar"
+        ref="messageListRef"
+        @scroll="handleScroll"
+      >
         <ChatMessageItem
           v-for="msg in store.activeConversation.messages"
           :key="msg.id"
@@ -22,10 +36,10 @@
       </div>
     </template>
     <template v-else>
-      <ChatEmptyState 
-        :sidebar-collapsed="sidebarCollapsed" 
-        @select="handleExample" 
-        @open-sidebar="emit('open-sidebar')" 
+      <ChatEmptyState
+        :sidebar-collapsed="sidebarCollapsed"
+        @select="handleExample"
+        @open-sidebar="emit('open-sidebar')"
       />
     </template>
     <ChatInput />
@@ -33,12 +47,12 @@
 </template>
 
 <script setup lang="ts">
-import { watch, nextTick, ref } from 'vue';
-import { useChatStore } from '../stores/chat';
-import ChatInput from './ChatInput.vue';
-import ChatEmptyState from './ChatEmptyState.vue';
-import ChatMessageItem from './ChatMessageItem.vue';
-import type { ChatMessage } from '../types';
+import { watch, nextTick, ref } from "vue";
+import { useChatStore } from "../stores/chat";
+import ChatInput from "./ChatInput.vue";
+import ChatEmptyState from "./ChatEmptyState.vue";
+import ChatMessageItem from "./ChatMessageItem.vue";
+import type { ChatMessage } from "../types";
 
 defineProps<{
   sidebarCollapsed?: boolean;
@@ -46,8 +60,8 @@ defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'toggle-drawer'): void;
-  (e: 'open-sidebar'): void;
+  (e: "toggle-drawer"): void;
+  (e: "open-sidebar"): void;
 }>();
 
 const store = useChatStore();
@@ -57,7 +71,7 @@ function isLastAssistantMsg(msg: ChatMessage): boolean {
   const msgs = store.activeConversation?.messages;
   if (!msgs) return false;
   for (let i = msgs.length - 1; i >= 0; i--) {
-    if (msgs[i].role === 'assistant') return msgs[i].id === msg.id;
+    if (msgs[i].role === "assistant") return msgs[i].id === msg.id;
   }
   return false;
 }
@@ -87,7 +101,7 @@ watch(
       scrollToBottom(true);
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 watch(
@@ -95,7 +109,7 @@ watch(
   () => {
     scrollToBottom(false);
   },
-  { deep: true }
+  { deep: true },
 );
 
 async function handleExample(query: string) {

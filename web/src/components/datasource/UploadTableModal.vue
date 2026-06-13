@@ -6,7 +6,7 @@
           <i class="fas fa-times"></i>
         </button>
         <h3>上传数据到「{{ modelValue.name }}」</h3>
-        
+
         <div class="da-form">
           <!-- Step 1: Upload Zone -->
           <div
@@ -18,11 +18,19 @@
             @drop.prevent="handleDrop"
             @click="fileInputRef?.click()"
           >
-            <input ref="fileInputRef" type="file" accept=".csv,.xlsx,.xls" hidden @change="handleChange" />
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".csv,.xlsx,.xls"
+              hidden
+              @change="handleChange"
+            />
             <div class="upload-placeholder">
               <i class="fas fa-cloud-upload-alt"></i>
               <p>点击或拖拽文件到这里</p>
-              <span class="support-text">支持 .csv, .xlsx, .xls (单个或多个 Sheet)</span>
+              <span class="support-text"
+                >支持 .csv, .xlsx, .xls (单个或多个 Sheet)</span
+              >
             </div>
           </div>
 
@@ -30,21 +38,41 @@
           <div v-else class="file-ready-container">
             <div class="file-summary">
               <div class="file-icon-box">
-                <i :class="isExcel ? 'fas fa-file-excel' : 'fas fa-file-csv'"></i>
+                <i
+                  :class="isExcel ? 'fas fa-file-excel' : 'fas fa-file-csv'"
+                ></i>
               </div>
               <div class="file-meta">
                 <div class="file-name">{{ file.name }}</div>
-                <div class="file-size">{{ (file.size / 1024).toFixed(1) }} KB</div>
+                <div class="file-size">
+                  {{ (file.size / 1024).toFixed(1) }} KB
+                </div>
               </div>
-              <button class="btn-change-file" @click="resetFile">修改文件</button>
+              <button class="btn-change-file" @click="resetFile">
+                修改文件
+              </button>
             </div>
 
             <div class="config-section">
-              <label class="section-title">确认表名称 ({{ tableConfigs.filter(c => c.selected).length }} / {{ tableConfigs.length }})</label>
+              <label class="section-title"
+                >确认表名称 ({{
+                  tableConfigs.filter((c) => c.selected).length
+                }}
+                / {{ tableConfigs.length }})</label
+              >
               <div class="table-config-list no-scrollbar">
-                <div v-for="(config, idx) in tableConfigs" :key="idx" class="table-config-item" :class="{ disabled: !config.selected }">
+                <div
+                  v-for="(config, idx) in tableConfigs"
+                  :key="idx"
+                  class="table-config-item"
+                  :class="{ disabled: !config.selected }"
+                >
                   <div class="item-check">
-                    <input type="checkbox" v-model="config.selected" :disabled="tableConfigs.length === 1 && config.selected" />
+                    <input
+                      type="checkbox"
+                      v-model="config.selected"
+                      :disabled="tableConfigs.length === 1 && config.selected"
+                    />
                   </div>
                   <div class="item-sheet-name" v-if="isExcel">
                     <span class="badge">Sheet</span>
@@ -52,7 +80,10 @@
                   </div>
                   <div class="item-input-group">
                     <i class="fas fa-table"></i>
-                    <input v-model="config.displayName" placeholder="输入表展示名" />
+                    <input
+                      v-model="config.displayName"
+                      placeholder="输入表展示名"
+                    />
                   </div>
                 </div>
               </div>
@@ -65,14 +96,16 @@
         </div>
 
         <div class="modal-footer">
-          <button class="btn-da-ghost" @click="emit('update:modelValue', null)">取消</button>
-          <button 
-            class="btn-da-primary" 
-            :disabled="!file || !canSubmit || submitting" 
+          <button class="btn-da-ghost" @click="emit('update:modelValue', null)">
+            取消
+          </button>
+          <button
+            class="btn-da-primary"
+            :disabled="!file || !canSubmit || submitting"
             @click="handleSubmit"
           >
             <i class="fas fa-check" v-if="!submitting"></i>
-            {{ submitting ? '上传中...' : '开始上传' }}
+            {{ submitting ? "上传中..." : "开始上传" }}
           </button>
         </div>
       </div>
@@ -81,9 +114,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
-import type { DataSource } from '../../stores/datasource';
-import * as XLSX from 'xlsx';
+import { ref, computed, watch } from "vue";
+import type { DataSource } from "../../stores/datasource";
+import * as XLSX from "xlsx";
 
 const props = defineProps<{
   modelValue: DataSource | null;
@@ -92,8 +125,13 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: DataSource | null): void;
-  (e: 'submit', dsId: number, file: File, configs: { sheetName?: string; displayName: string }[]): void;
+  (e: "update:modelValue", value: DataSource | null): void;
+  (
+    e: "submit",
+    dsId: number,
+    file: File,
+    configs: { sheetName?: string; displayName: string }[],
+  ): void;
 }>();
 
 const dragOver = ref(false);
@@ -109,47 +147,52 @@ const tableConfigs = ref<TableConfig[]>([]);
 
 const isExcel = computed(() => {
   if (!file.value) return false;
-  const ext = file.value.name.split('.').pop()?.toLowerCase();
-  return ext === 'xlsx' || ext === 'xls';
+  const ext = file.value.name.split(".").pop()?.toLowerCase();
+  return ext === "xlsx" || ext === "xls";
 });
 
 const canSubmit = computed(() => {
-  return tableConfigs.value.some(c => c.selected && c.displayName.trim());
+  return tableConfigs.value.some((c) => c.selected && c.displayName.trim());
 });
 
-watch(() => props.modelValue, (newVal) => {
-  if (!newVal) resetFile();
-});
+watch(
+  () => props.modelValue,
+  (newVal) => {
+    if (!newVal) resetFile();
+  },
+);
 
 function resetFile() {
   file.value = null;
   tableConfigs.value = [];
-  if (fileInputRef.value) fileInputRef.value.value = '';
+  if (fileInputRef.value) fileInputRef.value.value = "";
 }
 
 async function handleFileSelection(f: File) {
   file.value = f;
-  const ext = f.name.split('.').pop()?.toLowerCase();
-  
-  if (ext === 'xlsx' || ext === 'xls') {
+  const ext = f.name.split(".").pop()?.toLowerCase();
+
+  if (ext === "xlsx" || ext === "xls") {
     try {
       const data = await f.arrayBuffer();
-      const workbook = XLSX.read(data, { type: 'array' });
-      tableConfigs.value = workbook.SheetNames.map(name => ({
+      const workbook = XLSX.read(data, { type: "array" });
+      tableConfigs.value = workbook.SheetNames.map((name) => ({
         sheetName: name,
         displayName: name, // Default to sheet name
-        selected: true
+        selected: true,
       }));
     } catch (err) {
-      console.error('Failed to parse Excel sheets', err);
+      console.error("Failed to parse Excel sheets", err);
       // Fallback or error handled by parent/error prop
     }
   } else {
     // CSV
-    tableConfigs.value = [{
-      displayName: f.name.replace(/\.[^/.]+$/, ""),
-      selected: true
-    }];
+    tableConfigs.value = [
+      {
+        displayName: f.name.replace(/\.[^/.]+$/, ""),
+        selected: true,
+      },
+    ];
   }
 }
 
@@ -167,10 +210,13 @@ function handleDrop(e: DragEvent) {
 function handleSubmit() {
   if (!file.value || !canSubmit.value) return;
   const finalConfigs = tableConfigs.value
-    .filter(c => c.selected)
-    .map(c => ({ sheetName: c.sheetName, displayName: c.displayName.trim() }));
-  
-  emit('submit', 0, file.value, finalConfigs);
+    .filter((c) => c.selected)
+    .map((c) => ({
+      sheetName: c.sheetName,
+      displayName: c.displayName.trim(),
+    }));
+
+  emit("submit", 0, file.value, finalConfigs);
 }
 </script>
 
@@ -183,7 +229,9 @@ function handleSubmit() {
   border-radius: 24px;
   padding: 32px;
   width: 480px;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(14, 165, 233, 0.1);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 40px rgba(14, 165, 233, 0.1);
   animation: modal-pop 0.4s cubic-bezier(0.16, 1, 0.3, 1);
   transition: width 0.3s ease;
 }
@@ -193,8 +241,14 @@ function handleSubmit() {
 }
 
 @keyframes modal-pop {
-  from { opacity: 0; transform: translateY(20px) scale(0.95); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 .modal h3 {
@@ -220,7 +274,8 @@ function handleSubmit() {
   background: rgba(255, 255, 255, 0.02);
 }
 
-.da-upload-zone:hover, .da-upload-zone.is-active {
+.da-upload-zone:hover,
+.da-upload-zone.is-active {
   border-color: #0ea5e9;
   background: rgba(14, 165, 233, 0.05);
   box-shadow: inset 0 0 20px rgba(14, 165, 233, 0.05);
@@ -433,7 +488,10 @@ function handleSubmit() {
   box-shadow: 0 4px 12px rgba(14, 165, 233, 0.3);
 }
 
-.btn-da-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.btn-da-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 .btn-da-ghost {
   background: transparent;
@@ -451,7 +509,11 @@ function handleSubmit() {
   color: #fff;
 }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 </style>
-

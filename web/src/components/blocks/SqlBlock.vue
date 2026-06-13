@@ -1,46 +1,62 @@
 <template>
   <div class="sql-block">
-    <div class="sql-header" @click="isExpanded = !isExpanded" title="点击展开/收起">
+    <div
+      class="sql-header"
+      @click="isExpanded = !isExpanded"
+      title="点击展开/收起"
+    >
       <div class="sql-title">
         <i class="fas fa-terminal sql-type-icon"></i>
         <span class="sql-label">SQL 查询语句</span>
         <span v-if="!isExpanded" class="sql-hint">点击展开代码</span>
       </div>
       <div class="header-actions">
-        <button v-show="isExpanded" class="action-btn" @click.stop="copySQL" :title="copied ? '已复制' : '复制'">
+        <button
+          v-show="isExpanded"
+          class="action-btn"
+          @click.stop="copySQL"
+          :title="copied ? '已复制' : '复制'"
+        >
           <i class="fas" :class="copied ? 'fa-check' : 'fa-copy'"></i>
-          {{ copied ? '已复制' : '复制' }}
+          {{ copied ? "已复制" : "复制" }}
         </button>
-        <i class="fas fa-chevron-down toggle-icon" :class="{ 'is-flipped': isExpanded }"></i>
+        <i
+          class="fas fa-chevron-down toggle-icon"
+          :class="{ 'is-flipped': isExpanded }"
+        ></i>
       </div>
     </div>
     <div v-show="isExpanded" class="sql-content">
-      <pre class="sql-code no-scrollbar"><code v-html="highlightedSQL"></code></pre>
+      <pre
+        class="sql-code no-scrollbar"
+      ><code v-html="highlightedSQL"></code></pre>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue';
-import hljs from 'highlight.js/lib/core';
-import sql from 'highlight.js/lib/languages/sql';
+import { computed, ref } from "vue";
+import hljs from "highlight.js/lib/core";
+import sql from "highlight.js/lib/languages/sql";
 
-hljs.registerLanguage('sql', sql);
+hljs.registerLanguage("sql", sql);
 
 const props = defineProps<{ content?: string }>();
 const copied = ref(false);
 const isExpanded = ref(true);
 
 const highlightedSQL = computed(() => {
-  if (!props.content) return '';
-  return hljs.highlight(props.content, { language: 'sql' }).value;
+  if (!props.content) return "";
+  return hljs.highlight(props.content, { language: "sql" }).value;
 });
 
 function copySQL() {
   if (!props.content) return;
   navigator.clipboard.writeText(props.content);
   copied.value = true;
-  setTimeout(() => { copied.value = false; }, 2000);
+  setTimeout(() => {
+    copied.value = false;
+  }, 2000);
 }
 </script>
 
@@ -137,10 +153,15 @@ function copySQL() {
   overflow-x: auto;
   font-size: 13px;
   line-height: 1.6;
-  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
   color: #e2e8f0;
 }
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 </style>

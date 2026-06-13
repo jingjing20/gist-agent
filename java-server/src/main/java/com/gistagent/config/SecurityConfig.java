@@ -2,7 +2,6 @@ package com.gistagent.config;
 
 import com.gistagent.auth.JwtAuthEntryPoint;
 import com.gistagent.auth.JwtAuthFilter;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,35 +17,34 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 public class SecurityConfig {
 
-	private static final String[] PUBLIC_PATHS = {
-			"/health",
-			"/auth/register",
-			"/auth/login",
-			"/auth/forgot-password",
-			"/auth/reset-password"
-	};
+  private static final String[] PUBLIC_PATHS = {
+    "/health", "/auth/register", "/auth/login", "/auth/forgot-password", "/auth/reset-password"
+  };
 
-	@Bean
-	public SecurityFilterChain securityFilterChain(HttpSecurity http,
-												   JwtAuthFilter jwtAuthFilter,
-												   JwtAuthEntryPoint entryPoint) throws Exception {
-		http
-				.csrf(csrf -> csrf.disable())
-				.cors(cors -> {})
-				.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-				.httpBasic(b -> b.disable())
-				.formLogin(f -> f.disable())
-				.exceptionHandling(eh -> eh.authenticationEntryPoint(entryPoint))
-				.authorizeHttpRequests(auth -> auth
-						.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-						.requestMatchers(PUBLIC_PATHS).permitAll()
-						.anyRequest().authenticated())
-				.addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
-		return http.build();
-	}
+  @Bean
+  public SecurityFilterChain securityFilterChain(
+      HttpSecurity http, JwtAuthFilter jwtAuthFilter, JwtAuthEntryPoint entryPoint)
+      throws Exception {
+    http.csrf(csrf -> csrf.disable())
+        .cors(cors -> {})
+        .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .httpBasic(b -> b.disable())
+        .formLogin(f -> f.disable())
+        .exceptionHandling(eh -> eh.authenticationEntryPoint(entryPoint))
+        .authorizeHttpRequests(
+            auth ->
+                auth.requestMatchers(HttpMethod.OPTIONS, "/**")
+                    .permitAll()
+                    .requestMatchers(PUBLIC_PATHS)
+                    .permitAll()
+                    .anyRequest()
+                    .authenticated())
+        .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+    return http.build();
+  }
 
-	@Bean
-	public PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
 }

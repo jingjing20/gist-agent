@@ -1,29 +1,36 @@
 <template>
   <div class="auth-block">
     <div class="auth-icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+      >
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
       </svg>
     </div>
     <div class="auth-content">
       <h4 class="title">数据表访问受限</h4>
       <p class="desc">本次分析需要读取以下由于未授权而拦截的数据库表：</p>
       <ul class="tables-list">
-        <li v-for="t in tables" :key="t"><code>{{ t }}</code></li>
+        <li v-for="t in tables" :key="t">
+          <code>{{ t }}</code>
+        </li>
       </ul>
       <div v-if="reason" class="reason">
         <strong>需要权限原因：</strong>{{ reason }}
       </div>
       <button class="apply-btn" @click="handleApply" :disabled="applied">
-        {{ applied ? '申请已提交并等待审批' : '立即申请表权限' }}
+        {{ applied ? "申请已提交并等待审批" : "立即申请表权限" }}
       </button>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useToastStore } from '../../stores/toast';
+import { ref } from "vue";
+import { useToastStore } from "../../stores/toast";
 
 defineProps<{
   tables?: string[];
@@ -35,7 +42,7 @@ const toast = useToastStore();
 
 function handleApply() {
   applied.value = true;
-  toast.info('申请已提交，请等待管理员审批');
+  toast.info("申请已提交，请等待管理员审批");
 }
 </script>
 

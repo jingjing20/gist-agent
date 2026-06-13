@@ -2,7 +2,11 @@
   <aside class="da-drawer" :class="{ 'is-open': modelValue }">
     <div class="drawer-header">
       <h2 class="drawer-title">Data Source Context</h2>
-      <button class="drawer-toggle" @click="emit('update:modelValue', false)" title="收起抽屉">
+      <button
+        class="drawer-toggle"
+        @click="emit('update:modelValue', false)"
+        title="收起抽屉"
+      >
         <i class="fas fa-angle-double-right"></i>
       </button>
     </div>
@@ -18,17 +22,28 @@
     <div class="ds-card tables-card">
       <div class="card-accent accent-blue"></div>
       <h3 class="card-subtitle">当前数据表:</h3>
-      <div v-if="loadingSchema" class="text-xs text-da-text-muted">Loading...</div>
+      <div v-if="loadingSchema" class="text-xs text-da-text-muted">
+        Loading...
+      </div>
       <ul v-else class="table-list">
         <li
           v-for="table in schemaTables"
           :key="table.tableName"
           class="table-item"
-          :class="{ 'active': selectedTable?.tableName === table.tableName }"
+          :class="{ active: selectedTable?.tableName === table.tableName }"
           @click="selectedTable = table"
         >
-          <i class="fas" :class="table.isUploaded ? 'fa-file-csv text-da-primary' : 'fa-database text-da-gradient-end'"></i>
-          <span class="table-name" :title="table.display_name">{{ table.tableName }}</span>
+          <i
+            class="fas"
+            :class="
+              table.isUploaded
+                ? 'fa-file-csv text-da-primary'
+                : 'fa-database text-da-gradient-end'
+            "
+          ></i>
+          <span class="table-name" :title="table.display_name">{{
+            table.tableName
+          }}</span>
         </li>
       </ul>
     </div>
@@ -38,8 +53,14 @@
       <div class="card-accent accent-cyan"></div>
       <h3 class="card-subtitle">数据表字段:</h3>
       <ul class="field-list">
-        <li v-for="field in selectedTable.fields" :key="field.name" class="field-item">
-          <span class="field-name" :title="field.comment">{{ field.name }}</span>
+        <li
+          v-for="field in selectedTable.fields"
+          :key="field.name"
+          class="field-item"
+        >
+          <span class="field-name" :title="field.comment">{{
+            field.name
+          }}</span>
           <span class="field-type">({{ field.type }})</span>
         </li>
       </ul>
@@ -48,17 +69,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
-import { useDataSourceStore } from '../stores/datasource';
-import { useChatStore } from '../stores/chat';
-import { useToastStore } from '../stores/toast';
+import { ref, computed, watch, onMounted } from "vue";
+import { useDataSourceStore } from "../stores/datasource";
+import { useChatStore } from "../stores/chat";
+import { useToastStore } from "../stores/toast";
 
 const props = defineProps<{
   modelValue: boolean; // Controls open/close state
 }>();
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void;
+  (e: "update:modelValue", value: boolean): void;
 }>();
 
 const dsStore = useDataSourceStore();
@@ -70,10 +91,11 @@ const loadingSchema = ref(false);
 const selectedTable = ref<any | null>(null);
 
 const currentSource = computed(() => {
-  const dsId = chatStore.activeDatasourceId || chatStore.activeConversation?.datasource_id;
-  if (dsId) return dsStore.list.find(d => d.id === dsId);
+  const dsId =
+    chatStore.activeDatasourceId || chatStore.activeConversation?.datasource_id;
+  if (dsId) return dsStore.list.find((d) => d.id === dsId);
   // Default to first local DB if none selected
-  return dsStore.list.find(d => d.is_local === 1);
+  return dsStore.list.find((d) => d.is_local === 1);
 });
 
 async function loadSchema() {
@@ -85,17 +107,21 @@ async function loadSchema() {
       selectedTable.value = schemaTables.value[0];
     }
   } catch (err: any) {
-    console.error('Failed to load schema', err);
-    toast.error('获取表格架构失败: ' + err.message);
+    console.error("Failed to load schema", err);
+    toast.error("获取表格架构失败: " + err.message);
   } finally {
     loadingSchema.value = false;
   }
 }
 
-watch(() => currentSource.value?.id, () => {
-  selectedTable.value = null;
-  loadSchema();
-}, { immediate: true });
+watch(
+  () => currentSource.value?.id,
+  () => {
+    selectedTable.value = null;
+    loadSchema();
+  },
+  { immediate: true },
+);
 
 onMounted(() => {
   dsStore.fetchAll();
@@ -159,7 +185,7 @@ onMounted(() => {
   border-radius: 12px;
   padding: 16px;
   border: 1px solid rgba(51, 58, 77, 0.5); /* da-border/50 */
-  background: linear-gradient(to bottom, #2A3142, #1C212E);
+  background: linear-gradient(to bottom, #2a3142, #1c212e);
   position: relative;
   overflow: hidden;
   box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -191,9 +217,15 @@ onMounted(() => {
   width: 4px;
   height: 100%;
 }
-.accent-purple { background: rgba(148, 163, 184, 0.3); }
-.accent-blue { background: rgba(139, 92, 246, 0.5); }
-.accent-cyan { background: rgba(14, 165, 233, 0.5); }
+.accent-purple {
+  background: rgba(148, 163, 184, 0.3);
+}
+.accent-blue {
+  background: rgba(139, 92, 246, 0.5);
+}
+.accent-cyan {
+  background: rgba(14, 165, 233, 0.5);
+}
 
 .card-subtitle {
   font-size: 12px;

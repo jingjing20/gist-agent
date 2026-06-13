@@ -12,7 +12,8 @@
         <div class="branding-content">
           <h2 class="hero-title">你的数据，<br />由 AI 深度解析</h2>
           <p class="hero-desc">
-            集成最新 LLM 技术，支持上传 CSV/Excel 文件。自然语言一键对话，自动生成精美 ECharts 动态图表。
+            集成最新 LLM 技术，支持上传 CSV/Excel
+            文件。自然语言一键对话，自动生成精美 ECharts 动态图表。
           </p>
         </div>
       </div>
@@ -29,17 +30,29 @@
             <div class="input-group">
               <div class="input-wrapper">
                 <i class="far fa-envelope"></i>
-                <input v-model="email" type="email" placeholder="name@company.com" required />
+                <input
+                  v-model="email"
+                  type="email"
+                  placeholder="name@company.com"
+                  required
+                />
               </div>
             </div>
 
             <div class="input-group">
               <div class="input-wrapper">
                 <i class="fas fa-lock"></i>
-                <input v-model="password" type="password" placeholder="••••••••" required />
+                <input
+                  v-model="password"
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                />
               </div>
               <div class="forgot-box">
-                <router-link to="/forgot-password" class="forgot-link">忘记密码？</router-link>
+                <router-link to="/forgot-password" class="forgot-link"
+                  >忘记密码？</router-link
+                >
               </div>
             </div>
 
@@ -50,7 +63,9 @@
 
             <button type="submit" class="btn-primary" :disabled="loading">
               <span v-if="!loading">立即登录</span>
-              <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 处理中...</span>
+              <span v-else class="loading-spinner"
+                ><i class="fas fa-spinner fa-spin"></i> 处理中...</span
+              >
             </button>
           </form>
 
@@ -64,34 +79,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
-import { useToastStore } from '../stores/toast';
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/auth";
+import { useToastStore } from "../stores/toast";
 
 const router = useRouter();
 const authStore = useAuthStore();
 const toast = useToastStore();
 
-const email = ref('');
-const password = ref('');
-const error = ref('');
+const email = ref("");
+const password = ref("");
+const error = ref("");
 const loading = ref(false);
 
 async function handleLogin() {
-  error.value = '';
+  error.value = "";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-    error.value = '请输入正确的邮箱格式';
+    error.value = "请输入正确的邮箱格式";
     return;
   }
   loading.value = true;
   try {
     await authStore.login(email.value, password.value);
-    toast.success('登录成功，欢迎回来');
-    router.replace('/chat');
+    toast.success("登录成功，欢迎回来");
+    router.replace("/chat");
   } catch (e: any) {
-    error.value = e.message || '登录失败';
-    toast.error('登录失败: ' + error.value);
+    error.value = e.message || "登录失败";
+    toast.error("登录失败: " + error.value);
   } finally {
     loading.value = false;
   }
@@ -105,7 +120,7 @@ async function handleLogin() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-image: url('../assets/images/auth_bg.png');
+  background-image: url("../assets/images/auth_bg.png");
   background-size: cover;
   background-position: center;
   overflow: hidden;
@@ -137,13 +152,18 @@ async function handleLogin() {
 }
 
 .branding::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 10%;
   right: 0;
   bottom: 10%;
   width: 1px;
-  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
 }
 
 .branding-content {
@@ -217,7 +237,6 @@ async function handleLogin() {
 .form-header {
   margin-bottom: 40px;
 }
-
 
 .form-header h3 {
   font-size: 24px;
@@ -348,8 +367,15 @@ async function handleLogin() {
 }
 
 @media (max-width: 1100px) {
-  .branding { display: none; }
-  .form-panel { flex: 1; }
-  .glass-card { max-width: 500px; min-height: auto; }
+  .branding {
+    display: none;
+  }
+  .form-panel {
+    flex: 1;
+  }
+  .glass-card {
+    max-width: 500px;
+    min-height: auto;
+  }
 }
 </style>

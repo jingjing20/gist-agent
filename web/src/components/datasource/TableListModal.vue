@@ -12,15 +12,15 @@
           <div v-if="loading" class="loading-box">
             <i class="fas fa-circle-notch fa-spin"></i> 加载中...
           </div>
-          <div v-else-if="!tables.length" class="empty-box">
-            暂无上传的表
-          </div>
+          <div v-else-if="!tables.length" class="empty-box">暂无上传的表</div>
           <div v-else class="table-grid">
             <div v-for="t in tables" :key="t.id" class="table-list-item">
               <div class="t-info">
                 <div class="t-name">
                   {{ t.display_name }}
-                  <span class="t-uploader" v-if="t.uploader_name">· 上传者: {{ t.uploader_name }}</span>
+                  <span class="t-uploader" v-if="t.uploader_name"
+                    >· 上传者: {{ t.uploader_name }}</span
+                  >
                 </div>
                 <div class="t-code">{{ t.table_name }}</div>
               </div>
@@ -40,8 +40,8 @@
 </template>
 
 <script setup lang="ts">
-import type { DataSource, UploadedTable } from '../../stores/datasource';
-import { useAuthStore } from '../../stores/auth';
+import type { DataSource, UploadedTable } from "../../stores/datasource";
+import { useAuthStore } from "../../stores/auth";
 
 defineProps<{
   modelValue: DataSource | null;
@@ -58,8 +58,8 @@ const canDelete = (ds: DataSource, t: UploadedTable) => {
 };
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: DataSource | null): void;
-  (e: 'delete-table', dsId: number, tableId: number): void;
+  (e: "update:modelValue", value: DataSource | null): void;
+  (e: "delete-table", dsId: number, tableId: number): void;
 }>();
 </script>
 
@@ -76,8 +76,14 @@ const emit = defineEmits<{
 }
 
 @keyframes modal-pop {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 .table-modal {
@@ -113,7 +119,8 @@ const emit = defineEmits<{
   overflow-y: auto;
 }
 
-.loading-box, .empty-box {
+.loading-box,
+.empty-box {
   padding: 40px;
   text-align: center;
   color: var(--da-text-muted);
@@ -141,9 +148,24 @@ const emit = defineEmits<{
   gap: 2px;
 }
 
-.t-name { font-weight: 600; color: #fff; font-size: 14px; display: flex; align-items: center; }
-.t-uploader { font-size: 11px; font-weight: 400; color: var(--da-text-muted); margin-left: 8px; }
-.t-code { font-size: 12px; color: var(--da-text-muted); font-family: monospace; }
+.t-name {
+  font-weight: 600;
+  color: #fff;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+}
+.t-uploader {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--da-text-muted);
+  margin-left: 8px;
+}
+.t-code {
+  font-size: 12px;
+  color: var(--da-text-muted);
+  font-family: monospace;
+}
 
 .t-delete-btn {
   background: none;
@@ -152,8 +174,15 @@ const emit = defineEmits<{
   cursor: pointer;
   transition: color 0.2s;
 }
-.t-delete-btn:hover { color: #ef4444; }
+.t-delete-btn:hover {
+  color: #ef4444;
+}
 
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 </style>

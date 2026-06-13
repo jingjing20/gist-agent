@@ -1,11 +1,10 @@
-import { Module } from '@nestjs/common';
-import { ConversationController } from './conversation.controller';
-import { ConversationService } from './conversation.service';
-
+import { Module } from "@nestjs/common";
+import { ConversationController } from "./conversation.controller";
+import { ConversationService } from "./conversation.service";
 
 @Module({
-	controllers: [ConversationController],
-	providers: [ConversationService],
-	exports: [ConversationService],
+  controllers: [ConversationController],
+  providers: [ConversationService],
+  exports: [ConversationService],
 })
-export class ConversationModule { }
+export class ConversationModule {}

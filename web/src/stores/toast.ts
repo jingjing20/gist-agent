@@ -1,7 +1,7 @@
-import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { defineStore } from "pinia";
+import { ref } from "vue";
 
-export type ToastType = 'success' | 'error' | 'info' | 'warning';
+export type ToastType = "success" | "error" | "info" | "warning";
 
 export interface Toast {
   id: number;
@@ -10,11 +10,11 @@ export interface Toast {
   duration?: number;
 }
 
-export const useToastStore = defineStore('toast', () => {
+export const useToastStore = defineStore("toast", () => {
   const toasts = ref<Toast[]>([]);
   let nextId = 1;
 
-  function add(message: string, type: ToastType = 'info', duration = 3000) {
+  function add(message: string, type: ToastType = "info", duration = 3000) {
     const id = nextId++;
     toasts.value.push({ id, type, message, duration });
 
@@ -26,23 +26,23 @@ export const useToastStore = defineStore('toast', () => {
   }
 
   function success(message: string, duration?: number) {
-    add(message, 'success', duration);
+    add(message, "success", duration);
   }
 
   function error(message: string, duration?: number) {
-    add(message, 'error', duration);
+    add(message, "error", duration);
   }
 
   function warn(message: string, duration?: number) {
-    add(message, 'warning', duration);
+    add(message, "warning", duration);
   }
 
   function info(message: string, duration?: number) {
-    add(message, 'info', duration);
+    add(message, "info", duration);
   }
 
   function remove(id: number) {
-    const index = toasts.value.findIndex(t => t.id === id);
+    const index = toasts.value.findIndex((t) => t.id === id);
     if (index !== -1) {
       toasts.value.splice(index, 1);
     }
@@ -54,6 +54,6 @@ export const useToastStore = defineStore('toast', () => {
     error,
     warn,
     info,
-    remove
+    remove,
   };
 });

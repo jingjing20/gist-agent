@@ -12,7 +12,8 @@
         <div class="branding-content">
           <h2 class="hero-title">你的数据，<br />由 AI 深度解析</h2>
           <p class="hero-desc">
-            集成最新 LLM 技术，支持上传 CSV/Excel 文件。自然语言一键对话，自动生成精美 ECharts 动态图表。
+            集成最新 LLM 技术，支持上传 CSV/Excel
+            文件。自然语言一键对话，自动生成精美 ECharts 动态图表。
           </p>
         </div>
       </div>
@@ -29,21 +30,35 @@
             <div class="input-group">
               <div class="input-wrapper">
                 <i class="far fa-envelope"></i>
-                <input v-model="email" type="email" placeholder="name@company.com" required />
+                <input
+                  v-model="email"
+                  type="email"
+                  placeholder="name@company.com"
+                  required
+                />
               </div>
             </div>
 
             <div class="input-group">
               <div class="input-wrapper">
                 <i class="fas fa-lock"></i>
-                <input v-model="password" type="password" placeholder="设置至少 6 位密码" required />
+                <input
+                  v-model="password"
+                  type="password"
+                  placeholder="设置至少 6 位密码"
+                  required
+                />
               </div>
             </div>
 
             <div class="input-group">
               <div class="input-wrapper">
                 <i class="far fa-user"></i>
-                <input v-model="name" type="text" placeholder="您的昵称（可选）" />
+                <input
+                  v-model="name"
+                  type="text"
+                  placeholder="您的昵称（可选）"
+                />
               </div>
             </div>
 
@@ -54,7 +69,9 @@
 
             <button type="submit" class="btn-primary" :disabled="loading">
               <span v-if="!loading">立即注册</span>
-              <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 处理中...</span>
+              <span v-else class="loading-spinner"
+                ><i class="fas fa-spinner fa-spin"></i> 处理中...</span
+              >
             </button>
           </form>
 
@@ -68,35 +85,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
-import { useToastStore } from '../stores/toast';
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { useAuthStore } from "../stores/auth";
+import { useToastStore } from "../stores/toast";
 
 const router = useRouter();
 const authStore = useAuthStore();
 const toast = useToastStore();
 
-const email = ref('');
-const password = ref('');
-const name = ref('');
-const error = ref('');
+const email = ref("");
+const password = ref("");
+const name = ref("");
+const error = ref("");
 const loading = ref(false);
 
 async function handleRegister() {
-  error.value = '';
+  error.value = "";
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.value)) {
-    error.value = '请输入正确的邮箱格式';
+    error.value = "请输入正确的邮箱格式";
     return;
   }
   loading.value = true;
   try {
-    await authStore.register(email.value, password.value, name.value || undefined);
-    toast.success('注册成功，欢迎加入');
-    router.replace('/chat');
+    await authStore.register(
+      email.value,
+      password.value,
+      name.value || undefined,
+    );
+    toast.success("注册成功，欢迎加入");
+    router.replace("/chat");
   } catch (e: any) {
-    error.value = e.message || '注册失败';
-    toast.error('注册失败: ' + error.value);
+    error.value = e.message || "注册失败";
+    toast.error("注册失败: " + error.value);
   } finally {
     loading.value = false;
   }
@@ -110,7 +131,7 @@ async function handleRegister() {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-image: url('../assets/images/auth_bg.png');
+  background-image: url("../assets/images/auth_bg.png");
   background-size: cover;
   background-position: center;
   overflow: hidden;
@@ -142,13 +163,18 @@ async function handleRegister() {
 }
 
 .branding::after {
-  content: '';
+  content: "";
   position: absolute;
   top: 10%;
   right: 0;
   bottom: 10%;
   width: 1px;
-  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    rgba(255, 255, 255, 0.1),
+    transparent
+  );
 }
 
 .branding-content {
@@ -222,7 +248,6 @@ async function handleRegister() {
 .form-header {
   margin-bottom: 40px;
 }
-
 
 .form-header h3 {
   font-size: 24px;
@@ -330,8 +355,15 @@ async function handleRegister() {
 }
 
 @media (max-width: 1100px) {
-  .branding { display: none; }
-  .form-panel { flex: 1; }
-  .glass-card { max-width: 500px; min-height: auto; }
+  .branding {
+    display: none;
+  }
+  .form-panel {
+    flex: 1;
+  }
+  .glass-card {
+    max-width: 500px;
+    min-height: auto;
+  }
 }
 </style>

@@ -1,6 +1,11 @@
 <template>
   <div class="empty-state-container no-scrollbar">
-    <button v-if="sidebarCollapsed" class="expand-sidebar-btn" @click="emit('open-sidebar')" title="展开侧边栏">
+    <button
+      v-if="sidebarCollapsed"
+      class="expand-sidebar-btn"
+      @click="emit('open-sidebar')"
+      title="展开侧边栏"
+    >
       <i class="fas fa-angle-double-right"></i>
     </button>
     <div class="empty-state-content">
@@ -10,7 +15,9 @@
         </div>
         <div class="hero-text-content">
           <h1 class="hero-title">Gist Agent</h1>
-          <p class="hero-subtitle">基于 AI 的智能数据分析专家，助你快速洞察业务本质</p>
+          <p class="hero-subtitle">
+            基于 AI 的智能数据分析专家，助你快速洞察业务本质
+          </p>
         </div>
       </div>
 
@@ -25,7 +32,10 @@
         >
           <div class="ds-trigger" @click="dsOpen = !dsOpen">
             <div class="ds-info">
-              <i v-if="activeDs?.is_local" class="fas fa-database ds-type-icon"></i>
+              <i
+                v-if="activeDs?.is_local"
+                class="fas fa-database ds-type-icon"
+              ></i>
               <i v-else class="fas fa-file-csv ds-type-icon"></i>
               <span class="ds-value">{{ activeDatasourceName }}</span>
             </div>
@@ -41,7 +51,9 @@
               @mousedown.prevent="selectDs(ds.id)"
             >
               <div class="ds-option-label">
-                <i :class="ds.is_local ? 'fas fa-database' : 'fas fa-file-csv'"></i>
+                <i
+                  :class="ds.is_local ? 'fas fa-database' : 'fas fa-file-csv'"
+                ></i>
                 <span>{{ ds.name }}</span>
               </div>
               <span v-if="ds.is_local" class="local-badge">公共库</span>
@@ -75,19 +87,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
-import { useChatStore } from '../stores/chat';
-import { useDataSourceStore } from '../stores/datasource';
+import { ref, computed, watch, onMounted } from "vue";
+import { useChatStore } from "../stores/chat";
+import { useDataSourceStore } from "../stores/datasource";
 
-withDefaults(defineProps<{
-  sidebarCollapsed?: boolean;
-}>(), {
-  sidebarCollapsed: false
-});
+withDefaults(
+  defineProps<{
+    sidebarCollapsed?: boolean;
+  }>(),
+  {
+    sidebarCollapsed: false,
+  },
+);
 
 const emit = defineEmits<{
-  (e: 'select', query: string): void;
-  (e: 'open-sidebar'): void;
+  (e: "select", query: string): void;
+  (e: "open-sidebar"): void;
 }>();
 
 const chatStore = useChatStore();
@@ -96,17 +111,17 @@ const dsStore = useDataSourceStore();
 const dsOpen = ref(false);
 
 const DEFAULT_QUERIES = [
-  '帮我分析下近一月平台的日活趋势',
-  '对比不同平台最近一周的新增用户数',
-  '近 7 天用户行为类型分布是怎样的',
+  "帮我分析下近一月平台的日活趋势",
+  "对比不同平台最近一周的新增用户数",
+  "近 7 天用户行为类型分布是怎样的",
 ];
 
 const activeDs = computed(() => {
-  return dsStore.list.find(d => d.id === chatStore.activeDatasourceId);
+  return dsStore.list.find((d) => d.id === chatStore.activeDatasourceId);
 });
 
 const activeDatasourceName = computed(() => {
-  return activeDs.value?.name || '选择数据源';
+  return activeDs.value?.name || "选择数据源";
 });
 
 const suggestionsLoading = computed(() => {
@@ -133,14 +148,16 @@ onMounted(async () => {
   }
   // 如果没有激活的数据源，默认选中第一个本地库
   if (!chatStore.activeDatasourceId) {
-    const local = dsStore.list.find(d => d.is_local === 1) || dsStore.list[0];
+    const local = dsStore.list.find((d) => d.is_local === 1) || dsStore.list[0];
     if (local) chatStore.activeDatasourceId = local.id;
   }
 });
 
 watch(
   () => chatStore.activeDatasourceId,
-  (id) => { if (id != null) dsStore.fetchSuggestions(id); },
+  (id) => {
+    if (id != null) dsStore.fetchSuggestions(id);
+  },
   { immediate: true },
 );
 </script>
@@ -309,8 +326,14 @@ watch(
 }
 
 @keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .ds-option {
@@ -405,15 +428,24 @@ watch(
 
 /* Skeleton */
 .skeleton {
-  background: linear-gradient(90deg, var(--da-card) 25%, var(--da-border) 50%, var(--da-card) 75%);
+  background: linear-gradient(
+    90deg,
+    var(--da-card) 25%,
+    var(--da-border) 50%,
+    var(--da-card) 75%
+  );
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
   border-color: transparent !important;
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 .no-scrollbar::-webkit-scrollbar {
