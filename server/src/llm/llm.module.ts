@@ -1,9 +1,9 @@
-import { Module, Global } from "@nestjs/common";
-import { LlmService } from "./llm.service";
+import { Module, Global } from '@nestjs/common';
+import { LlmService } from './llm.service';
 
 @Global()
 @Module({
-  providers: [LlmService],
-  exports: [LlmService],
+    providers: [LlmService],
+    exports: [LlmService],
 })
 export class LlmModule {}
