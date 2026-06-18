@@ -4,8 +4,8 @@ import { wrapOpenAI } from 'langsmith/wrappers';
 
 @Injectable()
 export class LlmService {
-    readonly client: OpenAI;
-    readonly model: string;
+    private readonly client: OpenAI;
+    private readonly model: string;
 
     constructor() {
         const rawClient = new OpenAI({
@@ -53,5 +53,17 @@ export class LlmService {
             }
         }
         return fullContent;
+    }
+
+    streamWithTools(
+        messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+        tools: OpenAI.Chat.Completions.ChatCompletionTool[]
+    ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+        return this.client.chat.completions.create({
+            model: this.model,
+            messages,
+            tools,
+            stream: true,
+        }) as unknown as Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>>;
     }
 }

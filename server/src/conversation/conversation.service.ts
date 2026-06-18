@@ -1,4 +1,4 @@
-import { Injectable, OnModuleInit, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { v4 as uuidv4 } from 'uuid';
 import { RowDataPacket } from 'mysql2/promise';
@@ -23,70 +23,8 @@ export interface Message {
 }
 
 @Injectable()
-export class ConversationService implements OnModuleInit {
+export class ConversationService {
     constructor(private readonly db: DatabaseService) {}
-
-    async onModuleInit() {
-        await this.ensureMigrations();
-    }
-
-    // 历史库字段/索引兼容。建表在 scripts/init-db.ts 完成。
-    private async ensureMigrations() {
-        try {
-            const cols = await this.db.query<any[]>(
-                "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'user_id'"
-            );
-            if (!cols.length) {
-                await this.db.execute('ALTER TABLE conversation ADD COLUMN user_id INT NULL AFTER id');
-            }
-        } catch {
-            /* ignore */
-        }
-
-        try {
-            const cols = await this.db.query<any[]>(
-                "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'datasource_id'"
-            );
-            if (!cols.length) {
-                await this.db.execute('ALTER TABLE conversation ADD COLUMN datasource_id INT NULL AFTER user_id');
-            }
-        } catch {
-            /* ignore */
-        }
-
-        try {
-            const cols = await this.db.query<any[]>(
-                "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'conversation' AND COLUMN_NAME = 'semantic_state'"
-            );
-            if (!cols.length) {
-                await this.db.execute("ALTER TABLE conversation ADD COLUMN semantic_state JSON NULL COMMENT 'Semantic Summary' AFTER title");
-            }
-        } catch {
-            /* ignore */
-        }
-
-        try {
-            const cols = await this.db.query<any[]>(
-                "SELECT COLUMN_NAME FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'message' AND COLUMN_NAME = 'llm_messages'"
-            );
-            if (!cols.length) {
-                await this.db.execute('ALTER TABLE message ADD COLUMN llm_messages JSON NULL AFTER blocks');
-            }
-        } catch {
-            /* ignore */
-        }
-
-        try {
-            const indexes = await this.db.query<any[]>(
-                "SELECT INDEX_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'message' AND INDEX_NAME = 'idx_conv_time'"
-            );
-            if (!indexes.length) {
-                await this.db.execute('ALTER TABLE message ADD INDEX idx_conv_time (conversation_id, created_at)');
-            }
-        } catch {
-            /* ignore */
-        }
-    }
 
     async findAll(userId: number): Promise<Conversation[]> {
         const rows = await this.db.query<RowDataPacket[]>('SELECT * FROM conversation WHERE user_id = ? ORDER BY updated_at DESC', [userId]);
@@ -161,34 +99,37 @@ export class ConversationService implements OnModuleInit {
 
     async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, blocks: unknown[], llmMessages: unknown[] = []): Promise<Message> {
         const id = uuidv4();
-        await this.db.execute('INSERT INTO message (id, conversation_id, role, content, llm_messages) VALUES (?, ?, ?, ?, ?)', [
-            id,
-            conversationId,
-            role,
-            content,
-            JSON.stringify(llmMessages),
-        ]);
 
-        const blockValues: unknown[] = [];
-        const blockPlaceholders: string[] = [];
+        await this.db.withTransaction(async (conn) => {
+            await conn.execute('INSERT INTO message (id, conversation_id, role, content, llm_messages) VALUES (?, ?, ?, ?, ?)', [
+                id,
+                conversationId,
+                role,
+                content,
+                JSON.stringify(llmMessages),
+            ]);
 
-        for (let i = 0; i < blocks.length; i++) {
-            const block = blocks[i] as any;
-            const blockId = uuidv4();
-            const { type, content: blockContent, ...rest } = block;
-            const hasMetadata = Object.keys(rest).length > 0;
+            const blockValues: unknown[] = [];
+            const blockPlaceholders: string[] = [];
 
-            const metadataStr = hasMetadata ? JSON.stringify(rest) : null;
-            blockValues.push(blockId, id, i, type, blockContent ?? null, metadataStr);
-            blockPlaceholders.push('(?, ?, ?, ?, ?, ?)');
-        }
+            for (let i = 0; i < blocks.length; i++) {
+                const block = blocks[i] as any;
+                const blockId = uuidv4();
+                const { type, content: blockContent, ...rest } = block;
+                const hasMetadata = Object.keys(rest).length > 0;
 
-        if (blockPlaceholders.length > 0) {
-            const sql = `INSERT INTO message_block (id, message_id, sort_order, type, content, metadata) VALUES ${blockPlaceholders.join(', ')}`;
-            await this.db.execute(sql, blockValues);
-        }
+                const metadataStr = hasMetadata ? JSON.stringify(rest) : null;
+                blockValues.push(blockId, id, i, type, blockContent ?? null, metadataStr);
+                blockPlaceholders.push('(?, ?, ?, ?, ?, ?)');
+            }
 
-        await this.db.execute('UPDATE conversation SET updated_at = NOW() WHERE id = ?', [conversationId]);
+            if (blockPlaceholders.length > 0) {
+                const sql = `INSERT INTO message_block (id, message_id, sort_order, type, content, metadata) VALUES ${blockPlaceholders.join(', ')}`;
+                await conn.execute(sql, blockValues as any);
+            }
+
+            await conn.execute('UPDATE conversation SET updated_at = NOW() WHERE id = ?', [conversationId]);
+        });
 
         return {
             id,

@@ -41,7 +41,8 @@ export class SchemaService {
             return isInternal ? '当前数据库中没有可用的业务表。' : '当前数据源中还没有上传的表。';
         }
 
-        const prompt = await this.fetchSchemaPromptFromLocal(allowedTables, uploadedTableNames);
+        const rows = await this.fetchRawSchemaRows(allowedTables);
+        const prompt = rows.length > 0 ? this.formatSchemaRows(rows, uploadedTableNames) : '当前数据库中没有可用的业务表。';
 
         if (prompt) {
             this.cache.set(cacheKey, { prompt, timestamp: Date.now() });
@@ -75,31 +76,30 @@ export class SchemaService {
     }
 
     /**
-     * 从 information_schema 抓取物理表结构并格式化。
+     * 从 information_schema 抓取物理表结构原始行，供各格式化方法复用。
      */
-    private async fetchSchemaPromptFromLocal(allowedTables: string[], uploadedTableNames: string[]): Promise<string> {
+    private async fetchRawSchemaRows(allowedTables: string[]): Promise<any[]> {
         const dbNameRows = await this.db.query<any[]>('SELECT DATABASE() AS db_name');
         const dbName = dbNameRows[0]?.db_name;
-        if (!dbName) return '无法获取目标数据库名称。';
+        if (!dbName) return [];
 
         const placeholders = allowedTables.map(() => '?').join(', ');
         const sql = `
-			SELECT
-				c.TABLE_NAME,
-				t.TABLE_COMMENT,
-				c.COLUMN_NAME,
-				c.COLUMN_TYPE,
-				c.COLUMN_COMMENT
-			FROM information_schema.COLUMNS c
-			JOIN information_schema.TABLES t
-			  ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA
-			WHERE c.TABLE_SCHEMA = ?
-			  AND c.TABLE_NAME IN (${placeholders})
-			ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
-		`;
+            SELECT
+                c.TABLE_NAME,
+                t.TABLE_COMMENT,
+                c.COLUMN_NAME,
+                c.COLUMN_TYPE,
+                c.COLUMN_COMMENT
+            FROM information_schema.COLUMNS c
+            JOIN information_schema.TABLES t
+              ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA
+            WHERE c.TABLE_SCHEMA = ?
+              AND c.TABLE_NAME IN (${placeholders})
+            ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
+        `;
 
-        const rows = await this.db.query<any[]>(sql, [dbName, ...allowedTables]);
-        return this.formatSchemaRows(rows, uploadedTableNames);
+        return this.db.query<any[]>(sql, [dbName, ...allowedTables]);
     }
 
     async getStructuredSchema(datasourceId: number | null, userId: number): Promise<any[]> {
@@ -110,27 +110,7 @@ export class SchemaService {
 
         if (allowedTables.length === 0) return [];
 
-        const dbNameRows = await this.db.query<any[]>('SELECT DATABASE() AS db_name');
-        const dbName = dbNameRows[0]?.db_name;
-        if (!dbName) return [];
-
-        const placeholders = allowedTables.map(() => '?').join(', ');
-        const sql = `
-			SELECT
-				c.TABLE_NAME,
-				t.TABLE_COMMENT,
-				c.COLUMN_NAME,
-				c.COLUMN_TYPE,
-				c.COLUMN_COMMENT
-			FROM information_schema.COLUMNS c
-			JOIN information_schema.TABLES t
-			  ON c.TABLE_NAME = t.TABLE_NAME AND c.TABLE_SCHEMA = t.TABLE_SCHEMA
-			WHERE c.TABLE_SCHEMA = ?
-			  AND c.TABLE_NAME IN (${placeholders})
-			ORDER BY c.TABLE_NAME, c.ORDINAL_POSITION
-		`;
-
-        const rows = await this.db.query<any[]>(sql, [dbName, ...allowedTables]);
+        const rows = await this.fetchRawSchemaRows(allowedTables);
         const tablesMap = new Map<
             string,
             {

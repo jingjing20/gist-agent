@@ -101,12 +101,7 @@ export class ChatService {
         const tools = this.toolRegistry.getDefinitions();
 
         for (let iteration = 0; iteration < MAX_AGENT_ITERATIONS; iteration++) {
-            const stream = await this.llm.client.chat.completions.create({
-                model: this.llm.model,
-                messages,
-                tools,
-                stream: true,
-            });
+            const stream = await this.llm.streamWithTools(messages, tools);
 
             let content = ''; // 累积本次迭代的文本输出
             let reasoningContent = ''; // thinking 模式下的推理链（DeepSeek / Moonshot 等）
@@ -210,27 +205,39 @@ export class ChatService {
                     emitter.send(sqlBlock);
                     blocks.push(sqlBlock);
                 }
+            }
 
-                // 通过 ToolRegistry 按名称查找工具实例（类似策略模式），
-                // 新增工具只需实现 Tool 接口并注册到 ChatModule，无需修改此循环
-                const tool = this.toolRegistry.get(name);
-                let toolResult: string;
+            // 并发执行所有 tool_calls，通过 Promise.all 减少串行等待。
+            // 每个任务返回 { toolResult, blocks, toolCallId }，执行完后按原始顺序写回 messages，
+            // 保证 OpenAI 要求的 tool result 与 tool_call id 的顺序对应关系。
+            const toolResults = await Promise.all(
+                validToolCalls.map(async (tc) => {
+                    const name = tc.function.name;
+                    let args: Record<string, unknown> = {};
+                    try {
+                        args = JSON.parse(tc.function.arguments);
+                    } catch {
+                        /* malformed args */
+                    }
 
-                if (tool) {
-                    const result = await tool.execute(args, {
-                        emitter,
-                        datasourceId,
-                        userId,
-                    });
-                    toolResult = result.toolResult;
-                    blocks.push(...result.blocks);
-                } else {
-                    toolResult = `工具 ${name} 不存在`;
-                }
+                    const tool = this.toolRegistry.get(name);
+                    if (tool) {
+                        const result = await tool.execute(args, {
+                            emitter,
+                            datasourceId,
+                            userId,
+                        });
+                        return { toolCallId: tc.id, toolResult: result.toolResult, resultBlocks: result.blocks };
+                    }
+                    return { toolCallId: tc.id, toolResult: `工具 ${name} 不存在`, resultBlocks: [] as SSEEvent[] };
+                })
+            );
 
+            for (const { toolCallId, toolResult, resultBlocks } of toolResults) {
+                blocks.push(...resultBlocks);
                 const toolMsg: OpenAI.Chat.Completions.ChatCompletionMessageParam = {
                     role: 'tool',
-                    tool_call_id: tc.id,
+                    tool_call_id: toolCallId,
                     content: toolResult,
                 };
                 messages.push(toolMsg);

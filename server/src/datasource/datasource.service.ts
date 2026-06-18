@@ -45,13 +45,18 @@ export class DataSourceService {
      * 判断用户是否有权访问数据源：公共 -> 自建 -> 被授权，三级短路
      */
     async canAccess(datasourceId: number, userId: number): Promise<boolean> {
-        const rows = await this.db.query<RowDataPacket[]>('SELECT created_by FROM data_source WHERE id = ?', [datasourceId]);
+        const rows = await this.db.query<RowDataPacket[]>(
+            `SELECT d.created_by, p.user_id AS has_perm
+             FROM data_source d
+             LEFT JOIN datasource_permission p ON p.datasource_id = d.id AND p.user_id = ?
+             WHERE d.id = ?`,
+            [userId, datasourceId]
+        );
         if (!rows.length) return false;
         const row = rows[0] as any;
         if (row.created_by == null) return true;
         if (row.created_by === userId) return true;
-        const perm = await this.db.query<RowDataPacket[]>('SELECT 1 FROM datasource_permission WHERE datasource_id = ? AND user_id = ?', [datasourceId, userId]);
-        return perm.length > 0;
+        return row.has_perm != null;
     }
 
     async findAllForUser(userId: number): Promise<DataSource[]> {
