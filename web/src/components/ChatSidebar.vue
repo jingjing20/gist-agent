@@ -11,21 +11,24 @@
         </div>
 
         <div class="conversation-list no-scrollbar">
-            <div
-                v-for="conv in store.conversations"
-                :key="conv.id"
-                class="conversation-item"
-                :class="{ active: conv.id === store.activeConversationId }"
-                @click="store.selectConversation(conv.id)"
-            >
-                <div class="active-indicator" v-if="conv.id === store.activeConversationId"></div>
-                <span class="conv-title" :title="conv.title">{{ conv.title }}</span>
-                <div class="conv-actions">
-                    <button class="action-btn delete-btn" @click.stop="confirmDeleteConv(conv.id)" title="删除">
-                        <i class="fas fa-trash-alt"></i>
-                    </button>
+            <template v-for="group in groupedConversations" :key="group.label">
+                <div class="group-label">{{ group.label }}</div>
+                <div
+                    v-for="conv in group.items"
+                    :key="conv.id"
+                    class="conversation-item"
+                    :class="{ active: conv.id === store.activeConversationId }"
+                    @click="store.selectConversation(conv.id)"
+                >
+                    <div class="active-indicator" v-if="conv.id === store.activeConversationId"></div>
+                    <span class="conv-title" :title="conv.title">{{ conv.title }}</span>
+                    <div class="conv-actions">
+                        <button class="action-btn delete-btn" @click.stop="confirmDeleteConv(conv.id)" title="删除">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </div>
                 </div>
-            </div>
+            </template>
 
             <div v-if="store.conversations.length === 0" class="empty-hint">暂无对话记录</div>
         </div>
@@ -42,7 +45,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useChatStore } from '../stores/chat';
 import { useToastStore } from '../stores/toast';
 import ConfirmModal from './ConfirmModal.vue';
@@ -58,6 +61,34 @@ const emit = defineEmits<{
 const store = useChatStore();
 const toast = useToastStore();
 const deletingConvId = ref<string | null>(null);
+
+const groupedConversations = computed(() => {
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    const todayMs = startOfToday.getTime();
+    const sevenDaysMs = todayMs - 6 * 24 * 60 * 60 * 1000;
+
+    const today: typeof store.conversations = [];
+    const week: typeof store.conversations = [];
+    const older: typeof store.conversations = [];
+
+    for (const conv of store.conversations) {
+        const t = conv.updatedAt ?? conv.createdAt ?? 0;
+        if (t >= todayMs) {
+            today.push(conv);
+        } else if (t >= sevenDaysMs) {
+            week.push(conv);
+        } else {
+            older.push(conv);
+        }
+    }
+
+    const groups = [];
+    if (today.length) groups.push({ label: '今天', items: today });
+    if (week.length) groups.push({ label: '近七天', items: week });
+    if (older.length) groups.push({ label: '更早', items: older });
+    return groups;
+});
 
 function confirmDeleteConv(id: string) {
     deletingConvId.value = id;
@@ -156,6 +187,20 @@ onMounted(() => {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+
+.group-label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--da-text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 8px 4px 4px;
+    opacity: 0.6;
+}
+
+.group-label:first-child {
+    padding-top: 2px;
 }
 
 .conversation-item {
