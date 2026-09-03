@@ -5,12 +5,10 @@
 	"scripts": {
 		"dev:py": "uv run --directory py-server python src/main.py",
 		"dev:server": "pnpm --filter server dev",
-		"dev:java": "cd ./java-server && bash ./gradlew bootRun --continuous",
 		"dev:web": "pnpm --filter web dev",
 		"dev": "concurrently \"pnpm dev:server\" \"pnpm dev:web\"",
 		"init-db": "pnpm --filter server init-db",
-		"format": "prettier --write \"server/**/*.{ts,json}\" \"web/**/*.{ts,vue,json}\"",
-		"format:java": "cd java-server && ./gradlew spotlessApply"
+		"format": "prettier --write \"server/**/*.{ts,json}\" \"web/**/*.{ts,vue,json}\""
 	},
 	"devDependencies": {
 		"concurrently": "^9.1.2",
