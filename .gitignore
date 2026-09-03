@@ -70,10 +70,3 @@ dist-h5/
 
 .idea/
 .history
-
-# Python
-__pycache__/
-*.py[cod]
-.venv/
-.python-version
-.ruff_cache/

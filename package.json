@@ -3,7 +3,6 @@
 	"version": "1.0.0",
 	"private": true,
 	"scripts": {
-		"dev:py": "uv run --directory py-server python src/main.py",
 		"dev:server": "pnpm --filter server dev",
 		"dev:web": "pnpm --filter web dev",
 		"dev": "concurrently \"pnpm dev:server\" \"pnpm dev:web\"",
