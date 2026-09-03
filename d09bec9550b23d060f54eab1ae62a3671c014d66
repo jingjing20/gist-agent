@@ -1,0 +1,22 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.32",
+  "base_commit_sha": "d09bec9550b23d060f54eab1ae62a3671c014d66",
+  "prompts": {
+    "ebfad137fac35b60": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1d5fa9d0-23ea-463b-8e12-007431e06ee6",
+        "model": "grok-4.6",
+        "ide": "cursor"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 3961,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
