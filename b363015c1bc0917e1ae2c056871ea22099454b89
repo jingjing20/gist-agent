@@ -1,0 +1,24 @@
+package.json
+  ebfad137fac35b60 11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.32",
+  "base_commit_sha": "b363015c1bc0917e1ae2c056871ea22099454b89",
+  "prompts": {
+    "ebfad137fac35b60": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "1d5fa9d0-23ea-463b-8e12-007431e06ee6",
+        "model": "grok-4.6",
+        "ide": "cursor"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1,
+      "total_deletions": 5578,
+      "accepted_lines": 1,
+      "overriden_lines": 0
+    }
+  }
+}
