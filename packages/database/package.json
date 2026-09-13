@@ -1,0 +1,13 @@
+{
+  "name": "@gist/database",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": { "@gist/config": "workspace:*", "pg": "^8.16.3" },
+  "devDependencies": { "@types/pg": "^8.15.5", "typescript": "^5.7.3" }
+}

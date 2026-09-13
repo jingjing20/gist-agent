@@ -1,0 +1,17 @@
+{
+  "name": "@gist/llm",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@gist/config": "workspace:*",
+    "langsmith": "^0.5.15",
+    "openai": "^4.82.0"
+  },
+  "devDependencies": { "typescript": "^5.7.3" }
+}

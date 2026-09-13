@@ -1,6 +1,6 @@
 packages:
-  - 'server'
-  - 'web'
+  - 'apps/*'
+  - 'packages/*'
 allowBuilds:
   '@nestjs/core': true
   bcrypt: true

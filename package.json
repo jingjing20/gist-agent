@@ -1,16 +1,23 @@
 {
-	"name": "gist-agent",
-	"version": "1.0.0",
-	"private": true,
-	"scripts": {
-		"dev:server": "pnpm --filter server dev",
-		"dev:web": "pnpm --filter web dev",
-		"dev": "concurrently \"pnpm dev:server\" \"pnpm dev:web\"",
-		"init-db": "pnpm --filter server init-db",
-		"format": "prettier --write \"server/**/*.{ts,json}\" \"web/**/*.{ts,vue,json}\""
-	},
-	"devDependencies": {
-		"concurrently": "^9.1.2",
-		"prettier": "^3.5.3"
-	}
+    "name": "gist-agent",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+        "dev:api": "pnpm --filter @gist/api dev",
+        "dev:worker": "pnpm --filter @gist/worker dev",
+        "dev:web": "pnpm --filter @gist/web dev",
+        "dev": "concurrently -n api,worker,web \"pnpm dev:api\" \"pnpm dev:worker\" \"pnpm dev:web\"",
+        "build": "pnpm -r --if-present build",
+        "typecheck": "pnpm -r --if-present typecheck",
+        "smoke:conversation": "node scripts/smoke-multi-conversation.mjs",
+        "test:reasoning": "pnpm --filter @gist/llm build && pnpm --filter @gist/worker build && node scripts/reasoning-context-regression.mjs",
+        "init-db": "pnpm --filter @gist/api init-db",
+        "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\""
+    },
+    "devDependencies": {
+        "@gist/config": "workspace:*",
+        "@gist/database": "workspace:*",
+        "concurrently": "^9.1.2",
+        "prettier": "^3.5.3"
+    }
 }
