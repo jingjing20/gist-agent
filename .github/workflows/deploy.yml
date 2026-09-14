@@ -27,10 +27,11 @@ jobs:
       - name: Install deps
         run: pnpm install
 
-      - name: Type check & build
-        run: |
-          set -e
-          pnpm --filter web build
+      - name: Type check
+        run: pnpm typecheck
+
+      - name: Build
+        run: pnpm build
 
   # ========================
   # 2️⃣ 部署阶段（CD）

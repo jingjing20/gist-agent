@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 FROM node:22-alpine AS builder
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 WORKDIR /app
@@ -9,7 +10,8 @@ COPY packages/config/package.json ./packages/config/
 COPY packages/contracts/package.json ./packages/contracts/
 COPY packages/database/package.json ./packages/database/
 COPY packages/llm/package.json ./packages/llm/
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=gist-pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir /pnpm/store
 COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
 RUN pnpm --filter @gist/api... build
