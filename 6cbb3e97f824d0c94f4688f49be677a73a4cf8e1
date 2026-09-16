@@ -1,0 +1,52 @@
+docs/agent-refactor/05-data-security-and-quality.md
+  1d0a762ae1535d65 1-136
+docs/agent-refactor/README.md
+  1d0a762ae1535d65 1-88
+docs/agent-refactor/07-delivery-roadmap.md
+  1d0a762ae1535d65 1-176
+docs/agent-refactor/01-execution-reliability.md
+  1d0a762ae1535d65 1-149
+docs/agent-refactor/04-memory.md
+  1d0a762ae1535d65 1-143
+docs/agent-refactor/06-evaluation-and-observability.md
+  1d0a762ae1535d65 1-150
+docs/agent-refactor/03-context-and-artifacts.md
+  1d0a762ae1535d65 1-160
+docs/agent-refactor/02-orchestration-and-prompts.md
+  1d0a762ae1535d65 1-161
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "6cbb3e97f824d0c94f4688f49be677a73a4cf8e1",
+  "prompts": {
+    "1d0a762ae1535d65": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0a993-c67d-7152-bf53-02c675002faa",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1168,
+      "total_deletions": 5,
+      "accepted_lines": 1163,
+      "overriden_lines": 0
+    },
+    "c3dbc1c93e618dba": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a09fce-64d3-74d2-846a-7fce56b3a880",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 138,
+      "total_deletions": 0,
+      "accepted_lines": 138,
+      "overriden_lines": 0
+    }
+  }
+}
