@@ -35,6 +35,7 @@
 | [05-data-security-and-quality.md](./05-data-security-and-quality.md) | 数据安全与分析质量 | SQL fail-closed、只读账号、注入防护、结果校验 |
 | [06-evaluation-and-observability.md](./06-evaluation-and-observability.md) | 评测与可观测性 | Agent E2E 评测、指标体系、版本追踪 |
 | [07-delivery-roadmap.md](./07-delivery-roadmap.md) | 分阶段路线图 | 里程碑、依赖关系、Definition of Done |
+| [08-phase-0-implementation.md](./08-phase-0-implementation.md) | Phase 0 实施记录 | 版本追踪、错误码、首响应指标与验证结果 |
 
 ## 4. 优先级摘要
 

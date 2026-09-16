@@ -1,5 +1,5 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
-import type { GenerationStatus } from '@gist/contracts';
+import type { GenerationErrorCode, GenerationStatus } from '@gist/contracts';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
 import { DatabaseService, type QueryRow } from '../database/database.service';
@@ -91,6 +91,24 @@ export class GenerationService implements OnModuleDestroy {
         return result.rowCount === 1;
     }
 
+    async markFirstDelta(identity: GenerationIdentity): Promise<void> {
+        await this.db.withTransaction(async (transaction) => {
+            const [updated] = await transaction.execute(
+                `UPDATE generation
+                 SET first_token_at=COALESCE(first_token_at,NOW()),updated_at=NOW()
+                 WHERE id=? AND writer_token=? AND status IN ('starting','running','cancel_requested')`,
+                [identity.id, identity.writerToken]
+            );
+            if (updated.rowCount !== 1) return;
+            await transaction.execute(
+                `UPDATE generation_attempt
+                 SET received_first_delta=TRUE
+                 WHERE generation_id=? AND writer_token=? AND completed_at IS NULL`,
+                [identity.id, identity.writerToken]
+            );
+        });
+    }
+
     async isCancelRequested(id: string): Promise<boolean> {
         const rows = await this.db.query<QueryRow[]>('SELECT status FROM generation WHERE id=?', [id]);
         return !rows.length || ['cancel_requested', 'cancelled'].includes(rows[0].status);
@@ -117,13 +135,14 @@ export class GenerationService implements OnModuleDestroy {
         identity: GenerationIdentity,
         status: Extract<GenerationStatus, 'completed' | 'failed' | 'cancelled'>,
         error: string | undefined,
+        errorCode: GenerationErrorCode | undefined,
         terminal: SSEEvent
     ): Promise<void> {
         await this.db.withTransaction(async (transaction) => {
             const [updated] = await transaction.execute(
-                `UPDATE generation SET status=?,error=?,updated_at=NOW(),completed_at=NOW(),writer_token=NULL
+                `UPDATE generation SET status=?,error=?,error_code=?,updated_at=NOW(),completed_at=NOW(),writer_token=NULL
         WHERE id=? AND (?='' OR writer_token=?)`,
-                [status, error ?? null, identity.id, identity.writerToken, identity.writerToken]
+                [status, error ?? null, errorCode ?? null, identity.id, identity.writerToken, identity.writerToken]
             );
             if (updated.rowCount !== 1) return;
             await transaction.execute('UPDATE generation_attempt SET status=?,error=?,completed_at=NOW() WHERE generation_id=? AND completed_at IS NULL', [
@@ -149,7 +168,7 @@ export class GenerationService implements OnModuleDestroy {
     async failStale(timeoutMs: number): Promise<number> {
         const rows = await this.db.query<QueryRow[]>(
             `UPDATE generation
-      SET status='failed',error='生成进程意外中断，已保留收到的部分内容',completed_at=NOW(),updated_at=NOW(),writer_token=NULL
+      SET status='failed',error='生成进程意外中断，已保留收到的部分内容',error_code='WORKER_LOST',completed_at=NOW(),updated_at=NOW(),writer_token=NULL
       WHERE status IN ('starting','running') AND writer_token IS NOT NULL
         AND writer_heartbeat_at < NOW() - (? * INTERVAL '1 millisecond')
       RETURNING id,user_id,conversation_id,response_message_id`,
@@ -166,7 +185,7 @@ export class GenerationService implements OnModuleDestroy {
                     userId: row.user_id,
                     conversationId: row.conversation_id,
                     messageId: row.response_message_id,
-                    event: { type: 'done', status: 'failed', error: '生成进程意外中断，已保留收到的部分内容' },
+                    event: { type: 'done', status: 'failed', error: '生成进程意外中断，已保留收到的部分内容', errorCode: 'WORKER_LOST' },
                 }),
             ]);
         }

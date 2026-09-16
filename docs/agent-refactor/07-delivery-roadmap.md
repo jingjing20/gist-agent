@@ -18,6 +18,8 @@
 
 ## 3. Phase 0：建立可比较基线
 
+实施状态：已完成，并在运行中的 API/Worker/Redis/PostgreSQL 环境通过完整 smoke。详情见 [Phase 0 实施记录](./08-phase-0-implementation.md)。
+
 ### 交付物
 
 - Prompt/tool/context/memory 版本字段。
@@ -173,4 +175,3 @@
 - 把更多查询结论自动写入长期记忆。
 - 为追求并发而允许同一线性 conversation 同时生成多条分支。
 - 先做复杂向量 RAG，而不解决 Turn、Artifact 和 Schema 目录建模。
-

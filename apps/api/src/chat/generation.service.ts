@@ -3,6 +3,7 @@ import type { Request, Response } from 'express';
 import Redis from 'ioredis';
 import { randomUUID } from 'crypto';
 import { DatabaseService, QueryRow } from '../database/database.service';
+import { AGENT_RUNTIME_VERSIONS } from '@gist/contracts';
 
 @Injectable()
 export class GenerationService implements OnModuleDestroy {
@@ -50,8 +51,28 @@ export class GenerationService implements OnModuleDestroy {
                 'assistant',
             ]);
             await tx.execute(
-                "INSERT INTO generation (id,user_id,conversation_id,request_message_id,response_message_id,status,idempotency_key,request_hash,reasoning_enabled) VALUES (?,?,?,?,?,'pending',?,?,?)",
-                [id, userId, conversationId, requestMessageId, responseMessageId, idempotencyKey, requestHash, reasoningEnabled]
+                `INSERT INTO generation (
+                    id,user_id,conversation_id,request_message_id,response_message_id,status,
+                    idempotency_key,request_hash,reasoning_enabled,model_provider,model_name,
+                    prompt_policy_version,toolset_version,context_policy_version,memory_policy_version,schema_context_version
+                ) VALUES (?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?,?)`,
+                [
+                    id,
+                    userId,
+                    conversationId,
+                    requestMessageId,
+                    responseMessageId,
+                    idempotencyKey,
+                    requestHash,
+                    reasoningEnabled,
+                    process.env.LLM_PROVIDER || 'openai-compatible',
+                    process.env.OPENAI_MODEL || 'gpt-4o',
+                    AGENT_RUNTIME_VERSIONS.promptPolicy,
+                    AGENT_RUNTIME_VERSIONS.toolset,
+                    AGENT_RUNTIME_VERSIONS.contextPolicy,
+                    AGENT_RUNTIME_VERSIONS.memoryPolicy,
+                    AGENT_RUNTIME_VERSIONS.schemaContext,
+                ]
             );
             await tx.execute("INSERT INTO outbox_event (aggregate_id,type,payload) VALUES (?,'generation.enqueue',?::jsonb)", [
                 id,
@@ -98,7 +119,7 @@ export class GenerationService implements OnModuleDestroy {
         );
         const reconciled = knownIds.length
             ? await this.db.query<QueryRow[]>(
-                  `SELECT g.id AS generation_id,g.conversation_id,g.response_message_id AS message_id,g.status,g.last_sequence,m.content,m.blocks,g.error
+                  `SELECT g.id AS generation_id,g.conversation_id,g.response_message_id AS message_id,g.status,g.last_sequence,m.content,m.blocks,g.error,g.error_code
              FROM generation g JOIN message m ON m.id=g.response_message_id WHERE g.user_id=? AND g.id IN (${knownIds.map(() => '?').join(',')})`,
                   [userId, ...knownIds]
               )
@@ -125,6 +146,7 @@ export class GenerationService implements OnModuleDestroy {
                 sequence: Number(generation[0].last_sequence),
                 status: generation[0].status,
                 error: generation[0].error,
+                errorCode: generation[0].error_code,
             },
         };
     }

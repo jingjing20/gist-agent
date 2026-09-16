@@ -1,5 +1,31 @@
 export const GENERATION_QUEUE_NAME = 'conversation-generations';
 
+/**
+ * Agent 行为相关组件的稳定版本。任何会改变模型决策或上下文语义的修改，
+ * 都应提升对应版本，并随 generation 一起持久化，便于评测和线上追踪。
+ */
+export const AGENT_RUNTIME_VERSIONS = {
+  promptPolicy: 'prompt-policy-v1',
+  toolset: 'toolset-v1',
+  contextPolicy: 'context-policy-v1',
+  memoryPolicy: 'memory-policy-v1',
+  schemaContext: 'schema-context-v1',
+} as const;
+
+export const GENERATION_ERROR_CODES = [
+  'ANALYSIS_TIMEOUT',
+  'CANCELLED',
+  'WRITER_OWNERSHIP_LOST',
+  'GENERATION_CAPACITY_UNAVAILABLE',
+  'MAX_AGENT_ITERATIONS_EXCEEDED',
+  'LLM_REQUEST_FAILED',
+  'TOOL_EXECUTION_FAILED',
+  'WORKER_LOST',
+  'INTERNAL_ERROR',
+] as const;
+
+export type GenerationErrorCode = (typeof GENERATION_ERROR_CODES)[number];
+
 export type GenerationStatus =
   | 'pending'
   | 'starting'

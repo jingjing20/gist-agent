@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import assert from 'node:assert/strict';
 import { DatabaseClient } from '@gist/database';
 import { loadWorkspaceEnv } from '@gist/config';
+import { AGENT_RUNTIME_VERSIONS } from '../packages/contracts/dist/index.js';
 
 loadWorkspaceEnv();
 const api = process.env.API_BASE_URL || 'http://127.0.0.1:3000/api';
@@ -51,6 +53,33 @@ try {
   })));
   const results = await Promise.all(generations.map((generation) => waitFor(generation.generationId, registration.token)));
   if (results.some((result) => result.status !== 'completed')) throw new Error(`unexpected statuses: ${JSON.stringify(results)}`);
+
+  const generationIds = generations.map((generation) => generation.generationId);
+  const placeholders = generationIds.map(() => '?').join(',');
+  const persisted = await database.query(
+    `SELECT id,error_code,first_token_at,model_provider,model_name,prompt_policy_version,toolset_version,
+            context_policy_version,memory_policy_version,schema_context_version
+       FROM generation WHERE id IN (${placeholders}) ORDER BY id`,
+    generationIds,
+  );
+  assert.equal(persisted.length, generationIds.length);
+  for (const row of persisted) {
+    assert.equal(row.error_code, null);
+    assert.ok(row.first_token_at, `missing first_token_at for ${row.id}`);
+    assert.ok(row.model_provider);
+    assert.ok(row.model_name);
+    assert.equal(row.prompt_policy_version, AGENT_RUNTIME_VERSIONS.promptPolicy);
+    assert.equal(row.toolset_version, AGENT_RUNTIME_VERSIONS.toolset);
+    assert.equal(row.context_policy_version, AGENT_RUNTIME_VERSIONS.contextPolicy);
+    assert.equal(row.memory_policy_version, AGENT_RUNTIME_VERSIONS.memoryPolicy);
+    assert.equal(row.schema_context_version, AGENT_RUNTIME_VERSIONS.schemaContext);
+  }
+  const attempts = await database.query(
+    `SELECT generation_id,received_first_delta FROM generation_attempt WHERE generation_id IN (${placeholders})`,
+    generationIds,
+  );
+  assert.equal(attempts.length, generationIds.length);
+  assert.ok(attempts.every((attempt) => attempt.received_first_delta === true));
   console.log(JSON.stringify({ conversations: conversations.length, generations: results }, null, 2));
 } finally {
   await database.execute('DELETE FROM app_user WHERE email=?', [email]).catch(() => undefined);

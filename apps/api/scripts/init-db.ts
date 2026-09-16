@@ -92,6 +92,14 @@ async function initDB() {
       ALTER TABLE generation ADD COLUMN IF NOT EXISTS cancel_requested_at TIMESTAMPTZ;
       ALTER TABLE generation ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
       ALTER TABLE generation ADD COLUMN IF NOT EXISTS first_token_at TIMESTAMPTZ;
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS error_code VARCHAR(64);
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS model_provider VARCHAR(100) NOT NULL DEFAULT 'openai-compatible';
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS model_name VARCHAR(200) NOT NULL DEFAULT 'gpt-4o';
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS prompt_policy_version VARCHAR(64) NOT NULL DEFAULT 'prompt-policy-v1';
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS toolset_version VARCHAR(64) NOT NULL DEFAULT 'toolset-v1';
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS context_policy_version VARCHAR(64) NOT NULL DEFAULT 'context-policy-v1';
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS memory_policy_version VARCHAR(64) NOT NULL DEFAULT 'memory-policy-v1';
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS schema_context_version VARCHAR(64) NOT NULL DEFAULT 'schema-context-v1';
       ALTER TABLE generation ADD CONSTRAINT generation_status_check CHECK(status IN ('pending','starting','running','completed','failed','cancel_requested','cancelled'));
       CREATE INDEX IF NOT EXISTS idx_generation_writer_heartbeat ON generation(status,writer_heartbeat_at);
       CREATE TABLE IF NOT EXISTS outbox_event (

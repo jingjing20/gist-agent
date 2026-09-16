@@ -11,6 +11,8 @@ import { randomUUID } from 'crypto';
 import { GenerationReliabilityService, type GenerationPermit } from './generation-reliability.service';
 import { workerConfig } from '@gist/config';
 import type { GenerationStatus } from '@gist/contracts';
+import type { GenerationErrorCode } from '@gist/contracts';
+import { GenerationExecutionError, normalizeGenerationError } from './generation-errors';
 
 // Agent 循环上限：防止 LLM 陷入无限 tool_call 循环（如反复查错 SQL 又反复修）
 const MAX_AGENT_ITERATIONS = 15;
@@ -41,7 +43,7 @@ export class ChatService {
         if (!candidate || ['completed', 'failed', 'cancelled'].includes(candidate.status)) return;
         if (candidate.status === 'cancel_requested') {
             const identity = { ...candidate, writerToken: '' };
-            await this.generations.finalize(identity, 'cancelled', undefined, { type: 'done', status: 'cancelled' });
+            await this.generations.finalize(identity, 'cancelled', undefined, 'CANCELLED', { type: 'done', status: 'cancelled', errorCode: 'CANCELLED' });
             return;
         }
         if (candidate.status !== 'pending') return;
@@ -53,7 +55,7 @@ export class ChatService {
             provider: process.env.LLM_PROVIDER || 'openai-compatible',
             token: writerToken,
         });
-        if (!permit) throw new Error('GENERATION_CAPACITY_UNAVAILABLE');
+        if (!permit) throw new GenerationExecutionError('GENERATION_CAPACITY_UNAVAILABLE', '生成容量暂时不可用');
         const generation = await this.generations.claim(generationId, writerToken);
         if (!generation) {
             await this.reliability.release(permit);
@@ -96,6 +98,7 @@ export class ChatService {
         let terminal: SSEEvent = { type: 'done' };
         let finalStatus: GenerationStatus = 'completed';
         let errorDetail: string | undefined;
+        let errorCode: GenerationErrorCode | undefined;
 
         // Promise.race 实现全局超时：Agent Loop 和定时器竞争，
         // 任何一方先完成即决定结果。这比在循环内部检查时间更可靠，
@@ -108,29 +111,46 @@ export class ChatService {
                 excludeMessageIds: [messageId],
             });
             await Promise.race([
-                this.runAgentLoop(emitter, messages, turnMessages, blocks, datasourceId, userId, reasoningActive, signal, () =>
-                    this.conversationService.updateMessage(messageId, '', blocks, turnMessages)
+                this.runAgentLoop(
+                    emitter,
+                    messages,
+                    turnMessages,
+                    blocks,
+                    datasourceId,
+                    userId,
+                    reasoningActive,
+                    signal,
+                    () => this.conversationService.updateMessage(messageId, '', blocks, turnMessages),
+                    () => this.generations.markFirstDelta(generation)
                 ),
-                new Promise<never>((_, reject) => setTimeout(() => reject(new Error('分析超时，请尝试简化问题后重试')), CHAT_TIMEOUT_MS)),
+                new Promise<never>((_, reject) =>
+                    setTimeout(() => reject(new GenerationExecutionError('ANALYSIS_TIMEOUT', '分析超时，请尝试简化问题后重试')), CHAT_TIMEOUT_MS)
+                ),
             ]);
-            if (signal.aborted) throw new Error('已取消');
+            if (signal.aborted) throw new GenerationExecutionError('CANCELLED', '已取消');
         } catch (err: unknown) {
-            const msg = err instanceof Error ? err.message : String(err);
-            const stack = err instanceof Error ? err.stack : undefined;
-            this.logger.error(`handleChat failed conversationId=${conversationId} userId=${userId}: ${msg}`, stack);
-            const errorEvent: SSEEvent = { type: 'error', content: msg };
+            const normalized = normalizeGenerationError(err, { ownershipLost: ownershipLost(), aborted: signal.aborted });
+            this.logger.error(
+                `handleChat failed conversationId=${conversationId} userId=${userId} code=${normalized.code}: ${normalized.message}`,
+                normalized.stack
+            );
+            const errorEvent: SSEEvent = { type: 'error', content: normalized.message, errorCode: normalized.code };
             emitter.send(errorEvent);
             blocks.push(errorEvent);
-            finalStatus = signal.aborted && !ownershipLost() ? 'cancelled' : 'failed';
-            errorDetail = msg;
-            terminal = finalStatus === 'cancelled' ? { type: 'done', status: 'cancelled' } : { type: 'done', status: 'failed', error: msg };
+            finalStatus = normalized.code === 'CANCELLED' ? 'cancelled' : 'failed';
+            errorDetail = normalized.message;
+            errorCode = normalized.code;
+            terminal =
+                finalStatus === 'cancelled'
+                    ? { type: 'done', status: 'cancelled', errorCode: normalized.code }
+                    : { type: 'done', status: 'failed', error: normalized.message, errorCode: normalized.code };
         }
         clearInterval(cancelPoll);
 
         // 持久化：blocks 用于前端历史回放，turnMessages 用于下次对话重建 LLM 上下文
         await this.conversationService.updateMessage(messageId, '', blocks, turnMessages);
         await this.generations.drain(generation);
-        await this.generations.finalize(generation, finalStatus, errorDetail, terminal);
+        await this.generations.finalize(generation, finalStatus, errorDetail, errorCode, terminal);
 
         // Fire-and-forget：蒸馏器异步提取业务口径定义，写入 conversation.semantic_state
         // 不 await 是因为蒸馏失败不应影响本次对话的响应
@@ -152,10 +172,12 @@ export class ChatService {
         userId?: number,
         reasoningEnabled = false,
         signal?: AbortSignal,
-        checkpoint?: () => Promise<void>
+        checkpoint?: () => Promise<void>,
+        onFirstDelta?: () => Promise<void>
     ): Promise<void> {
         const tools = this.toolRegistry.getDefinitions();
         let lastCheckpointAt = Date.now();
+        let firstDeltaRecorded = false;
 
         for (let iteration = 0; iteration < MAX_AGENT_ITERATIONS; iteration++) {
             if (signal?.aborted) throw new Error('已取消');
@@ -214,6 +236,15 @@ export class ChatService {
                         if (tc.function?.arguments) {
                             toolCalls[tc.index].function.arguments += tc.function.arguments;
                         }
+                    }
+                }
+
+                if (!firstDeltaRecorded && (delta.content || delta.reasoning_content || delta.tool_calls?.length)) {
+                    firstDeltaRecorded = true;
+                    try {
+                        await onFirstDelta?.();
+                    } catch (error) {
+                        this.logger.warn(`Failed to persist first delta metric: ${error instanceof Error ? error.message : error}`);
                     }
                 }
             }
