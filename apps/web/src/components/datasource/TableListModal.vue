@@ -10,13 +10,13 @@
                 </div>
                 <div class="modal-scroll-content no-scrollbar">
                     <div v-if="loading" class="loading-box"><i class="fas fa-circle-notch fa-spin"></i> 加载中...</div>
-                    <div v-else-if="!tables.length" class="empty-box">暂无上传的表</div>
+                    <div v-else-if="!tables.length" class="empty-box">暂无数据表</div>
                     <div v-else class="table-grid">
                         <div v-for="t in tables" :key="t.id" class="table-list-item">
                             <div class="t-info">
                                 <div class="t-name">
                                     {{ t.display_name }}
-                                    <span class="t-uploader" v-if="t.uploader_name">· 上传者: {{ t.uploader_name }}</span>
+                                    <span class="t-uploader" v-if="t.creator_name">· 上传者: {{ t.creator_name }}</span>
                                 </div>
                                 <div class="t-code">{{ t.table_name }}</div>
                             </div>
@@ -32,21 +32,21 @@
 </template>
 
 <script setup lang="ts">
-import type { DataSource, UploadedTable } from '../../stores/datasource';
+import type { DataSource, DataSourceTable } from '../../stores/datasource';
 import { useAuthStore } from '../../stores/auth';
 
 defineProps<{
     modelValue: DataSource | null;
-    tables: UploadedTable[];
+    tables: DataSourceTable[];
     loading: boolean;
 }>();
 
 const authStore = useAuthStore();
 
-const canDelete = (ds: DataSource, t: UploadedTable) => {
+const canDelete = (ds: DataSource, t: DataSourceTable) => {
     const uid = authStore.user?.id;
     if (!uid) return false;
-    return ds.created_by === uid || t.user_id === uid;
+    return t.source_type === 'uploaded' && (ds.created_by === uid || t.created_by === uid);
 };
 
 const emit = defineEmits<{

@@ -192,8 +192,20 @@ export const useChatStore = defineStore('chat', () => {
             return;
         }
         if (event.type === 'log_update') {
-            const item = [...message.blocks].reverse().find((b) => b.type === 'log' && b.title === event.title);
+            const item = [...message.blocks].reverse().find((b) => b.type === 'log' && b.title === event.title && String(b.content || '').startsWith('正在'));
             if (item) item.content = event.content;
+            return;
+        }
+        if (event.type === 'log_remove') {
+            let index = -1;
+            for (let i = message.blocks.length - 1; i >= 0; i--) {
+                const block = message.blocks[i];
+                if (block.type === 'log' && block.title === event.title && String(block.content || '').startsWith('正在')) {
+                    index = i;
+                    break;
+                }
+            }
+            if (index >= 0) message.blocks.splice(index, 1);
             return;
         }
         if (event.type === 'chart') {

@@ -4,6 +4,47 @@ import { Pool, type PoolClient, type QueryResult } from 'pg';
 export type QueryRow = Record<string, any>;
 export interface ExecuteResult { insertId: number; rowCount: number; rows: QueryRow[] }
 
+export type TableSourceType = 'preset' | 'uploaded' | 'external';
+
+export interface DataSourceTableCatalogEntry extends QueryRow {
+  id: number;
+  datasource_id: number;
+  schema_name: string;
+  table_name: string;
+  display_name: string;
+  description: string | null;
+  dataset_key: string | null;
+  source_type: TableSourceType;
+  is_agent_visible: boolean;
+  created_by: number | null;
+  created_at: string;
+}
+
+interface CatalogQueryable {
+  query<T extends QueryRow[] = QueryRow[]>(sql: string, params?: unknown[]): Promise<T>;
+}
+
+/** Resolve the selected datasource, defaulting to the built-in local datasource. */
+export async function resolveCatalogDatasourceId(db: CatalogQueryable, datasourceId: number | null): Promise<number | null> {
+  if (datasourceId != null) return datasourceId;
+  const rows = await db.query<QueryRow[]>('SELECT id FROM data_source WHERE is_local = 1 LIMIT 1');
+  return rows.length > 0 ? Number(rows[0].id) : null;
+}
+
+/** The catalog is the sole authority for tables that an agent may inspect or query. */
+export async function getAgentVisibleCatalogTables(db: CatalogQueryable, datasourceId: number | null): Promise<DataSourceTableCatalogEntry[]> {
+  const resolvedId = await resolveCatalogDatasourceId(db, datasourceId);
+  if (resolvedId == null) return [];
+  return db.query<DataSourceTableCatalogEntry[]>(
+    `SELECT id, datasource_id, schema_name, table_name, display_name, description,
+            dataset_key, source_type, is_agent_visible, created_by, created_at
+       FROM datasource_table_catalog
+      WHERE datasource_id = ? AND schema_name = current_schema() AND is_agent_visible = TRUE
+      ORDER BY dataset_key NULLS LAST, id`,
+    [resolvedId],
+  );
+}
+
 export class DatabaseClient {
   private readonly pool: Pool;
 

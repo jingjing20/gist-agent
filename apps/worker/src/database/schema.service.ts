@@ -1,8 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from './database.service';
-import { QueryRow } from './database.service';
-
-const PRESET_BUSINESS_TABLES = ['platform_info', 'daily_active_stats', 'user_behavior_log'];
+import { getAgentVisibleCatalogTables, type DataSourceTableCatalogEntry } from '@gist/database';
 
 interface SchemaCacheEntry {
     prompt: string;
@@ -13,7 +11,7 @@ const CACHE_TTL_MS = 60 * 1000; // 1 分钟缓存
 
 /**
  * 管理数据库 Schema 可见性及 AI 提示词生成。
- * 核心逻辑：过滤系统表和用户上传表，将其结构转换为 AI 可理解的文本。
+ * 核心逻辑：以数据源表目录作为唯一授权来源，将已登记结构转换为 AI 可理解的文本。
  */
 @Injectable()
 export class SchemaService {
@@ -23,7 +21,7 @@ export class SchemaService {
 
     /**
      * 获取用于 AI 会话的数据库结构 Prompt。
-     * 包含权限控制：仅列出预设业务表和当前用户上传的表。
+     * 包含权限控制：仅列出目录中明确对 Agent 开放的表。
      */
     async getDatabaseSchemaPrompt(datasourceId: number | null, userId: number): Promise<string> {
         const cacheKey = `${datasourceId || 'local'}_${userId}`;
@@ -32,17 +30,15 @@ export class SchemaService {
             return cached.prompt;
         }
 
-        const isInternal = await this.isInternalDs(datasourceId);
-        const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
-
-        const allowedTables = isInternal ? [...PRESET_BUSINESS_TABLES, ...uploadedTableNames] : uploadedTableNames;
+        const catalogTables = await getAgentVisibleCatalogTables(this.db, datasourceId);
+        const allowedTables = catalogTables.map((table) => table.table_name);
 
         if (allowedTables.length === 0) {
-            return isInternal ? '当前数据库中没有可用的业务表。' : '当前数据源中还没有上传的表。';
+            return '当前数据源中没有对 Agent 开放的业务表。';
         }
 
         const rows = await this.fetchRawSchemaRows(allowedTables);
-        const prompt = rows.length > 0 ? this.formatSchemaRows(rows, uploadedTableNames) : '当前数据库中没有可用的业务表。';
+        const prompt = rows.length > 0 ? this.formatSchemaRows(rows, catalogTables) : '当前数据源中没有可用的业务表。';
 
         if (prompt) {
             this.cache.set(cacheKey, { prompt, timestamp: Date.now() });
@@ -55,24 +51,16 @@ export class SchemaService {
         this.cache.delete(cacheKey);
     }
 
-    async getAllowedTableNames(datasourceId: number | null, userId: number): Promise<string[]> {
-        const isInternal = await this.isInternalDs(datasourceId);
-        const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
-
-        if (isInternal) {
-            return [...PRESET_BUSINESS_TABLES, ...uploadedTableNames];
+    clearDatasourceCache(datasourceId: number | null): void {
+        const prefix = `${datasourceId || 'local'}_`;
+        for (const key of this.cache.keys()) {
+            if (key.startsWith(prefix)) this.cache.delete(key);
         }
-        return uploadedTableNames;
     }
 
-    /**
-     * 判断是否为内部/本地数据源。
-     */
-    private async isInternalDs(datasourceId: number | null): Promise<boolean> {
-        if (!datasourceId) return true;
-        const rows = await this.db.query<QueryRow[]>('SELECT is_local FROM data_source WHERE id = ?', [datasourceId]);
-        if (!rows.length) return true;
-        return !!(rows[0] as any).is_local;
+    async getAllowedTableNames(datasourceId: number | null, userId: number): Promise<string[]> {
+        const catalogTables = await getAgentVisibleCatalogTables(this.db, datasourceId);
+        return catalogTables.map((table) => table.table_name);
     }
 
     /**
@@ -96,10 +84,9 @@ export class SchemaService {
     }
 
     async getStructuredSchema(datasourceId: number | null, userId: number): Promise<any[]> {
-        const isInternal = await this.isInternalDs(datasourceId);
-        const uploadedTableNames = await this.getUserUploadedTableNames(datasourceId, userId);
-
-        const allowedTables = isInternal ? [...PRESET_BUSINESS_TABLES, ...uploadedTableNames] : uploadedTableNames;
+        const catalogTables = await getAgentVisibleCatalogTables(this.db, datasourceId);
+        const allowedTables = catalogTables.map((table) => table.table_name);
+        const catalogByName = new Map(catalogTables.map((table) => [table.table_name, table]));
 
         if (allowedTables.length === 0) return [];
 
@@ -110,6 +97,8 @@ export class SchemaService {
                 tableName: string;
                 display_name: string;
                 isUploaded: boolean;
+                sourceType?: string;
+                datasetKey?: string | null;
                 fields: any[];
             }
         >();
@@ -119,8 +108,10 @@ export class SchemaService {
             if (!tablesMap.has(tableName)) {
                 tablesMap.set(tableName, {
                     tableName,
-                    display_name: row.TABLE_COMMENT || tableName,
-                    isUploaded: uploadedTableNames.includes(tableName),
+                    display_name: catalogByName.get(tableName)?.display_name || row.TABLE_COMMENT || tableName,
+                    isUploaded: catalogByName.get(tableName)?.source_type === 'uploaded',
+                    sourceType: catalogByName.get(tableName)?.source_type,
+                    datasetKey: catalogByName.get(tableName)?.dataset_key,
                     fields: [],
                 });
             }
@@ -135,28 +126,16 @@ export class SchemaService {
         return Array.from(tablesMap.values());
     }
 
-    private async getUserUploadedTableNames(datasourceId: number | null, userId: number): Promise<string[]> {
-        const actualDatasourceId = datasourceId ?? (await this.getLocalDatasourceId());
-        if (!actualDatasourceId) return [];
-
-        const rows = await this.db.query<QueryRow[]>('SELECT table_name FROM uploaded_table WHERE datasource_id = ?', [actualDatasourceId]);
-        return rows.map((r: any) => r.table_name);
-    }
-
-    private async getLocalDatasourceId(): Promise<number | null> {
-        const rows = await this.db.query<QueryRow[]>('SELECT id FROM data_source WHERE is_local = 1 LIMIT 1');
-        return rows.length > 0 ? (rows[0] as any).id : null;
-    }
-
     /**
      * 将数据库行数据转换为 AI 友好的文本格式。
      */
-    private formatSchemaRows(rows: any[], uploadedTableNames: string[]): string {
+    private formatSchemaRows(rows: any[], catalogTables: DataSourceTableCatalogEntry[]): string {
         if (!rows || rows.length === 0) {
             return '当前数据库中没有可用的业务表。';
         }
 
-        const tablesMap = new Map<string, { comment: string; columns: string[]; isUploaded: boolean }>();
+        const catalogByName = new Map(catalogTables.map((table) => [table.table_name, table]));
+        const tablesMap = new Map<string, { comment: string; columns: string[]; catalog?: DataSourceTableCatalogEntry }>();
 
         for (const row of rows) {
             const tableName = row.TABLE_NAME;
@@ -164,7 +143,7 @@ export class SchemaService {
                 tablesMap.set(tableName, {
                     comment: row.TABLE_COMMENT || '',
                     columns: [],
-                    isUploaded: uploadedTableNames.includes(tableName),
+                    catalog: catalogByName.get(tableName),
                 });
             }
             const tableInfo = tablesMap.get(tableName)!;
@@ -174,9 +153,10 @@ export class SchemaService {
 
         const promptLines: string[] = [];
         for (const [tableName, info] of tablesMap.entries()) {
-            const label = info.isUploaded ? ' [用户上传]' : '';
+            const label = info.catalog?.source_type === 'uploaded' ? ' [用户上传]' : '';
             promptLines.push(`表名: ${tableName}${label}`);
-            promptLines.push(`说明: ${info.comment}`);
+            if (info.catalog?.dataset_key) promptLines.push(`数据集: ${info.catalog.dataset_key}`);
+            promptLines.push(`说明: ${info.catalog?.description || info.comment}`);
             promptLines.push(`字段:\n${info.columns.join('\n')}`);
             promptLines.push('');
         }

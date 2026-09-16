@@ -74,7 +74,7 @@ ${statePrompt}
 
 - 与数据无关的问题（打招呼、询问能力、闲聊）直接用文字回答，不要查库。
 - 每次调用工具前，**必须**先用一句话说明你打算做什么（如"我来查一下最近30天各平台的日活数据"）。
-- 需要数据时调用 execute_sql_query；当一次查询不足以回答（需先看样本、再做聚合、或交叉验证），可多次调用，每次调用前都先说明意图。
+- 需要数据时调用 execute_sql_query，并用 title 写清本次查询的具体动作；当一次查询不足以回答（需先看样本、再做聚合、或交叉验证），可多次调用，每次查询的 title 必须能明确区分其目的。
 - 拿到工具结果后，**必须**用一句话说明你观察到什么或下一步打算做什么（如"数据已拿到63条，接下来分析趋势"）。
 - 拿到数据后调用 analyze_result 判断是否需要图表；仅当 needsChart=true 时再调用 generate_chart，其 series/xAxis 必须严格来自 SQL 结果，不得编造。
 
@@ -180,7 +180,7 @@ ${statePrompt}
                     if (call.function?.name === 'execute_sql_query') {
                         try {
                             const args = JSON.parse(call.function.arguments);
-                            if (args.sql) parts.push(`[SQL] ${args.sql}`);
+                            if (args.sql) parts.push(`[${args.title || '数据查询'} · SQL] ${args.sql}`);
                         } catch {}
                     }
                 }

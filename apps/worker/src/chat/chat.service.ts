@@ -205,11 +205,11 @@ export class ChatService {
                                 function: { name, arguments: '' },
                             };
 
-                            const title = name === 'execute_sql_query' ? '[SQL 生成]' : `[工具调用] ${name}`;
-                            const content = name === 'execute_sql_query' ? '正在构思查询逻辑...' : '正在处理...';
-                            const callLog: SSEEvent = { type: 'log', title, content };
-                            emitter.send(callLog);
-                            blocks.push(callLog);
+                            if (name !== 'execute_sql_query') {
+                                const callLog: SSEEvent = { type: 'log', title: `[工具调用] ${name}`, content: '正在处理...' };
+                                emitter.send(callLog);
+                                blocks.push(callLog);
+                            }
                         }
                         if (tc.function?.arguments) {
                             toolCalls[tc.index].function.arguments += tc.function.arguments;
@@ -244,28 +244,13 @@ export class ChatService {
             for (const tc of validToolCalls) {
                 const name = tc.function.name;
                 const argsStr = tc.function.arguments;
-                let args: Record<string, unknown> = {};
-                try {
-                    args = JSON.parse(argsStr);
-                } catch {
-                    /* malformed args */
-                }
+                if (name === 'execute_sql_query') continue;
 
-                const title = name === 'execute_sql_query' ? '[SQL 生成]' : `[工具调用] ${name}`;
-                const lastLog = [...blocks].reverse().find((b) => b.type === 'log' && b.title === title);
+                const title = `[工具调用] ${name}`;
+                const lastLog = [...blocks].reverse().find((b) => b.type === 'log' && b.title === title && String(b.content || '').startsWith('正在'));
                 if (lastLog) {
-                    lastLog.content = name === 'execute_sql_query' ? 'SQL 生成完毕，具体查询逻辑请查看下方SQL代码块' : argsStr || '处理完毕';
+                    lastLog.content = argsStr || '处理完毕';
                     emitter.send({ ...lastLog, type: 'log_update' } as any);
-                }
-
-                // 如果是 SQL 查询，生成完成后立刻渲染出源码区块
-                if (name === 'execute_sql_query' && args.sql) {
-                    const sqlBlock: SSEEvent = {
-                        type: 'sql',
-                        content: args.sql as string,
-                    };
-                    emitter.send(sqlBlock);
-                    blocks.push(sqlBlock);
                 }
             }
 

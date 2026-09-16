@@ -12,13 +12,18 @@ export interface DataSource {
     created_at: string;
 }
 
-export interface UploadedTable {
+export interface DataSourceTable {
     id: number;
     datasource_id: number;
-    user_id: number;
-    uploader_name?: string | null;
+    schema_name: string;
     table_name: string;
     display_name: string;
+    description?: string | null;
+    dataset_key?: string | null;
+    source_type: 'preset' | 'uploaded' | 'external';
+    is_agent_visible: boolean;
+    created_by?: number | null;
+    creator_name?: string | null;
     created_at: string;
 }
 
@@ -114,7 +119,7 @@ export const useDataSourceStore = defineStore('datasource', () => {
         return res.json();
     }
 
-    async function uploadTable(datasourceId: number, file: File, tableConfigs: { sheetName?: string; displayName: string }[]): Promise<UploadedTable[]> {
+    async function uploadTable(datasourceId: number, file: File, tableConfigs: { sheetName?: string; displayName: string }[]): Promise<DataSourceTable[]> {
         const form = new FormData();
         form.append('file', file);
         form.append('tableConfigs', JSON.stringify(tableConfigs));
@@ -129,7 +134,7 @@ export const useDataSourceStore = defineStore('datasource', () => {
         return res.json();
     }
 
-    async function listTables(datasourceId: number): Promise<UploadedTable[]> {
+    async function listTables(datasourceId: number): Promise<DataSourceTable[]> {
         const res = await apiFetch(`/datasources/${datasourceId}/tables`);
         if (!res.ok) throw new Error('获取表列表失败');
         return res.json();

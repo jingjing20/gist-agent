@@ -73,7 +73,7 @@ import UploadTableModal from '../components/datasource/UploadTableModal.vue';
 import GrantPermissionModal from '../components/datasource/GrantPermissionModal.vue';
 import TableListModal from '../components/datasource/TableListModal.vue';
 import ConfirmModal from '../components/ConfirmModal.vue';
-import type { DataSource, UploadedTable } from '../stores/datasource';
+import type { DataSource, DataSourceTable } from '../stores/datasource';
 
 const dsStore = useDataSourceStore();
 const authStore = useAuthStore();
@@ -214,26 +214,17 @@ async function handleRevoke(userId: number) {
 
 // --- Tables ---
 const showingTablesDs = ref<DataSource | null>(null);
-const tables = ref<UploadedTable[]>([]);
+const tables = ref<DataSourceTable[]>([]);
 const tablesLoading = ref(false);
-const PRESET_TABLES = [
-    { table_name: 'platform_info', display_name: '平台信息' },
-    { table_name: 'daily_active_stats', display_name: '日活统计' },
-    { table_name: 'user_behavior_log', display_name: '用户行为日志' },
-];
 async function openTables(ds: DataSource) {
     showingTablesDs.value = ds;
-    if (ds.is_local) {
-        tables.value = PRESET_TABLES as any;
-    } else {
-        tablesLoading.value = true;
-        try {
-            tables.value = await dsStore.listTables(ds.id);
-        } catch {
-            tables.value = [];
-        } finally {
-            tablesLoading.value = false;
-        }
+    tablesLoading.value = true;
+    try {
+        tables.value = await dsStore.listTables(ds.id);
+    } catch {
+        tables.value = [];
+    } finally {
+        tablesLoading.value = false;
     }
 }
 

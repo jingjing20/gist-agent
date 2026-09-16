@@ -91,7 +91,7 @@ export class DataSourceController {
 
     @Get(':id/tables')
     listTables(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
-        return this.datasourceService.listUploadedTables(id, user.id);
+        return this.datasourceService.listTables(id, user.id);
     }
 
     @Post(':id/tables')
@@ -194,7 +194,7 @@ export class DataSourceController {
 
     @Delete(':id/tables/:tableId')
     async deleteTable(@CurrentUser() user: User, @Param('tableId', ParseIntPipe) tableId: number) {
-        const dsId = await this.datasourceService.deleteUploadedTable(tableId, user.id);
+        const dsId = await this.datasourceService.deleteTable(tableId, user.id);
         if (dsId) this.suggestionService.invalidateAndRegenerate(dsId, user.id);
         return { ok: true };
     }

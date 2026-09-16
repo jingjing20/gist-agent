@@ -3,7 +3,7 @@
         <div class="table-header">
             <div class="header-left">
                 <i class="fas fa-table text-da-primary"></i>
-                <span class="table-label">查询结果预览</span>
+                <span class="table-label">{{ title || '查询结果预览' }}</span>
             </div>
             <div class="header-right">
                 <span class="row-count">共 {{ rowCount || rows?.length || 0 }} 条记录</span>
@@ -36,6 +36,7 @@ import { computed } from 'vue';
 const MAX_DISPLAY = 200;
 
 const props = defineProps<{
+    title?: string;
     columns?: string[];
     rows?: Record<string, unknown>[];
     rowCount?: number;

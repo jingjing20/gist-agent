@@ -3,7 +3,7 @@
         <div class="sql-header" @click="isExpanded = !isExpanded" title="点击展开/收起">
             <div class="sql-title">
                 <i class="fas fa-terminal sql-type-icon"></i>
-                <span class="sql-label">SQL 查询语句</span>
+                <span class="sql-label">{{ title || 'SQL 查询语句' }}</span>
                 <span v-if="!isExpanded" class="sql-hint">点击展开代码</span>
             </div>
             <div class="header-actions">
@@ -27,7 +27,7 @@ import sql from 'highlight.js/lib/languages/sql';
 
 hljs.registerLanguage('sql', sql);
 
-const props = defineProps<{ content?: string }>();
+const props = defineProps<{ content?: string; title?: string }>();
 const copied = ref(false);
 const isExpanded = ref(true);
 

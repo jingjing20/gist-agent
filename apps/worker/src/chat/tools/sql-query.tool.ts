@@ -17,9 +17,13 @@ export class SqlQueryTool implements Tool {
             parameters: {
                 type: 'object',
                 properties: {
+                    title: {
+                        type: 'string',
+                        description: '本次查询的简短动作标题，使用明确的中文动宾短语（建议 6-15 个字），例如“查询所有平台类型”；不要包含“SQL”“查询结果”等后缀',
+                    },
                     sql: { type: 'string', description: '安全的只读 PostgreSQL 查询语句' },
                 },
-                required: ['sql'],
+                required: ['title', 'sql'],
             },
         },
     };
@@ -28,18 +32,24 @@ export class SqlQueryTool implements Tool {
 
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
         const sql = args.sql as string;
+        const queryTitle = String(args.title || '执行数据查询').trim().slice(0, 30) || '执行数据查询';
         const blocks: SSEEvent[] = [];
 
         const execLog: SSEEvent = {
             type: 'log',
-            title: '[数据查询]',
-            content: '正在从数据库提取并处理结果...',
+            title: queryTitle,
+            content: '正在从数据库读取结果...',
         };
         ctx.emitter.send(execLog);
         blocks.push(execLog);
 
-        // Add a slight delay to enhance the perception of "thinking/processing"
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const sqlBlock: SSEEvent = {
+            type: 'sql',
+            title: `${queryTitle} · SQL 语句`,
+            content: sql,
+        };
+        ctx.emitter.send(sqlBlock);
+        blocks.push(sqlBlock);
 
         try {
             const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId);
@@ -47,18 +57,20 @@ export class SqlQueryTool implements Tool {
             if (r.wasFixed) {
                 const fixLog: SSEEvent = {
                     type: 'log',
-                    title: '[防腐层自动修复]',
+                    title: `${queryTitle} · SQL 自动修复`,
                     content: `检测到语法错误已由内部子模型修复。\n修复前：${sql}\n\n修复后：${r.finalSql}`,
                 };
                 ctx.emitter.send(fixLog);
                 blocks.push(fixLog);
             }
 
-            execLog.content = `查询成功，共读取 ${r.rowCount} 条数据`;
-            ctx.emitter.send({ ...execLog, type: 'log_update' } as any);
+            ctx.emitter.send({ type: 'log_remove', title: queryTitle });
+            const execLogIndex = blocks.indexOf(execLog);
+            if (execLogIndex >= 0) blocks.splice(execLogIndex, 1);
 
             const tableEvent: SSEEvent = {
                 type: 'table',
+                title: `${queryTitle} · 查询结果`,
                 columns: r.columns,
                 rows: r.rows,
                 rowCount: r.rowCount,

@@ -14,13 +14,18 @@ export interface DataSource {
     created_at: string;
 }
 
-export interface UploadedTable {
+export interface DataSourceTable {
     id: number;
     datasource_id: number;
-    user_id: number;
-    uploader_name?: string | null;
+    schema_name: string;
     table_name: string;
     display_name: string;
+    description?: string | null;
+    dataset_key?: string | null;
+    source_type: 'preset' | 'uploaded' | 'external';
+    is_agent_visible: boolean;
+    created_by?: number | null;
+    creator_name?: string | null;
     created_at: string;
 }
 
@@ -129,7 +134,7 @@ export class DataSourceService {
         if (row.is_local) throw new BadRequestException('默认本地库不可删除');
         if (row.created_by !== userId) throw new ForbiddenException('仅创建人可删除');
 
-        const tableRows = await this.db.query<RowDataPacket[]>('SELECT table_name FROM uploaded_table WHERE datasource_id = ?', [id]);
+        const tableRows = await this.db.query<RowDataPacket[]>("SELECT table_name FROM datasource_table_catalog WHERE datasource_id = ? AND source_type = 'uploaded'", [id]);
         for (const t of tableRows) {
             await this.db.execute(`DROP TABLE IF EXISTS \`${(t as any).table_name}\``);
         }
@@ -143,7 +148,8 @@ export class DataSourceService {
      * 1. CREATE TABLE (动态列定义)
      * 2. LOAD DATA LOCAL INFILE (极速写入) -- 失败则降级为批量 INSERT
      * 3. ALTER TABLE 写入列注释 (原始列名 -> COMMENT)
-     * 4. 异步触发: Schema 增强 (LLM 推断业务语义) + 推荐问题重新生成
+     * 4. 注册到统一表目录
+     * 5. 异步触发: Schema 增强 (LLM 推断业务语义) + 推荐问题重新生成
      *
      * 表名使用 ut_{timestamp}_{random} 格式，避免用户输入带来的注入风险
      */
@@ -153,7 +159,7 @@ export class DataSourceService {
         displayName: string,
         columns: Array<{ name: string; originalName?: string; type: string }>,
         rows: Array<Record<string, unknown>>
-    ): Promise<UploadedTable> {
+    ): Promise<DataSourceTable> {
         const ds = await this.findOne(datasourceId, userId);
         if (ds.is_local === 1) throw new ForbiddenException('公共默认数据源不支持上传文件');
 
@@ -217,22 +223,27 @@ export class DataSourceService {
                 await this.db.execute(`COMMENT ON COLUMN \`${tableName}\`.\`${col.name}\` IS '${esc(comment)}'`);
             }
 
-            const result = await this.db.execute('INSERT INTO uploaded_table (datasource_id, user_id, table_name, display_name) VALUES (?, ?, ?, ?) RETURNING id', [
-                datasourceId,
-                userId,
-                tableName,
-                displayName,
-            ]);
+            const result = await this.db.execute(
+                `INSERT INTO datasource_table_catalog
+                    (datasource_id, schema_name, table_name, display_name, description, source_type, is_agent_visible, created_by)
+                 VALUES (?, 'public', ?, ?, ?, 'uploaded', TRUE, ?) RETURNING id`,
+                [datasourceId, tableName, displayName, displayName, userId]
+            );
 
-            this.schemaService.clearUserCache(datasourceId, userId);
+            this.schemaService.clearDatasourceCache(datasourceId);
             this.schemaEnrichmentService.enrichTableSchemaAsync(tableName);
 
             return {
                 id: result.insertId,
                 datasource_id: datasourceId,
-                user_id: userId,
+                schema_name: 'public',
                 table_name: tableName,
                 display_name: displayName,
+                description: displayName,
+                dataset_key: null,
+                source_type: 'uploaded',
+                is_agent_visible: true,
+                created_by: userId,
                 created_at: new Date().toISOString(),
             };
         } catch (error) {
@@ -241,43 +252,40 @@ export class DataSourceService {
         }
     }
 
-    async listUploadedTables(datasourceId: number, userId: number): Promise<UploadedTable[]> {
+    async listTables(datasourceId: number, userId: number): Promise<DataSourceTable[]> {
         await this.findOne(datasourceId, userId); // 走一遍 findOne 就是包含了鉴权，未抛错即可
 
         const rows = await this.db.query<RowDataPacket[]>(
-            `SELECT t.id, t.datasource_id, t.user_id, u.name as uploader_name, t.table_name, t.display_name, t.created_at
-       FROM uploaded_table t
-       LEFT JOIN user u ON t.user_id = u.id
+            `SELECT t.id, t.datasource_id, t.schema_name, t.table_name, t.display_name, t.description,
+                    t.dataset_key, t.source_type, t.is_agent_visible, t.created_by, u.name as creator_name, t.created_at
+       FROM datasource_table_catalog t
+       LEFT JOIN user u ON t.created_by = u.id
        WHERE t.datasource_id = ?
-       ORDER BY t.created_at DESC`,
+       ORDER BY t.dataset_key NULLS LAST, t.id`,
             [datasourceId]
         );
-        return rows as unknown as UploadedTable[];
+        return rows as unknown as DataSourceTable[];
     }
 
-    async deleteUploadedTable(tableId: number, userId: number): Promise<number> {
+    async deleteTable(tableId: number, userId: number): Promise<number> {
         const rows = await this.db.query<RowDataPacket[]>(
-            `SELECT t.table_name, t.user_id, t.datasource_id, d.created_by as ds_creator_id
-       FROM uploaded_table t
+            `SELECT t.table_name, t.created_by, t.datasource_id, t.source_type, d.created_by as ds_creator_id
+       FROM datasource_table_catalog t
        LEFT JOIN data_source d ON t.datasource_id = d.id
        WHERE t.id = ?`,
             [tableId]
         );
-        if (!rows.length) throw new NotFoundException(`上传表 id=${tableId} 不存在`);
+        if (!rows.length) throw new NotFoundException(`数据表 id=${tableId} 不存在`);
         const row = rows[0] as any;
-        if (row.user_id !== userId && row.ds_creator_id !== userId) {
+        if (row.source_type !== 'uploaded') throw new ForbiddenException('仅用户上传表可以删除');
+        if (row.created_by !== userId && row.ds_creator_id !== userId) {
             throw new ForbiddenException('仅数据源创建者或表上传人可删除');
         }
 
         await this.db.execute(`DROP TABLE IF EXISTS \`${row.table_name}\``);
-        await this.db.execute('DELETE FROM uploaded_table WHERE id = ?', [tableId]);
-        this.schemaService.clearUserCache(row.datasource_id ?? null, userId);
+        await this.db.execute('DELETE FROM datasource_table_catalog WHERE id = ?', [tableId]);
+        this.schemaService.clearDatasourceCache(row.datasource_id ?? null);
         return row.datasource_id;
-    }
-
-    async getUploadedTableNames(datasourceId: number, userId: number): Promise<string[]> {
-        const rows = await this.db.query<RowDataPacket[]>('SELECT table_name FROM uploaded_table WHERE datasource_id = ?', [datasourceId]);
-        return rows.map((r: any) => r.table_name);
     }
 
     async grant(datasourceId: number, targetUserId: number, grantorId: number): Promise<void> {

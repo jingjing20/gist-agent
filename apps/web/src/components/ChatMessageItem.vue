@@ -12,8 +12,8 @@
             </template>
             <template v-else>
                 <div class="assistant-content">
-                    <template v-for="(block, i) in msg.blocks" :key="i">
-                        <component :is="blockComponent(block.type)" v-bind="blockProps(block, i)" />
+                    <template v-for="(block, i) in msg.blocks" :key="blockKey(block, i)">
+                        <component :is="blockComponent(block.type)" v-bind="blockProps(block)" />
                     </template>
                     <div v-if="isStreaming" class="streaming-indicator">
                         <span class="dot"></span>
@@ -34,6 +34,7 @@ import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
 import LogBlock from './blocks/LogBlock.vue';
 import ChartBlock from './blocks/ChartBlock.vue';
+import { thinkingStateKey } from './blocks/thinking-state';
 import type { MessageBlock, ChatMessage } from '../types';
 
 const props = defineProps<{
@@ -55,19 +56,26 @@ function blockComponent(type: string): Component {
     return blockMap[type] || MarkdownBlock;
 }
 
-function blockProps(block: MessageBlock, index: number = -1): Record<string, unknown> {
+function blockKey(block: MessageBlock, index: number): string {
+    return block.type === 'thinking' ? `${index}:${thinkingStateKey(props.isStreaming)}` : String(index);
+}
+
+function blockProps(block: MessageBlock): Record<string, unknown> {
     if (block.type === 'log') {
-        const isLast = props.msg.blocks && index === props.msg.blocks.length - 1;
         return {
             title: block.title,
             content: block.content,
-            isLoading: props.isStreaming && isLast,
+            isLoading: props.isStreaming && String(block.content || '').startsWith('正在'),
         };
     }
     if (block.type === 'chart') {
         return { chartData: block.chartData };
     }
+    if (block.type === 'thinking') {
+        return { content: block.content, isStreaming: props.isStreaming };
+    }
     return {
+        title: block.title,
         content: block.type === 'error' ? `**错误:** ${block.content}` : block.content,
         columns: block.columns,
         rows: block.rows,

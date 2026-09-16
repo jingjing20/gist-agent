@@ -10,6 +10,8 @@
         "build": "pnpm -r --if-present build",
         "typecheck": "pnpm -r --if-present typecheck",
         "smoke:conversation": "node scripts/smoke-multi-conversation.mjs",
+        "benchmark:analytics": "pnpm --filter @gist/api benchmark:analytics",
+        "benchmark:analytics:update": "pnpm --filter @gist/api benchmark:analytics:update",
         "test:reasoning": "pnpm --filter @gist/llm build && pnpm --filter @gist/worker build && node scripts/reasoning-context-regression.mjs",
         "init-db": "pnpm --filter @gist/api init-db",
         "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\""
