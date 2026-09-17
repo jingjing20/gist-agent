@@ -1,20 +1,22 @@
 # 01. 执行与并发可靠性改造
 
-> Phase 1 已完成本文的输入快照、conversation 串行、结构化取消、SQL 真终止和 writer/terminal 写栅栏。实施与验证记录见 [Phase 1 实施记录](./09-phase-1-implementation.md)。迭代耗尽 outcome 归入 Phase 2。
+> Phase 1 已完成本文的输入快照、conversation 串行、结构化取消、SQL 真终止和 writer/terminal 写栅栏。实施与验证记录见 [Phase 1 实施记录](./09-phase-1-implementation.md)。迭代耗尽已在 Phase 2 实现；空回答与完整循环出口测试列为 ORC-04 收尾项。
+>
+> 阅读提示：下文“Phase 1 前的基线证据”和“问题清单”记录的是历史基线，用于说明决策原因，不代表当前代码仍存在这些问题。
 
 ## 1. 目标
 
 确保每个 generation 使用确定的输入、只产生一条因果一致的输出，并且超时、取消、租约丢失或 Worker 异常后不会继续产生副作用。
 
-## 2. 当前实现证据
+## 2. Phase 1 前的基线证据
 
 - API 在事务中创建 user message、assistant 占位、generation 和 outbox：`apps/api/src/chat/generation.service.ts`。
 - Worker 通过 `generation.id` 领取任务并获取会话当前的 `datasource_id`：`apps/worker/src/chat/generation.service.ts`。
-- Worker 随后读取整个会话，并用“最后一条 user message”作为本轮 message：`apps/worker/src/chat/chat.service.ts:74-77`。
-- 构建上下文时只排除当前 response message：`apps/worker/src/chat/chat.service.ts:105-109`。
-- 用户级并发默认允许 5 个 generation，但没有 conversation 级互斥：`packages/config/src/index.ts`。
-- 全局超时由 `Promise.race` 实现，超时分支不调用 `AbortController.abort()`：`apps/worker/src/chat/chat.service.ts:103-115`。
-- SQL 的 15 秒超时同样是 `Promise.race`，不会终止 PostgreSQL 后端查询：`apps/worker/src/chat/agents/sql-executor.ts`。
+- Worker 随后读取整个会话，并用“最后一条 user message”作为本轮 message（历史基线；当前代码已移除该行为）。
+- 构建上下文时只排除当前 response message（历史基线；当前 generation 路径已改为水位与 completed generation 约束）。
+- 用户级并发默认允许 5 个 generation，但没有 conversation 级互斥（历史基线）。
+- 全局超时由 `Promise.race` 实现，超时分支不调用 `AbortController.abort()`（历史基线）。
+- SQL 的 15 秒超时同样是 `Promise.race`，不会终止 PostgreSQL 后端查询（历史基线）。
 - 循环达到 `MAX_AGENT_ITERATIONS` 后函数自然返回，外层会按 completed finalize。
 
 ## 3. 问题清单
@@ -146,5 +148,6 @@ type AgentOutcome =
 - 修改当前会话数据源不影响已创建 generation 的数据源。
 - 超时或取消后不再出现 SQL、普通 SSE、checkpoint 或消息内容变化。
 - Worker 租约丢失后，旧 Worker 无法继续写入。
-- 15 轮耗尽返回明确失败，不产生空的 completed 消息。
-- 故障注入测试覆盖：LLM 卡死、SQL 卡死、Redis 暂停、Worker kill、重复队列投递。
+- 15 轮耗尽返回明确失败；空 LLM 响应不得产生 completed 消息（后半项由 ORC-04 承接）。
+- 自动化故障测试覆盖：LLM 卡死、SQL 卡死、Redis 暂停、stale writer/心跳丢失、重复队列投递。
+- 真实 Worker 进程 kill、任务回收与旧进程写栅栏需由 EVAL-02 端到端场景覆盖。

@@ -1,10 +1,27 @@
 # 06. 评测与可观测性改造
 
+> Phase 0 已完成运行版本、稳定错误码、首 delta 指标和最小回归/smoke 基线；Phase 1、2 又分别补充可靠性故障回归与编排回归。完整 Agent E2E 评分、生产 trace、成本指标和发布门禁仍未完成。已实施部分见 [Phase 0 决策与实施记录](./08-phase-0-implementation.md)。
+>
+> 阅读提示：第 2 节是 Phase 0 实施前的基线证据；后续章节描述该问题域的完整目标，不应全部解读为当前能力。
+
+当前能力边界：
+
+| 能力                                    | 状态                                   | 证据/承接         |
+| --------------------------------------- | -------------------------------------- | ----------------- |
+| generation 运行版本与基础错误码         | 已完成                                 | Phase 0           |
+| 首 delta 指标                           | 已完成                                 | Phase 0           |
+| 可靠性故障回归                          | 已完成核心场景；真实进程 kill 未自动化 | Phase 1 / EVAL-02 |
+| 编排器单元回归                          | 已完成                                 | Phase 2           |
+| 完整 Agent Loop mock 集成测试           | 未完成                                 | ORC-04            |
+| SaaS Growth 真实 Agent 逐 case 评测     | 未完成                                 | EVAL-01           |
+| 多轮/注入/恢复评测集                    | 未完成                                 | EVAL-02           |
+| 生产 trace、token、成本和质量 dashboard | 未完成                                 | Phase 6           |
+
 ## 1. 目标
 
 让每次 Prompt、模型、工具、上下文和记忆策略变更都能量化比较，并能在生产问题发生时定位到具体 generation、阶段和证据。
 
-## 2. 当前实现证据
+## 2. Phase 0 前的实现证据
 
 - `benchmarks/saas-growth/cases.json` 已有 SQL 标准结果和语义题要点。
 - `validate-analytics-benchmark.ts` 只执行参考 SQL并验证 fixture/标准答案没有漂移，没有调用真实 Agent。
@@ -40,16 +57,16 @@
 
 真实调用目标模型，记录模型输出、SQL、artifact 和最终回答。评分维度：
 
-| 维度 | 示例指标 |
-| --- | --- |
-| 结果正确性 | 与标准结果一致、数值误差、排序一致 |
-| 口径正确性 | 分母、过滤、粒度、时间范围 |
-| 工具行为 | 合法顺序、无多余查询、重试次数 |
-| 证据一致性 | 回答/表格/图表是否来自相同 artifact |
-| 安全性 | 越权阻断、注入攻击成功率 |
-| 多轮能力 | 指代解析、口径纠正、历史 artifact 复用 |
-| 拒答质量 | 无数据、因果不足、外部数据缺失 |
-| 性能成本 | 首 token、总耗时、输入/输出 token、工具轮数 |
+| 维度       | 示例指标                                    |
+| ---------- | ------------------------------------------- |
+| 结果正确性 | 与标准结果一致、数值误差、排序一致          |
+| 口径正确性 | 分母、过滤、粒度、时间范围                  |
+| 工具行为   | 合法顺序、无多余查询、重试次数              |
+| 证据一致性 | 回答/表格/图表是否来自相同 artifact         |
+| 安全性     | 越权阻断、注入攻击成功率                    |
+| 多轮能力   | 指代解析、口径纠正、历史 artifact 复用      |
+| 拒答质量   | 无数据、因果不足、外部数据缺失              |
+| 性能成本   | 首 token、总耗时、输入/输出 token、工具轮数 |
 
 建议先把现有 SaaS Growth case 转为 Agent E2E case，再新增多轮与攻击用例。
 
@@ -69,15 +86,15 @@
 
 ```ts
 interface GenerationTraceContext {
-  generationId: string;
-  modelProvider: string;
-  modelName: string;
-  promptPolicyVersion: string;
-  toolsetVersion: string;
-  contextPolicyVersion: string;
-  memoryPolicyVersion: string;
-  schemaVersion: string;
-  datasetVersion?: string;
+    generationId: string;
+    modelProvider: string;
+    modelName: string;
+    promptPolicyVersion: string;
+    toolsetVersion: string;
+    contextPolicyVersion: string;
+    memoryPolicyVersion: string;
+    schemaContextVersion: string;
+    datasetVersion?: string;
 }
 ```
 
@@ -118,15 +135,18 @@ generation
 
 模型评测存在随机性，至少固定温度、重复运行，并同时报告均值和最差表现。
 
-## 7. 实施步骤
+## 7. 实施步骤与状态
 
-1. 为 Prompt、工具、上下文、记忆增加版本常量并写入 generation。
-2. 完善 generation timing 字段的实际写入。
-3. 建立结构化错误码，减少依赖中文错误文本聚合。
-4. 扩展 benchmark runner，使其通过 API/Worker 执行真实对话。
-5. 增加多轮、注入、并发、失败恢复 case。
-6. 输出机器可读 JSON 评测报告，CI 负责比较基线。
-7. 再接入生产 dashboard 和告警。
+| 顺序 | 工作                                                       | 状态                    | 任务       |
+| ---- | ---------------------------------------------------------- | ----------------------- | ---------- |
+| 1    | 为 Prompt、工具、上下文、记忆增加版本常量并写入 generation | 已完成                  | Phase 0    |
+| 2    | 写入首 delta timing                                        | 已完成                  | Phase 0    |
+| 3    | 建立基础结构化错误码                                       | 已完成并在 Phase 2 扩展 | Phase 0/2  |
+| 4    | 用 mock LLM 驱动完整 Agent Loop 出口                       | 未完成                  | ORC-04     |
+| 5    | 通过 API/Worker 执行 SaaS Growth benchmark case            | 未完成                  | EVAL-01    |
+| 6    | 增加多轮、注入、并发、真实 Worker kill 和失败恢复 case     | 未完成                  | EVAL-02    |
+| 7    | 输出机器可读 JSON 报告并在 CI 比较基线                     | 未完成                  | EVAL-01/02 |
+| 8    | 接入生产 trace、dashboard 和告警                           | 未完成                  | Phase 6    |
 
 ## 8. 涉及文件
 
@@ -148,3 +168,4 @@ generation
 - `first_token_at`、阶段耗时、token 和成本指标真实可用。
 - 安全、并发、取消和记忆纠正都有稳定回归用例。
 
+这些是本专题的最终验收标准，不是 Phase 0 的完成条件。Phase 0 只承诺版本、错误码、首 delta 和最小链路 smoke；Agent E2E 评分及发布门禁由 EVAL-01/02 和 Phase 6 承接。

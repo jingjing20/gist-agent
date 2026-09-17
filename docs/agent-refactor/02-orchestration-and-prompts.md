@@ -1,14 +1,18 @@
 # 02. 编排与提示词改造
 
+> Phase 2 已完成轻量状态机、工具运行时校验、迭代耗尽失败、`analyze_result` 下线和 raw reasoning 产品隐藏。空回答失败语义与完整 Agent Loop mock 集成测试尚未完成，编号 ORC-04；实施与验证见 [Phase 2 决策与实施记录](./10-phase-2-implementation.md)。Query/Chart Artifact、完整 Prompt 分层和结构化 Planner 仍由 Phase 3 及后续阶段承接。
+>
+> 阅读提示：第 2～3 节记录的是 Phase 2 实施前的基线；第 4～7 节描述完整目标设计，其中并非全部属于 Phase 2 已交付范围。
+
 ## 1. 目标
 
 把权限、流程顺序和工具不变量从自然语言提示迁移到可验证的代码状态机；Prompt 只承担理解、规划、解释等适合模型完成的任务。
 
-## 2. 当前实现证据
+## 2. Phase 2 前的基线证据
 
-- 系统提示词同时包含身份、日期、全量 Schema、业务口径、ReAct 工作方式、工具顺序和输出风格：`apps/worker/src/chat/prompt-builder.ts:51-83`。
+- 系统提示词同时包含身份、日期、全量 Schema、业务口径、ReAct 工作方式、工具顺序和输出风格（历史基线；当前仍未完成完整 Prompt 分层）。
 - `execute_sql_query -> analyze_result -> generate_chart` 的顺序主要通过工具 description 和 System Prompt 约束。
-- 同一轮多个 tool call 会由 `Promise.all` 并发执行：`apps/worker/src/chat/chat.service.ts:257-281`。
+- 同一轮多个 tool call 会由 `Promise.all` 并发执行（历史基线；Phase 2 已改为串行）。
 - 工具参数 JSON 解析失败时使用空对象继续执行。
 - `AnalyzeResultTool` 不分析数据，只接受模型给出的 `needsChart`。
 - `GenerateChartTool` 不验证图表数据是否来自查询结果。
@@ -82,13 +86,13 @@ RECEIVED
 
 ```ts
 interface QueryPlan {
-  purpose: string;
-  grain: string;
-  metrics: Array<{ name: string; aggregation: string }>;
-  dimensions: string[];
-  filters: Array<{ field: string; operator: string; value: unknown }>;
-  joins: Array<{ left: string; right: string; cardinality: string }>;
-  expectedShape: 'scalar' | 'timeseries' | 'category' | 'detail';
+    purpose: string;
+    grain: string;
+    metrics: Array<{ name: string; aggregation: string }>;
+    dimensions: string[];
+    filters: Array<{ field: string; operator: string; value: unknown }>;
+    joins: Array<{ left: string; right: string; cardinality: string }>;
+    expectedShape: 'scalar' | 'timeseries' | 'category' | 'detail';
 }
 ```
 
@@ -151,11 +155,17 @@ interface QueryPlan {
 - `packages/llm/src/index.ts`
 - `apps/web/src/components/blocks/ThinkingBlock.vue`
 
-## 9. 验收标准
+## 9. 完整目标与当前状态
 
-- 任意工具都不能在非法状态执行。
-- 无效 JSON 不触发工具副作用。
-- 同一批工具调用只并发执行明确声明为互不依赖的只读步骤。
-- 图表中的每个数值都可追溯至指定 artifact 字段。
-- Prompt 模板有版本号，并能独立快照测试。
-- 前端只显示结构化进度，不显示原始 reasoning。
+| 验收项                                                            | 当前状态                     | 承接阶段                   |
+| ----------------------------------------------------------------- | ---------------------------- | -------------------------- |
+| 任意工具都不能在非法状态执行                                      | Phase 2 已完成               | Phase 2                    |
+| 无效 JSON 不触发工具副作用                                        | Phase 2 已完成               | Phase 2                    |
+| 未声明并行安全的工具不得并发执行                                  | Phase 2 已完成；当前全部串行 | Phase 2                    |
+| 前端不显示原始 reasoning                                          | Phase 2 已完成               | Phase 2                    |
+| 图表中的每个数值可追溯至指定 artifact 字段                        | 未完成                       | Phase 3                    |
+| Prompt 模板分层、独立版本和快照测试                               | 未完成                       | Phase 3/4                  |
+| QuestionInterpreter、QueryPlanner、AnswerSynthesizer 结构化分工   | 未完成                       | Phase 3 及后续             |
+| 空 LLM 响应不进入 completed，完整 Agent Loop 出口有 mock 集成测试 | 未完成                       | ORC-04（Phase 3 进入门禁） |
+
+这里刻意区分“Phase 2 交付完成”和“本专题最终设计完成”。前者表示当前阶段承诺的不变量已经落地，不表示编排与 Prompt 领域再无后续工作。
