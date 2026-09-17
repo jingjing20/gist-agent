@@ -15,6 +15,7 @@
         "benchmark:analytics:update": "pnpm --filter @gist/api benchmark:analytics:update",
         "test:reasoning": "pnpm --filter @gist/llm build && pnpm --filter @gist/worker build && node scripts/reasoning-context-regression.mjs",
         "test:generation-baseline": "pnpm --filter @gist/contracts build && pnpm --filter @gist/worker build && node scripts/generation-baseline-regression.mjs",
+        "test:phase1-reliability": "pnpm --filter @gist/database build && pnpm --filter @gist/worker build && CHAT_TIMEOUT_MS=1000 node scripts/phase1-reliability-regression.mjs",
         "init-db": "pnpm --filter @gist/api init-db",
         "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\""
     },

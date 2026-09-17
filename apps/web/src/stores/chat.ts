@@ -120,7 +120,14 @@ export const useChatStore = defineStore('chat', () => {
                 headers: { 'Idempotency-Key': crypto.randomUUID() },
                 body: JSON.stringify({ message: content, conversationId: conv.id, datasourceId: activeDatasourceId.value, reasoningEnabled: reasoningEnabled.value }),
             });
-            if (!response.ok) throw new Error(`请求失败: ${response.status}`);
+            if (!response.ok) {
+                const problem = await response.json().catch(() => null);
+                if (response.status === 409 && problem?.code === 'CONVERSATION_GENERATION_ACTIVE') {
+                    throw new Error('当前对话正在生成回复，请等待完成或先取消');
+                }
+                if (response.status === 429) throw new Error(problem?.message || '当前生成任务过多，请稍后重试');
+                throw new Error(problem?.message || `请求失败: ${response.status}`);
+            }
             const data = await response.json();
             const user = conv.messages.find((m) => m.id === localUserId);
             if (user) user.id = data.userMessageId;

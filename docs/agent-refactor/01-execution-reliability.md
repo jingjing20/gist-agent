@@ -1,5 +1,7 @@
 # 01. 执行与并发可靠性改造
 
+> Phase 1 已完成本文的输入快照、conversation 串行、结构化取消、SQL 真终止和 writer/terminal 写栅栏。实施与验证记录见 [Phase 1 实施记录](./09-phase-1-implementation.md)。迭代耗尽 outcome 归入 Phase 2。
+
 ## 1. 目标
 
 确保每个 generation 使用确定的输入、只产生一条因果一致的输出，并且超时、取消、租约丢失或 Worker 异常后不会继续产生副作用。
@@ -49,16 +51,16 @@
 
 ```ts
 interface GenerationInput {
-  generationId: string;
-  requestMessageId: string;
-  responseMessageId: string;
-  conversationId: string;
-  userId: number;
-  datasourceId: number | null;
-  contextUpperBound: string; // message sequence 或 turn sequence
-  parentMessageId: string | null;
-  reasoningEnabled: boolean;
-  promptPolicyVersion: string;
+    generationId: string;
+    requestMessageId: string;
+    responseMessageId: string;
+    conversationId: string;
+    userId: number;
+    datasourceId: number | null;
+    contextUpperBound: string; // message sequence 或 turn sequence
+    parentMessageId: string | null;
+    reasoningEnabled: boolean;
+    promptPolicyVersion: string;
 }
 ```
 
@@ -104,11 +106,11 @@ Agent Loop 返回判别联合类型：
 
 ```ts
 type AgentOutcome =
-  | { kind: 'completed'; finalText: string }
-  | { kind: 'needs_clarification'; question: string }
-  | { kind: 'cancelled' }
-  | { kind: 'iteration_exhausted'; diagnostics: object }
-  | { kind: 'failed'; error: Error };
+    | { kind: 'completed'; finalText: string }
+    | { kind: 'needs_clarification'; question: string }
+    | { kind: 'cancelled' }
+    | { kind: 'iteration_exhausted'; diagnostics: object }
+    | { kind: 'failed'; error: Error };
 ```
 
 仅 `completed` 且具备最终回答时可写入 completed。
@@ -146,4 +148,3 @@ type AgentOutcome =
 - Worker 租约丢失后，旧 Worker 无法继续写入。
 - 15 轮耗尽返回明确失败，不产生空的 completed 消息。
 - 故障注入测试覆盖：LLM 卡死、SQL 卡死、Redis 暂停、Worker kill、重复队列投递。
-

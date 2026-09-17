@@ -2,15 +2,20 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { GenerationErrorCode, GenerationStatus } from '@gist/contracts';
 import { randomUUID } from 'crypto';
 import Redis from 'ioredis';
+import type OpenAI from 'openai';
 import { DatabaseService, type QueryRow } from '../database/database.service';
 import type { SSEEvent, SSEEmitter } from './tools/base-tool';
+import { GenerationExecutionError } from './generation-errors';
 
 export interface GenerationIdentity {
     id: string;
     conversationId: string;
+    requestMessageId: string;
     messageId: string;
     userId: number;
     datasourceId: number | null;
+    contextUpperBound: string;
+    parentMessageId: string | null;
     reasoningEnabled: boolean;
     writerToken: string;
 }
@@ -31,7 +36,7 @@ return { tostring(sequence), user_id }
 /** Worker 独占的 generation 写入仓库与 Redis 事件发布器。 */
 @Injectable()
 export class GenerationService implements OnModuleDestroy {
-    private readonly redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', { maxRetriesPerRequest: null });
+    private readonly redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', { maxRetriesPerRequest: null, commandTimeout: 5_000 });
     private readonly prefix = process.env.EVENT_KEY_PREFIX || 'gist-agent';
     private readonly retentionMs = 24 * 60 * 60 * 1000;
     private readonly queues = new Map<string, Promise<void>>();
@@ -40,8 +45,9 @@ export class GenerationService implements OnModuleDestroy {
 
     async candidate(id: string): Promise<(Omit<GenerationIdentity, 'writerToken'> & { status: GenerationStatus }) | null> {
         const rows = await this.db.query<QueryRow[]>(
-            `SELECT g.id,g.user_id,g.status,g.conversation_id,g.response_message_id,g.reasoning_enabled,c.datasource_id
-      FROM generation g JOIN conversation c ON c.id=g.conversation_id WHERE g.id=?`,
+            `SELECT id,user_id,status,conversation_id,request_message_id,response_message_id,reasoning_enabled,
+                    datasource_id,context_upper_bound,parent_message_id
+               FROM generation WHERE id=?`,
             [id]
         );
         if (!rows.length) return null;
@@ -50,8 +56,11 @@ export class GenerationService implements OnModuleDestroy {
             userId: rows[0].user_id,
             status: rows[0].status,
             conversationId: rows[0].conversation_id,
+            requestMessageId: rows[0].request_message_id,
             messageId: rows[0].response_message_id,
             datasourceId: rows[0].datasource_id ?? null,
+            contextUpperBound: rows[0].context_upper_bound,
+            parentMessageId: rows[0].parent_message_id ?? null,
             reasoningEnabled: rows[0].reasoning_enabled === true,
         };
     }
@@ -60,9 +69,9 @@ export class GenerationService implements OnModuleDestroy {
         const rows = await this.db.query<QueryRow[]>(
             `UPDATE generation g
       SET status='starting',writer_token=?,writer_heartbeat_at=NOW(),started_at=COALESCE(started_at,NOW()),updated_at=NOW()
-      FROM conversation c
-      WHERE g.id=? AND g.status='pending' AND g.writer_token IS NULL AND c.id=g.conversation_id
-      RETURNING g.id,g.user_id,g.conversation_id,g.response_message_id,g.reasoning_enabled,c.datasource_id`,
+      WHERE g.id=? AND g.status='pending' AND g.writer_token IS NULL
+      RETURNING g.id,g.user_id,g.conversation_id,g.request_message_id,g.response_message_id,g.reasoning_enabled,
+                g.datasource_id,g.context_upper_bound,g.parent_message_id`,
             [writerToken, id]
         );
         if (!rows.length) return null;
@@ -76,8 +85,11 @@ export class GenerationService implements OnModuleDestroy {
             id: rows[0].id,
             userId: rows[0].user_id,
             conversationId: rows[0].conversation_id,
+            requestMessageId: rows[0].request_message_id,
             messageId: rows[0].response_message_id,
             datasourceId: rows[0].datasource_id ?? null,
+            contextUpperBound: rows[0].context_upper_bound,
+            parentMessageId: rows[0].parent_message_id ?? null,
             reasoningEnabled: rows[0].reasoning_enabled === true,
             writerToken,
         };
@@ -96,7 +108,7 @@ export class GenerationService implements OnModuleDestroy {
             const [updated] = await transaction.execute(
                 `UPDATE generation
                  SET first_token_at=COALESCE(first_token_at,NOW()),updated_at=NOW()
-                 WHERE id=? AND writer_token=? AND status IN ('starting','running','cancel_requested')`,
+                 WHERE id=? AND writer_token=? AND status IN ('starting','running')`,
                 [identity.id, identity.writerToken]
             );
             if (updated.rowCount !== 1) return;
@@ -112,6 +124,27 @@ export class GenerationService implements OnModuleDestroy {
     async isCancelRequested(id: string): Promise<boolean> {
         const rows = await this.db.query<QueryRow[]>('SELECT status FROM generation WHERE id=?', [id]);
         return !rows.length || ['cancel_requested', 'cancelled'].includes(rows[0].status);
+    }
+
+    async assertWritable(identity: GenerationIdentity): Promise<void> {
+        const rows = await this.db.query<QueryRow[]>("SELECT 1 FROM generation WHERE id=? AND writer_token=? AND status IN ('starting','running')", [
+            identity.id,
+            identity.writerToken,
+        ]);
+        if (!rows.length) throw new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '生成任务写入权已丢失');
+    }
+
+    async checkpointMessage(identity: GenerationIdentity, blocks: SSEEvent[], llmMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[]): Promise<void> {
+        const result = await this.db.execute(
+            `UPDATE message
+                SET blocks=?::jsonb,llm_messages=?::jsonb
+              WHERE id=? AND EXISTS (
+                    SELECT 1 FROM generation
+                     WHERE id=? AND response_message_id=? AND writer_token=? AND status IN ('starting','running')
+              )`,
+            [JSON.stringify(blocks), JSON.stringify(llmMessages), identity.messageId, identity.id, identity.messageId, identity.writerToken]
+        );
+        if (result.rowCount !== 1) throw new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '生成任务写入权已丢失');
     }
 
     emitter(identity: GenerationIdentity): SSEEmitter {
@@ -136,15 +169,26 @@ export class GenerationService implements OnModuleDestroy {
         status: Extract<GenerationStatus, 'completed' | 'failed' | 'cancelled'>,
         error: string | undefined,
         errorCode: GenerationErrorCode | undefined,
-        terminal: SSEEvent
-    ): Promise<void> {
-        await this.db.withTransaction(async (transaction) => {
+        terminal: SSEEvent,
+        messageState?: { blocks: SSEEvent[]; llmMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] }
+    ): Promise<boolean> {
+        return this.db.withTransaction(async (transaction) => {
             const [updated] = await transaction.execute(
                 `UPDATE generation SET status=?,error=?,error_code=?,updated_at=NOW(),completed_at=NOW(),writer_token=NULL
-        WHERE id=? AND (?='' OR writer_token=?)`,
-                [status, error ?? null, errorCode ?? null, identity.id, identity.writerToken, identity.writerToken]
+                  WHERE id=? AND (
+                    (?<>'' AND writer_token=? AND status IN ('starting','running','cancel_requested'))
+                    OR (?='' AND writer_token IS NULL AND status='cancel_requested')
+                  )`,
+                [status, error ?? null, errorCode ?? null, identity.id, identity.writerToken, identity.writerToken, identity.writerToken]
             );
-            if (updated.rowCount !== 1) return;
+            if (updated.rowCount !== 1) return false;
+            if (messageState) {
+                await transaction.execute('UPDATE message SET blocks=?::jsonb,llm_messages=?::jsonb WHERE id=?', [
+                    JSON.stringify(messageState.blocks),
+                    JSON.stringify(messageState.llmMessages),
+                    identity.messageId,
+                ]);
+            }
             await transaction.execute('UPDATE generation_attempt SET status=?,error=?,completed_at=NOW() WHERE generation_id=? AND completed_at IS NULL', [
                 status,
                 error ?? null,
@@ -162,6 +206,7 @@ export class GenerationService implements OnModuleDestroy {
                     event: terminal,
                 }),
             ]);
+            return true;
         });
     }
 
@@ -202,20 +247,35 @@ export class GenerationService implements OnModuleDestroy {
     }
 
     private async publish(identity: GenerationIdentity, event: SSEEvent): Promise<void> {
-        const keys = this.keys(identity.userId, identity.id);
-        const payload = {
-            ...event,
-            eventId: randomUUID(),
-            streamId: '0-0',
-            generationId: identity.id,
-            conversationId: identity.conversationId,
-            messageId: identity.messageId,
-            sequence: 0,
-            occurredAt: new Date().toISOString(),
-        };
-        const result = (await this.redis.eval(PUBLISH_SCRIPT, 3, keys.sequence, keys.generation, keys.user, JSON.stringify(payload), String(this.retentionMs))) as [string, string];
-        const sequence = Number(result[0]);
-        await this.db.execute('UPDATE generation SET last_sequence=?,updated_at=NOW() WHERE id=? AND last_sequence < ?', [sequence, identity.id, sequence]);
+        await this.db.withTransaction(async (transaction) => {
+            const [owned] = await transaction.query<QueryRow[]>("SELECT 1 FROM generation WHERE id=? AND writer_token=? AND status IN ('starting','running') FOR UPDATE", [
+                identity.id,
+                identity.writerToken,
+            ]);
+            if (!owned.length) throw new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '生成任务写入权已丢失');
+            const keys = this.keys(identity.userId, identity.id);
+            const payload = {
+                ...event,
+                eventId: randomUUID(),
+                streamId: '0-0',
+                generationId: identity.id,
+                conversationId: identity.conversationId,
+                messageId: identity.messageId,
+                sequence: 0,
+                occurredAt: new Date().toISOString(),
+            };
+            const result = (await this.redis.eval(PUBLISH_SCRIPT, 3, keys.sequence, keys.generation, keys.user, JSON.stringify(payload), String(this.retentionMs))) as [
+                string,
+                string,
+            ];
+            const sequence = Number(result[0]);
+            await transaction.execute('UPDATE generation SET last_sequence=?,updated_at=NOW() WHERE id=? AND writer_token=? AND last_sequence < ?', [
+                sequence,
+                identity.id,
+                identity.writerToken,
+                sequence,
+            ]);
+        });
     }
 
     async onModuleDestroy(): Promise<void> {

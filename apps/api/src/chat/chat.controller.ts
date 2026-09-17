@@ -47,6 +47,6 @@ export class ChatController {
     @Post('generations/:id/retry')
     async retry(@CurrentUser() user: User, @Param('id') id: string) {
         const source = await this.generations.retry(user.id, id);
-        return this.chatService.startChat(user.id, source.message, source.conversationId, null, undefined, source.reasoningEnabled);
+        return this.chatService.startChat(user.id, source.message, source.conversationId, source.datasourceId, undefined, source.reasoningEnabled);
     }
 }

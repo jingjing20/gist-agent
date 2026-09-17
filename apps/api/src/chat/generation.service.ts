@@ -1,4 +1,4 @@
-import { ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
+import { ConflictException, ForbiddenException, HttpException, HttpStatus, Injectable, NotFoundException, OnModuleDestroy } from '@nestjs/common';
 import type { Request, Response } from 'express';
 import Redis from 'ioredis';
 import { randomUUID } from 'crypto';
@@ -17,10 +17,8 @@ export class GenerationService implements OnModuleDestroy {
         const requestMessageId = randomUUID();
         const responseMessageId = randomUUID();
         const limit = Number(process.env.USER_GENERATION_CONCURRENCY_LIMIT) || 5;
-        const conversation = await this.db.query<QueryRow[]>('SELECT datasource_id FROM conversation WHERE id = ? AND user_id = ?', [conversationId, userId]);
-        if (!conversation.length) throw new NotFoundException('对话不存在');
         return this.db.withTransaction(async (tx) => {
-            await tx.query('SELECT pg_advisory_xact_lock(?)', [userId]);
+            await tx.query('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [conversationId]);
             const [existing] = await tx.query<QueryRow[]>(
                 'SELECT id,conversation_id,request_message_id,response_message_id,request_hash FROM generation WHERE user_id=? AND idempotency_key=?',
                 [userId, idempotencyKey]
@@ -34,11 +32,28 @@ export class GenerationService implements OnModuleDestroy {
                     responseMessageId: existing[0].response_message_id,
                 };
             }
+            const [conversation] = await tx.query<QueryRow[]>('SELECT datasource_id FROM conversation WHERE id = ? AND user_id = ? FOR UPDATE', [conversationId, userId]);
+            if (!conversation.length) throw new NotFoundException('对话不存在');
+            const [active] = await tx.query<QueryRow[]>(
+                "SELECT id FROM generation WHERE conversation_id=? AND status IN ('pending','starting','running','cancel_requested') LIMIT 1",
+                [conversationId]
+            );
+            if (active.length) throw new ConflictException({ code: 'CONVERSATION_GENERATION_ACTIVE', message: '当前对话已有生成任务在运行' });
             const [counts] = await tx.query<QueryRow[]>(
                 "SELECT COUNT(*)::int AS count FROM generation WHERE user_id = ? AND status IN ('pending','starting','running','cancel_requested')",
                 [userId]
             );
             if (Number(counts[0].count) >= limit) throw new HttpException(`同时最多运行 ${limit} 个生成任务`, HttpStatus.TOO_MANY_REQUESTS);
+            const [snapshot] = await tx.query<QueryRow[]>('SELECT clock_timestamp() AS context_upper_bound');
+            const [parent] = await tx.query<QueryRow[]>(
+                `SELECT response_message_id
+                   FROM generation
+                  WHERE conversation_id=? AND status='completed'
+                  ORDER BY completed_at DESC NULLS LAST, created_at DESC
+                  LIMIT 1`,
+                [conversationId]
+            );
+            const effectiveDatasourceId = datasourceId ?? conversation[0].datasource_id ?? null;
             await tx.execute("INSERT INTO message (id,conversation_id,role,content,blocks,llm_messages) VALUES (?,?,?,?,'[]'::jsonb,'[]'::jsonb)", [
                 requestMessageId,
                 conversationId,
@@ -54,8 +69,9 @@ export class GenerationService implements OnModuleDestroy {
                 `INSERT INTO generation (
                     id,user_id,conversation_id,request_message_id,response_message_id,status,
                     idempotency_key,request_hash,reasoning_enabled,model_provider,model_name,
-                    prompt_policy_version,toolset_version,context_policy_version,memory_policy_version,schema_context_version
-                ) VALUES (?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?,?)`,
+                    prompt_policy_version,toolset_version,context_policy_version,memory_policy_version,schema_context_version,
+                    datasource_id,context_upper_bound,parent_message_id
+                ) VALUES (?,?,?,?,?,'pending',?,?,?,?,?,?,?,?,?,?,?,?,?)`,
                 [
                     id,
                     userId,
@@ -72,6 +88,9 @@ export class GenerationService implements OnModuleDestroy {
                     AGENT_RUNTIME_VERSIONS.contextPolicy,
                     AGENT_RUNTIME_VERSIONS.memoryPolicy,
                     AGENT_RUNTIME_VERSIONS.schemaContext,
+                    effectiveDatasourceId,
+                    snapshot[0].context_upper_bound,
+                    parent[0]?.response_message_id ?? null,
                 ]
             );
             await tx.execute("INSERT INTO outbox_event (aggregate_id,type,payload) VALUES (?,'generation.enqueue',?::jsonb)", [
@@ -103,12 +122,17 @@ export class GenerationService implements OnModuleDestroy {
 
     async retry(userId: number, id: string) {
         const rows = await this.db.query<QueryRow[]>(
-            `SELECT conversation_id,request_message_id,reasoning_enabled FROM generation WHERE id=? AND user_id=? AND status IN ('failed','cancelled')`,
+            `SELECT conversation_id,request_message_id,reasoning_enabled,datasource_id FROM generation WHERE id=? AND user_id=? AND status IN ('failed','cancelled')`,
             [id, userId]
         );
         if (!rows.length) throw new NotFoundException('生成任务不可重试');
         const request = await this.db.query<QueryRow[]>('SELECT content FROM message WHERE id=?', [rows[0].request_message_id]);
-        return { conversationId: rows[0].conversation_id, message: request[0]?.content ?? '', reasoningEnabled: rows[0].reasoning_enabled === true };
+        return {
+            conversationId: rows[0].conversation_id,
+            message: request[0]?.content ?? '',
+            datasourceId: rows[0].datasource_id ?? null,
+            reasoningEnabled: rows[0].reasoning_enabled === true,
+        };
     }
 
     async sync(userId: number, knownIds: string[] = []) {

@@ -1,6 +1,6 @@
 # Gist Agent 数据分析链路改造规划
 
-> 状态：Draft
+> 状态：分阶段实施中（Phase 0、Phase 1 已完成）
 >
 > 评审日期：2026-09-16
 >
@@ -26,16 +26,17 @@
 
 ## 3. 文档导航
 
-| 文档 | 主题 | 核心产出 |
-| --- | --- | --- |
-| [01-execution-reliability.md](./01-execution-reliability.md) | 执行与并发可靠性 | 真取消、会话隔离、终态栅栏、幂等副作用 |
-| [02-orchestration-and-prompts.md](./02-orchestration-and-prompts.md) | 编排与提示词 | 显式状态机、Prompt 分层、工具输入输出契约 |
-| [03-context-and-artifacts.md](./03-context-and-artifacts.md) | 上下文与证据 | Turn 模型、查询 artifact、Token 预算与召回 |
-| [04-memory.md](./04-memory.md) | 记忆系统 | 分类记忆、版本与来源、冲突和遗忘机制 |
-| [05-data-security-and-quality.md](./05-data-security-and-quality.md) | 数据安全与分析质量 | SQL fail-closed、只读账号、注入防护、结果校验 |
-| [06-evaluation-and-observability.md](./06-evaluation-and-observability.md) | 评测与可观测性 | Agent E2E 评测、指标体系、版本追踪 |
-| [07-delivery-roadmap.md](./07-delivery-roadmap.md) | 分阶段路线图 | 里程碑、依赖关系、Definition of Done |
-| [08-phase-0-implementation.md](./08-phase-0-implementation.md) | Phase 0 实施记录 | 版本追踪、错误码、首响应指标与验证结果 |
+| 文档                                                                       | 主题               | 核心产出                                      |
+| -------------------------------------------------------------------------- | ------------------ | --------------------------------------------- |
+| [01-execution-reliability.md](./01-execution-reliability.md)               | 执行与并发可靠性   | 真取消、会话隔离、终态栅栏、幂等副作用        |
+| [02-orchestration-and-prompts.md](./02-orchestration-and-prompts.md)       | 编排与提示词       | 显式状态机、Prompt 分层、工具输入输出契约     |
+| [03-context-and-artifacts.md](./03-context-and-artifacts.md)               | 上下文与证据       | Turn 模型、查询 artifact、Token 预算与召回    |
+| [04-memory.md](./04-memory.md)                                             | 记忆系统           | 分类记忆、版本与来源、冲突和遗忘机制          |
+| [05-data-security-and-quality.md](./05-data-security-and-quality.md)       | 数据安全与分析质量 | SQL fail-closed、只读账号、注入防护、结果校验 |
+| [06-evaluation-and-observability.md](./06-evaluation-and-observability.md) | 评测与可观测性     | Agent E2E 评测、指标体系、版本追踪            |
+| [07-delivery-roadmap.md](./07-delivery-roadmap.md)                         | 分阶段路线图       | 里程碑、依赖关系、Definition of Done          |
+| [08-phase-0-implementation.md](./08-phase-0-implementation.md)             | Phase 0 实施记录   | 版本追踪、错误码、首响应指标与验证结果        |
+| [09-phase-1-implementation.md](./09-phase-1-implementation.md)             | Phase 1 实施记录   | 输入快照、会话串行、真取消、终态写栅栏        |
 
 ## 4. 优先级摘要
 

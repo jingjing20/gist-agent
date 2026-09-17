@@ -100,8 +100,18 @@ async function initDB() {
       ALTER TABLE generation ADD COLUMN IF NOT EXISTS context_policy_version VARCHAR(64) NOT NULL DEFAULT 'context-policy-v1';
       ALTER TABLE generation ADD COLUMN IF NOT EXISTS memory_policy_version VARCHAR(64) NOT NULL DEFAULT 'memory-policy-v1';
       ALTER TABLE generation ADD COLUMN IF NOT EXISTS schema_context_version VARCHAR(64) NOT NULL DEFAULT 'schema-context-v1';
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS datasource_id INTEGER REFERENCES data_source(id) ON DELETE SET NULL;
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS context_upper_bound TIMESTAMPTZ;
+      ALTER TABLE generation ADD COLUMN IF NOT EXISTS parent_message_id UUID REFERENCES message(id) ON DELETE SET NULL;
+      UPDATE generation g SET datasource_id=c.datasource_id FROM conversation c
+        WHERE g.conversation_id=c.id AND g.datasource_id IS NULL;
+      UPDATE generation SET context_upper_bound=created_at WHERE context_upper_bound IS NULL;
+      ALTER TABLE generation ALTER COLUMN context_upper_bound SET NOT NULL;
       ALTER TABLE generation ADD CONSTRAINT generation_status_check CHECK(status IN ('pending','starting','running','completed','failed','cancel_requested','cancelled'));
       CREATE INDEX IF NOT EXISTS idx_generation_writer_heartbeat ON generation(status,writer_heartbeat_at);
+      CREATE UNIQUE INDEX IF NOT EXISTS uk_generation_conversation_active
+        ON generation(conversation_id)
+        WHERE status IN ('pending','starting','running','cancel_requested');
       CREATE TABLE IF NOT EXISTS outbox_event (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(), aggregate_id UUID NOT NULL, type VARCHAR(50) NOT NULL,
         payload JSONB NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, next_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

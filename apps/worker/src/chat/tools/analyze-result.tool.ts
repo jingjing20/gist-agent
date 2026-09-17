@@ -35,6 +35,8 @@ export class AnalyzeResultTool implements Tool {
     };
 
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
+        await ctx.assertWritable();
+        if (ctx.signal.aborted) throw ctx.signal.reason ?? new Error('已取消');
         if (args.needsChart) {
             // 在此处提前预告图表，前端立即渲染骨架屏；
             // 真实窗口期 = 下一轮 LLM 生成 generate_chart arguments 的耗时（通常数秒～数十秒）。

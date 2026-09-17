@@ -6,15 +6,15 @@
 
 ## 2. 阶段总览
 
-| 阶段 | 目标 | 主要事项 | 建议优先级 |
-| --- | --- | --- | --- |
-| Phase 0 | 建立基线 | 错误码、版本字段、关键回归测试 | P0 |
-| Phase 1 | 关闭可靠性缺口 | 真取消、输入快照、会话串行、终态栅栏 | P0 |
-| Phase 2 | 确定性编排 | 状态机、工具校验、明确终态 | P0/P1 |
-| Phase 3 | 证据与上下文 | Turn、Query Artifact、图表引用、动态预算 | P1 |
-| Phase 4 | 安全与质量 | 只读角色、fail-closed、结果质量检查 | P1 |
-| Phase 5 | 记忆升级 | 结构化记忆、版本、纠正与管理 | P1/P2 |
-| Phase 6 | 规模化优化 | Schema 检索、成本/延迟调优、在线评估 | P2 |
+| 阶段    | 目标           | 主要事项                                 | 建议优先级 |
+| ------- | -------------- | ---------------------------------------- | ---------- |
+| Phase 0 | 建立基线       | 错误码、版本字段、关键回归测试           | P0         |
+| Phase 1 | 关闭可靠性缺口 | 真取消、输入快照、会话串行、终态栅栏     | P0         |
+| Phase 2 | 确定性编排     | 状态机、工具校验、明确终态               | P0/P1      |
+| Phase 3 | 证据与上下文   | Turn、Query Artifact、图表引用、动态预算 | P1         |
+| Phase 4 | 安全与质量     | 只读角色、fail-closed、结果质量检查      | P1         |
+| Phase 5 | 记忆升级       | 结构化记忆、版本、纠正与管理             | P1/P2      |
+| Phase 6 | 规模化优化     | Schema 检索、成本/延迟调优、在线评估     | P2         |
 
 ## 3. Phase 0：建立可比较基线
 
@@ -33,6 +33,8 @@
 - 不再只凭人工体验判断 Prompt 效果。
 
 ## 4. Phase 1：可靠性止血
+
+实施状态：已完成，并在运行中的 API/Worker/Redis/PostgreSQL 环境通过完整故障注入与 smoke。详情见 [Phase 1 实施记录](./09-phase-1-implementation.md)。
 
 ### 工作包 A：Generation 输入快照
 
@@ -138,24 +140,24 @@
 
 ## 10. 推荐拆分的工程任务
 
-| ID | 任务 | 依赖 | 规模 |
-| --- | --- | --- | --- |
-| REL-01 | generation 固化 datasource/request/context 水位 | DB migration | M |
-| REL-02 | conversation active generation 唯一约束 | REL-01 | S |
-| REL-03 | 统一 cancellation context 与终态写栅栏 | 无 | M |
-| REL-04 | PostgreSQL 真取消和 statement timeout | REL-03 | M |
-| ORC-01 | Agent outcome 与迭代耗尽处理 | 无 | S |
-| ORC-02 | Tool runtime schema 校验 | 无 | M |
-| ORC-03 | 显式状态机 | ORC-01/02 | L |
-| ART-01 | Query Artifact 表与双写 | DB migration | M |
-| ART-02 | Chart Artifact 引用查询证据 | ART-01 | M |
-| CTX-01 | Turn 模型与整轮上下文 | REL-01、ART-01 | L |
-| CTX-02 | Model capability/tokenizer | 无 | M |
-| SEC-01 | SQL fail-closed 与只读角色 | 无 | M |
-| DQ-01 | ResultQuality 检查 | ART-01 | M |
-| MEM-01 | MemoryRecord 与 patch 协议 | DB migration | L |
-| EVAL-01 | Agent E2E benchmark runner | Phase 0 | M |
-| EVAL-02 | 并发/注入/多轮评测集 | EVAL-01 | M |
+| ID      | 任务                                            | 依赖           | 规模 |
+| ------- | ----------------------------------------------- | -------------- | ---- |
+| REL-01  | generation 固化 datasource/request/context 水位 | DB migration   | M    |
+| REL-02  | conversation active generation 唯一约束         | REL-01         | S    |
+| REL-03  | 统一 cancellation context 与终态写栅栏          | 无             | M    |
+| REL-04  | PostgreSQL 真取消和 statement timeout           | REL-03         | M    |
+| ORC-01  | Agent outcome 与迭代耗尽处理                    | 无             | S    |
+| ORC-02  | Tool runtime schema 校验                        | 无             | M    |
+| ORC-03  | 显式状态机                                      | ORC-01/02      | L    |
+| ART-01  | Query Artifact 表与双写                         | DB migration   | M    |
+| ART-02  | Chart Artifact 引用查询证据                     | ART-01         | M    |
+| CTX-01  | Turn 模型与整轮上下文                           | REL-01、ART-01 | L    |
+| CTX-02  | Model capability/tokenizer                      | 无             | M    |
+| SEC-01  | SQL fail-closed 与只读角色                      | 无             | M    |
+| DQ-01   | ResultQuality 检查                              | ART-01         | M    |
+| MEM-01  | MemoryRecord 与 patch 协议                      | DB migration   | L    |
+| EVAL-01 | Agent E2E benchmark runner                      | Phase 0        | M    |
+| EVAL-02 | 并发/注入/多轮评测集                            | EVAL-01        | M    |
 
 ## 11. 每个改造 PR 的 Definition of Done
 

@@ -51,6 +51,8 @@ export class GenerateChartTool implements Tool {
     };
 
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
+        await ctx.assertWritable();
+        if (ctx.signal.aborted) throw ctx.signal.reason ?? new Error('已取消');
         const chartData = {
             chartType: args.chartType,
             title: args.title,

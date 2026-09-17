@@ -31,8 +31,13 @@ export class SqlQueryTool implements Tool {
     constructor(private readonly sqlExecutor: SqlExecutorAgent) {}
 
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
+        await ctx.assertWritable();
+        if (ctx.signal.aborted) throw ctx.signal.reason ?? new Error('已取消');
         const sql = args.sql as string;
-        const queryTitle = String(args.title || '执行数据查询').trim().slice(0, 30) || '执行数据查询';
+        const queryTitle =
+            String(args.title || '执行数据查询')
+                .trim()
+                .slice(0, 30) || '执行数据查询';
         const blocks: SSEEvent[] = [];
 
         const execLog: SSEEvent = {
@@ -52,7 +57,8 @@ export class SqlQueryTool implements Tool {
         blocks.push(sqlBlock);
 
         try {
-            const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId);
+            const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId, ctx.signal);
+            await ctx.assertWritable();
 
             if (r.wasFixed) {
                 const fixLog: SSEEvent = {
@@ -103,6 +109,7 @@ export class SqlQueryTool implements Tool {
 
             return { toolResult, blocks };
         } catch (e: any) {
+            if (ctx.signal.aborted) throw ctx.signal.reason ?? e;
             execLog.content = `查询失败: ${e.message}`;
             ctx.emitter.send({ ...execLog, type: 'log_update' } as any);
             return { toolResult: `SQL 执行出错: ${e.message}`, blocks };

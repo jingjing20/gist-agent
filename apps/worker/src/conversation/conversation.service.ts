@@ -99,6 +99,57 @@ export class ConversationService {
         }) as unknown as Message[];
     }
 
+    async getGenerationContextMessages(conversationId: string, userId: number, contextUpperBound: string, requestMessageId: string): Promise<Message[]> {
+        const conv = await this.findOne(conversationId, userId);
+        if (!conv) return [];
+        const rows = await this.db.query<QueryRow[]>(
+            `SELECT m.*
+               FROM message m
+              WHERE m.conversation_id=?
+                AND (
+                  m.id=?
+                  OR (
+                    m.created_at < ?
+                    AND EXISTS (
+                      SELECT 1 FROM generation g
+                       WHERE g.conversation_id=m.conversation_id
+                         AND g.status='completed'
+                         AND (g.request_message_id=m.id OR g.response_message_id=m.id)
+                    )
+                  )
+                )
+              ORDER BY m.created_at ASC, CASE WHEN m.role='user' THEN 0 ELSE 1 END, m.id ASC`,
+            [conversationId, requestMessageId, contextUpperBound]
+        );
+        return this.hydrateMessages(rows);
+    }
+
+    async getMessage(id: string, conversationId: string, userId: number): Promise<Message | null> {
+        const conv = await this.findOne(conversationId, userId);
+        if (!conv) return null;
+        const rows = await this.db.query<QueryRow[]>('SELECT * FROM message WHERE id=? AND conversation_id=?', [id, conversationId]);
+        return (await this.hydrateMessages(rows))[0] ?? null;
+    }
+
+    private async hydrateMessages(rows: QueryRow[]): Promise<Message[]> {
+        if (rows.length === 0) return [];
+        const messageIds = rows.map((row) => row.id);
+        const placeholders = messageIds.map(() => '?').join(', ');
+        const blockRows = await this.db.query<QueryRow[]>(`SELECT * FROM message_block WHERE message_id IN (${placeholders}) ORDER BY message_id, sort_order`, messageIds);
+        const blocksByMessageId = new Map<string, any[]>();
+        for (const row of blockRows) {
+            const metadata = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata || {};
+            const blocks = blocksByMessageId.get(row.message_id) ?? [];
+            blocks.push({ type: row.type, ...(row.content != null ? { content: row.content } : {}), ...metadata });
+            blocksByMessageId.set(row.message_id, blocks);
+        }
+        return rows.map((row) => ({
+            ...row,
+            blocks: blocksByMessageId.get(row.id) ?? (typeof row.blocks === 'string' ? JSON.parse(row.blocks) : row.blocks || []),
+            llm_messages: typeof row.llm_messages === 'string' ? JSON.parse(row.llm_messages) : row.llm_messages || [],
+        })) as unknown as Message[];
+    }
+
     async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, blocks: unknown[], llmMessages: unknown[] = [], messageId?: string): Promise<Message> {
         const id = messageId ?? randomUUID();
 

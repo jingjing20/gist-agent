@@ -90,16 +90,26 @@ ${statePrompt}
         conversationId: string,
         userId: number,
         systemPrompt: string,
-        options: { reasoningEnabled?: boolean; excludeMessageIds?: readonly string[] } = {}
+        options: {
+            reasoningEnabled?: boolean;
+            excludeMessageIds?: readonly string[];
+            generationSnapshot?: { contextUpperBound: string; requestMessageId: string };
+        } = {}
     ): Promise<ChatMessage[]> {
         const systemMsg: ChatMessage = { role: 'system', content: systemPrompt };
         const systemTokens = estimateMessageTokens(systemMsg);
         const budgetForHistory = MAX_CONTEXT_TOKENS - systemTokens - RESPONSE_RESERVE - TOOLS_RESERVE;
 
         const excluded = new Set(options.excludeMessageIds ?? []);
-        const history = (await this.conversationService.getMessages(conversationId, userId))
-            .filter((message) => !excluded.has(message.id))
-            .filter((message) => !this.isEmptyAssistantMessage(message));
+        const sourceMessages = options.generationSnapshot
+            ? await this.conversationService.getGenerationContextMessages(
+                  conversationId,
+                  userId,
+                  options.generationSnapshot.contextUpperBound,
+                  options.generationSnapshot.requestMessageId
+              )
+            : await this.conversationService.getMessages(conversationId, userId);
+        const history = sourceMessages.filter((message) => !excluded.has(message.id)).filter((message) => !this.isEmptyAssistantMessage(message));
         if (history.length === 0) return [systemMsg];
 
         const entries = history.map((msg) => this.toHistoryEntry(msg, options.reasoningEnabled === true)).filter((entry): entry is HistoryEntry => entry !== null);

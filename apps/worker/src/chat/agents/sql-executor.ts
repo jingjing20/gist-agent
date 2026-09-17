@@ -26,17 +26,16 @@ export class SqlExecutorAgent {
         private readonly schemaService: SchemaService
     ) {}
 
-    /**
-     * 带超时的 SQL 查询执行。
-     * 用 Promise.race 而不是 MySQL 的 MAX_EXECUTION_TIME，
-     * 因为并非所有 MySQL 版本和语句类型都支持后者，
-     * Promise.race 是最可靠的客户端兜底方案
-     */
-    private async queryWithTimeout<T>(sql: string, datasourceId?: number | null, timeoutMs = 15000): Promise<T> {
-        return Promise.race([
-            this.db.query<T extends RowDataPacket[] ? T : any>(sql, [], datasourceId),
-            new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`查询超时（> ${timeoutMs / 1000}s），已自动熔断拦截`)), timeoutMs)),
-        ]);
+    private async queryWithTimeout<T>(sql: string, datasourceId?: number | null, timeoutMs = 15000, signal?: AbortSignal): Promise<T> {
+        const database = this.db as DatabaseService & {
+            queryReadOnly<R extends RowDataPacket[]>(
+                statement: string,
+                params: unknown[],
+                selectedDatasourceId: number | null | undefined,
+                options: { timeoutMs: number; signal?: AbortSignal }
+            ): Promise<R>;
+        };
+        return database.queryReadOnly<T extends RowDataPacket[] ? T : any>(sql, [], datasourceId, { timeoutMs, signal }) as Promise<T>;
     }
 
     /**
@@ -184,7 +183,7 @@ export class SqlExecutorAgent {
      *   若语法错误 -> attemptFixSql() -> 重试 (max 2 次)
      *   若语义错误 -> 直接向上层暴露
      */
-    async execute(sql: string, datasourceId?: number | null, userId?: number): Promise<QueryResult> {
+    async execute(sql: string, datasourceId?: number | null, userId?: number, signal?: AbortSignal): Promise<QueryResult> {
         const maxRetries = 2;
         let currentSql = sql;
         let attempt = 0;
@@ -199,7 +198,7 @@ export class SqlExecutorAgent {
                 const { astResult, parser } = this.validate(currentSql, allowedTables);
                 const safeSql = this.ensureLimit(astResult, parser);
 
-                let rows = await this.queryWithTimeout<RowDataPacket[]>(safeSql, datasourceId, 15000);
+                let rows = await this.queryWithTimeout<RowDataPacket[]>(safeSql, datasourceId, 15000, signal);
 
                 if (allowedTables !== 'ALL' && this.isShowTables(safeSql)) {
                     rows = this.filterShowTablesRows(rows as Record<string, unknown>[], allowedTables) as RowDataPacket[];

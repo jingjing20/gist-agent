@@ -17,7 +17,7 @@ import { GenerationExecutionError, normalizeGenerationError } from './generation
 // Agent 循环上限：防止 LLM 陷入无限 tool_call 循环（如反复查错 SQL 又反复修）
 const MAX_AGENT_ITERATIONS = 15;
 // 全局超时熔断：无论 Agent 处于哪个阶段，超过此时间强制终止并返回错误
-const CHAT_TIMEOUT_MS = 300_000;
+const CHAT_TIMEOUT_MS = Math.max(100, Number(process.env.CHAT_TIMEOUT_MS) || 300_000);
 // 排查厂商流式 tool_call 协议差异时打开（DEBUG_TOOL_CALL_DELTA=1），生产环境关闭
 const DEBUG_TOOL_CALL_DELTA = process.env.DEBUG_TOOL_CALL_DELTA === '1';
 
@@ -73,8 +73,7 @@ export class ChatService {
         );
         heartbeat.unref();
         try {
-            const rows = await this.conversationService.getMessages(generation.conversationId, generation.userId);
-            const request = [...rows].reverse().find((item) => item.role === 'user');
+            const request = await this.conversationService.getMessage(generation.requestMessageId, generation.conversationId, generation.userId);
             if (ownershipLost) throw new Error('WRITER_OWNERSHIP_LOST');
             await this.runGeneration(generation, request?.content ?? '', generation.datasourceId, () => ownershipLost);
         } finally {
@@ -91,52 +90,53 @@ export class ChatService {
         const emitter = this.generations.emitter(generation);
         const blocks: SSEEvent[] = [];
         const turnMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [];
+        let timedOut = false;
         const cancelPoll = setInterval(() => {
-            if (ownershipLost()) controller.abort();
-            else void this.generations.isCancelRequested(generation.id).then((cancelled) => cancelled && controller.abort());
+            if (ownershipLost()) controller.abort(new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '生成任务写入权已丢失'));
+            else void this.generations.isCancelRequested(generation.id).then((cancelled) => cancelled && controller.abort(new GenerationExecutionError('CANCELLED', '已取消')));
         }, 500);
+        const timeout = setTimeout(() => {
+            timedOut = true;
+            controller.abort(new GenerationExecutionError('ANALYSIS_TIMEOUT', '分析超时，请尝试简化问题后重试'));
+        }, CHAT_TIMEOUT_MS);
+        timeout.unref();
         let terminal: SSEEvent = { type: 'done' };
         let finalStatus: GenerationStatus = 'completed';
         let errorDetail: string | undefined;
         let errorCode: GenerationErrorCode | undefined;
 
-        // Promise.race 实现全局超时：Agent Loop 和定时器竞争，
-        // 任何一方先完成即决定结果。这比在循环内部检查时间更可靠，
-        // 因为单次 LLM 调用本身就可能耗时很长
+        // 全局定时器与用户取消共用同一 AbortController。
+        // 超时时先 abort LLM/工具/SQL，等执行栈退出后再写终态。
         try {
             const reasoningActive = this.llm.isReasoningActive(reasoningEnabled);
             const systemPrompt = await this.promptBuilder.buildSystemPrompt(datasourceId, userId, conversationId);
             const messages = await this.promptBuilder.buildMessages(conversationId, userId, systemPrompt, {
                 reasoningEnabled: reasoningActive,
                 excludeMessageIds: [messageId],
+                generationSnapshot: {
+                    contextUpperBound: generation.contextUpperBound,
+                    requestMessageId: generation.requestMessageId,
+                },
             });
-            await Promise.race([
-                this.runAgentLoop(
-                    emitter,
-                    messages,
-                    turnMessages,
-                    blocks,
-                    datasourceId,
-                    userId,
-                    reasoningActive,
-                    signal,
-                    () => this.conversationService.updateMessage(messageId, '', blocks, turnMessages),
-                    () => this.generations.markFirstDelta(generation)
-                ),
-                new Promise<never>((_, reject) =>
-                    setTimeout(() => reject(new GenerationExecutionError('ANALYSIS_TIMEOUT', '分析超时，请尝试简化问题后重试')), CHAT_TIMEOUT_MS)
-                ),
-            ]);
+            await this.runAgentLoop(
+                emitter,
+                messages,
+                turnMessages,
+                blocks,
+                datasourceId,
+                userId,
+                reasoningActive,
+                signal,
+                () => this.generations.checkpointMessage(generation, blocks, turnMessages),
+                () => this.generations.markFirstDelta(generation),
+                () => this.generations.assertWritable(generation)
+            );
             if (signal.aborted) throw new GenerationExecutionError('CANCELLED', '已取消');
         } catch (err: unknown) {
-            const normalized = normalizeGenerationError(err, { ownershipLost: ownershipLost(), aborted: signal.aborted });
-            this.logger.error(
-                `handleChat failed conversationId=${conversationId} userId=${userId} code=${normalized.code}: ${normalized.message}`,
-                normalized.stack
-            );
-            const errorEvent: SSEEvent = { type: 'error', content: normalized.message, errorCode: normalized.code };
-            emitter.send(errorEvent);
-            blocks.push(errorEvent);
+            const cause = signal.aborted && signal.reason instanceof Error ? signal.reason : err;
+            const normalized = normalizeGenerationError(cause, { ownershipLost: ownershipLost(), aborted: signal.aborted && !timedOut });
+            this.logger.error(`handleChat failed conversationId=${conversationId} userId=${userId} code=${normalized.code}: ${normalized.message}`, normalized.stack);
+            blocks.push({ type: 'error', content: normalized.message, errorCode: normalized.code });
             finalStatus = normalized.code === 'CANCELLED' ? 'cancelled' : 'failed';
             errorDetail = normalized.message;
             errorCode = normalized.code;
@@ -146,15 +146,18 @@ export class ChatService {
                     : { type: 'done', status: 'failed', error: normalized.message, errorCode: normalized.code };
         }
         clearInterval(cancelPoll);
+        clearTimeout(timeout);
 
-        // 持久化：blocks 用于前端历史回放，turnMessages 用于下次对话重建 LLM 上下文
-        await this.conversationService.updateMessage(messageId, '', blocks, turnMessages);
-        await this.generations.drain(generation);
-        await this.generations.finalize(generation, finalStatus, errorDetail, errorCode, terminal);
+        try {
+            await this.generations.drain(generation);
+        } catch (drainError) {
+            if (finalStatus === 'completed') throw drainError;
+        }
+        const finalized = await this.generations.finalize(generation, finalStatus, errorDetail, errorCode, terminal, { blocks, llmMessages: turnMessages });
 
         // Fire-and-forget：蒸馏器异步提取业务口径定义，写入 conversation.semantic_state
         // 不 await 是因为蒸馏失败不应影响本次对话的响应
-        this.distiller.updateStateAsync(conversationId, userId, message);
+        if (finalized && finalStatus === 'completed') this.distiller.updateStateAsync(conversationId, userId, message);
     }
 
     /**
@@ -173,7 +176,8 @@ export class ChatService {
         reasoningEnabled = false,
         signal?: AbortSignal,
         checkpoint?: () => Promise<void>,
-        onFirstDelta?: () => Promise<void>
+        onFirstDelta?: () => Promise<void>,
+        assertWritable?: () => Promise<void>
     ): Promise<void> {
         const tools = this.toolRegistry.getDefinitions();
         let lastCheckpointAt = Date.now();
@@ -181,6 +185,7 @@ export class ChatService {
 
         for (let iteration = 0; iteration < MAX_AGENT_ITERATIONS; iteration++) {
             if (signal?.aborted) throw new Error('已取消');
+            await assertWritable?.();
             const stream = await this.llm.streamWithTools(messages, tools, { signal, reasoningEnabled });
 
             let content = ''; // 累积本次迭代的文本输出
@@ -300,10 +305,13 @@ export class ChatService {
 
                     const tool = this.toolRegistry.get(name);
                     if (tool) {
+                        await assertWritable?.();
                         const result = await tool.execute(args, {
                             emitter,
                             datasourceId,
                             userId,
+                            signal: signal ?? new AbortController().signal,
+                            assertWritable: assertWritable ?? (async () => undefined),
                         });
                         return { toolCallId: tc.id, toolResult: result.toolResult, resultBlocks: result.blocks };
                     }
