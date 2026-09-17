@@ -1,0 +1,50 @@
+apps/worker/src/chat/tools/sql-query.tool.ts
+  107e5f4576e137db 3,33-40,118,123
+apps/worker/src/chat/chat.module.ts
+  107e5f4576e137db 29
+package.json
+  107e5f4576e137db 19
+docs/agent-refactor/07-delivery-roadmap.md
+  107e5f4576e137db 63-64
+docs/agent-refactor/10-phase-2-implementation.md
+  107e5f4576e137db 1-34
+apps/worker/src/chat/chat.service.ts
+  107e5f4576e137db 16,182,184,266,291-308,312,319
+apps/worker/src/chat/prompt-builder.ts
+  107e5f4576e137db 73,79
+apps/worker/src/chat/tools/base-tool.ts
+  107e5f4576e137db 39,45,48-57
+apps/web/src/components/ChatMessageItem.vue
+  107e5f4576e137db 15,30,43-46
+apps/worker/src/chat/tools/analyze-result.tool.ts
+  107e5f4576e137db 3,37-42
+apps/worker/src/chat/tools/generate-chart.tool.ts
+  107e5f4576e137db 3-5,15,22,26,50,55-76
+scripts/phase2-orchestration-regression.mjs
+  107e5f4576e137db 1-51
+packages/contracts/src/index.ts
+  107e5f4576e137db 8-9,23-24
+apps/worker/src/chat/agent-orchestrator.ts
+  107e5f4576e137db 1-85
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "30a2919d1c5f89c8d2c3aa9bc1a28ba16ca0fbf5",
+  "prompts": {
+    "107e5f4576e137db": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ad2c-3986-7930-8c84-70a3d4c46ef9",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 278,
+      "total_deletions": 72,
+      "accepted_lines": 278,
+      "overriden_lines": 0
+    }
+  }
+}
