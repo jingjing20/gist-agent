@@ -1,0 +1,106 @@
+apps/worker/src/chat/chat.module.ts
+  107e5f4576e137db 15-16,19-35
+apps/worker/src/chat/agents/sql-executor.ts
+  107e5f4576e137db 7-8,16,19,32,34,39,41,204-205,211-212,217-220,247-306
+apps/api/src/chat/generation.service.ts
+  107e5f4576e137db 96-101,170-174
+docs/agent-refactor/04-memory.md
+  107e5f4576e137db 182
+docs/agent-refactor/08-phase-0-implementation.md
+  107e5f4576e137db 11,44,88,127
+apps/api/scripts/init-db.ts
+  107e5f4576e137db 4,140
+apps/worker/src/chat/generation.service.ts
+  107e5f4576e137db 20,50,66,76,96,188,190-191,197-202,225-253,302-310
+apps/worker/src/chat/model-capabilities.ts
+  107e5f4576e137db 1-24
+docs/agent-refactor/07-delivery-roadmap.md
+  107e5f4576e137db 9-17,21,38,42,48,54,59,69,73,92,96,98,102,107,113,116,181,185-198
+docs/agent-refactor/11-phase-3-implementation-contract.md
+  107e5f4576e137db 3,5,15,17,19,24,171,173,175,181,188,195,202,209,216,259,263,276-282,293-302
+packages/contracts/src/index.ts
+  107e5f4576e137db 8-10,12,20,26-29,38-137
+apps/web/src/components/ChatMessageItem.vue
+  107e5f4576e137db 77
+docs/agent-refactor/10-phase-2-implementation.md
+  107e5f4576e137db 5,11,106,108-110,121-132,144,153-159,171,173,195-196
+package.json
+  107e5f4576e137db 19-24
+scripts/phase3-migrations-regression.mjs
+  107e5f4576e137db 1-98
+docs/agent-refactor/README.md
+  107e5f4576e137db 3,27,29-32,40,56,60-61,130
+scripts/smoke-multi-conversation.mjs
+  107e5f4576e137db 61-121,144-164
+docs/agent-refactor/03-context-and-artifacts.md
+  107e5f4576e137db 3,11,18,62,73-78,87,152,156,160,167,205,220,233
+apps/worker/src/chat/artifact.repository.ts
+  107e5f4576e137db 1-245
+apps/web/src/types/index.ts
+  107e5f4576e137db 13-17,22,25-28,37,40-43
+scripts/phase2-agent-loop-integration.mjs
+  107e5f4576e137db 1-333
+docs/agent-refactor/05-data-security-and-quality.md
+  107e5f4576e137db 182
+apps/worker/src/chat/chat.service.ts
+  107e5f4576e137db 117,134-139,187-188,196,198-203,209-219,281-283,285-288,322-336,352-364
+scripts/phase2-orchestration-regression.mjs
+  107e5f4576e137db 11-23,27-33,36-57,62-70,73,79,87-91
+apps/worker/src/chat/tools/read-query-artifact.tool.ts
+  107e5f4576e137db 1-53
+docs/agent-refactor/01-execution-reliability.md
+  107e5f4576e137db 3,151,153
+apps/worker/src/chat/tools/sql-query.tool.ts
+  107e5f4576e137db 5-7,28-37,39,44-47,51-53,57-61,95-121,139-140,143-144,160-171,178-185
+docs/agent-refactor/09-phase-1-implementation.md
+  107e5f4576e137db 5,135
+apps/worker/src/chat/tools/generate-chart.tool.ts
+  107e5f4576e137db 3-5,8-9,19,23-27,29-34,36,41-43,45-53,57,62-63,66-67,70-77,79-82,88-110,114-115,117-132,134-135,137-162,164-194
+apps/web/src/stores/chat.ts
+  107e5f4576e137db 218-229,236,239-242
+scripts/phase3-artifacts-regression.mjs
+  107e5f4576e137db 1-403
+scripts/phase3-context-regression.mjs
+  107e5f4576e137db 1-251
+docs/agent-refactor/02-orchestration-and-prompts.md
+  107e5f4576e137db 3,160-169
+docs/agent-refactor/06-evaluation-and-observability.md
+  107e5f4576e137db 3,13,15-17,127,140-149,171
+apps/worker/src/chat/agent-orchestrator.ts
+  107e5f4576e137db 6-8,48,50,66
+packages/database/src/index.ts
+  107e5f4576e137db 4-111,119-128,229-257
+apps/worker/src/database/schema.service.ts
+  107e5f4576e137db 4-5,131-159
+docs/agent-refactor/12-phase-3-implementation.md
+  107e5f4576e137db 1-102
+apps/worker/src/chat/prompt-builder.ts
+  107e5f4576e137db 3-4,6,74,76-77,95,100-120,150-195,338,344,347-351
+apps/worker/src/chat/tools/base-tool.ts
+  107e5f4576e137db 32-34
+apps/web/src/components/blocks/TableBlock.vue
+  107e5f4576e137db 9,29,43
+apps/worker/src/conversation/conversation.service.ts
+  107e5f4576e137db 25-47,150-212
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "fe962b259efc276978df042478af3652802a0fce",
+  "prompts": {
+    "107e5f4576e137db": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ad2c-3986-7930-8c84-70a3d4c46ef9",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 3229,
+      "total_deletions": 804,
+      "accepted_lines": 2909,
+      "overriden_lines": 0
+    }
+  }
+}
