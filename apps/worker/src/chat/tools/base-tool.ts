@@ -36,10 +36,22 @@ export interface ToolContext {
 export interface ToolExecutionResult {
     toolResult: string;
     blocks: SSEEvent[];
+    succeeded?: boolean;
 }
 
 export interface Tool {
     readonly name: string;
     readonly definition: OpenAI.Chat.Completions.ChatCompletionTool;
+    parseArguments(value: unknown): Record<string, unknown>;
     execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult>;
+}
+
+export function requireRecord(value: unknown): Record<string, unknown> {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('参数必须是 JSON 对象');
+    return value as Record<string, unknown>;
+}
+
+export function requireNonEmptyString(value: unknown, field: string): string {
+    if (typeof value !== 'string' || !value.trim()) throw new Error(`${field} 必须是非空字符串`);
+    return value.trim();
 }

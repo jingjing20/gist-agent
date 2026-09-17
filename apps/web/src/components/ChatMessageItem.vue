@@ -12,7 +12,7 @@
             </template>
             <template v-else>
                 <div class="assistant-content">
-                    <template v-for="(block, i) in msg.blocks" :key="blockKey(block, i)">
+                    <template v-for="(block, i) in visibleBlocks" :key="i">
                         <component :is="blockComponent(block.type)" v-bind="blockProps(block)" />
                     </template>
                     <div v-if="isStreaming" class="streaming-indicator">
@@ -27,14 +27,12 @@
 </template>
 
 <script setup lang="ts">
-import { type Component } from 'vue';
-import ThinkingBlock from './blocks/ThinkingBlock.vue';
+import { computed, type Component } from 'vue';
 import SqlBlock from './blocks/SqlBlock.vue';
 import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
 import LogBlock from './blocks/LogBlock.vue';
 import ChartBlock from './blocks/ChartBlock.vue';
-import { thinkingStateKey } from './blocks/thinking-state';
 import type { MessageBlock, ChatMessage } from '../types';
 
 const props = defineProps<{
@@ -42,8 +40,11 @@ const props = defineProps<{
     isStreaming: boolean;
 }>();
 
+// Raw model reasoning is not a product-facing protocol. Ignore legacy persisted
+// blocks as well as preventing new ones from being rendered.
+const visibleBlocks = computed(() => props.msg.blocks.filter((block) => block.type !== 'thinking' && block.type !== 'reasoning_chunk'));
+
 const blockMap: Record<string, Component> = {
-    thinking: ThinkingBlock,
     sql: SqlBlock,
     table: TableBlock,
     text: MarkdownBlock,
@@ -56,10 +57,6 @@ function blockComponent(type: string): Component {
     return blockMap[type] || MarkdownBlock;
 }
 
-function blockKey(block: MessageBlock, index: number): string {
-    return block.type === 'thinking' ? `${index}:${thinkingStateKey(props.isStreaming)}` : String(index);
-}
-
 function blockProps(block: MessageBlock): Record<string, unknown> {
     if (block.type === 'log') {
         return {
@@ -70,9 +67,6 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
     }
     if (block.type === 'chart') {
         return { chartData: block.chartData };
-    }
-    if (block.type === 'thinking') {
-        return { content: block.content, isStreaming: props.isStreaming };
     }
     return {
         title: block.title,

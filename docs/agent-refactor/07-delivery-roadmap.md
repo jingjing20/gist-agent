@@ -60,6 +60,8 @@
 
 ## 5. Phase 2：确定性编排
 
+实施状态：已完成。状态机、运行时参数校验、明确退出结果、原始推理隐藏和 `analyze_result` 下线均已落地；详情见 [Phase 2 实施记录](./10-phase-2-implementation.md)。
+
 ### 交付物
 
 - 明确 Agent state 与状态转换表。

@@ -8,7 +8,6 @@ import { ZombieGenerationMonitorService } from './zombie-generation-monitor.serv
 import { SqlExecutorAgent } from './agents/sql-executor';
 import { SemanticDistillerService } from './agents/semantic-distiller.service';
 import { PromptBuilder } from './prompt-builder';
-import { AnalyzeResultTool } from './tools/analyze-result.tool';
 import { GenerateChartTool } from './tools/generate-chart.tool';
 import { SqlQueryTool } from './tools/sql-query.tool';
 import { TOOL_INSTANCES, type Tool } from './tools/base-tool';
@@ -26,9 +25,8 @@ import { ToolRegistry } from './tools/tool-registry';
     SemanticDistillerService,
     PromptBuilder,
     SqlQueryTool,
-    AnalyzeResultTool,
     GenerateChartTool,
-    { provide: TOOL_INSTANCES, useFactory: (...tools: Tool[]) => tools, inject: [SqlQueryTool, AnalyzeResultTool, GenerateChartTool] },
+    { provide: TOOL_INSTANCES, useFactory: (...tools: Tool[]) => tools, inject: [SqlQueryTool, GenerateChartTool] },
     ToolRegistry,
   ],
 })

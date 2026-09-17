@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type OpenAI from 'openai';
-import type { Tool, ToolContext, ToolExecutionResult, SSEEvent } from './base-tool';
+import { requireNonEmptyString, requireRecord, type Tool, type ToolContext, type ToolExecutionResult, type SSEEvent } from './base-tool';
 import { SqlExecutorAgent } from '../agents/sql-executor';
 
 const MAX_TOOL_RESULT_CHARS = 60000;
@@ -29,6 +29,14 @@ export class SqlQueryTool implements Tool {
     };
 
     constructor(private readonly sqlExecutor: SqlExecutorAgent) {}
+
+    parseArguments(value: unknown): Record<string, unknown> {
+        const args = requireRecord(value);
+        return {
+            title: requireNonEmptyString(args.title, 'title'),
+            sql: requireNonEmptyString(args.sql, 'sql'),
+        };
+    }
 
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
         await ctx.assertWritable();
@@ -107,12 +115,12 @@ export class SqlQueryTool implements Tool {
                     })
                   : JSON.stringify(resultRows);
 
-            return { toolResult, blocks };
+            return { toolResult, blocks, succeeded: true };
         } catch (e: any) {
             if (ctx.signal.aborted) throw ctx.signal.reason ?? e;
             execLog.content = `查询失败: ${e.message}`;
             ctx.emitter.send({ ...execLog, type: 'log_update' } as any);
-            return { toolResult: `SQL 执行出错: ${e.message}`, blocks };
+            return { toolResult: `SQL 执行出错: ${e.message}`, blocks, succeeded: false };
         }
     }
 }

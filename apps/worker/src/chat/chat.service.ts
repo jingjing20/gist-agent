@@ -13,6 +13,7 @@ import { workerConfig } from '@gist/config';
 import type { GenerationStatus } from '@gist/contracts';
 import type { GenerationErrorCode } from '@gist/contracts';
 import { GenerationExecutionError, normalizeGenerationError } from './generation-errors';
+import { AgentOrchestrator, type AgentOutcome } from './agent-orchestrator';
 
 // Agent 循环上限：防止 LLM 陷入无限 tool_call 循环（如反复查错 SQL 又反复修）
 const MAX_AGENT_ITERATIONS = 15;
@@ -178,8 +179,9 @@ export class ChatService {
         checkpoint?: () => Promise<void>,
         onFirstDelta?: () => Promise<void>,
         assertWritable?: () => Promise<void>
-    ): Promise<void> {
+    ): Promise<AgentOutcome> {
         const tools = this.toolRegistry.getDefinitions();
+        const orchestrator = new AgentOrchestrator();
         let lastCheckpointAt = Date.now();
         let firstDeltaRecorded = false;
 
@@ -199,10 +201,6 @@ export class ChatService {
 
                 if (delta.reasoning_content) {
                     reasoningContent += delta.reasoning_content;
-                    emitter.send({ type: 'reasoning_chunk', content: delta.reasoning_content });
-                    const last = blocks[blocks.length - 1];
-                    if (last?.type === 'thinking') last.content = String(last.content ?? '') + delta.reasoning_content;
-                    else blocks.push({ type: 'thinking', content: delta.reasoning_content });
                 }
 
                 if (delta.content) {
@@ -265,7 +263,7 @@ export class ChatService {
                     messages.push(msg);
                     turnMessages.push(msg);
                 }
-                break;
+                return orchestrator.complete();
             }
 
             const assistantMsg: any = {
@@ -290,45 +288,34 @@ export class ChatService {
                 }
             }
 
-            // 并发执行所有 tool_calls，通过 Promise.all 减少串行等待。
-            // 每个任务返回 { toolResult, blocks, toolCallId }，执行完后按原始顺序写回 messages，
-            // 保证 OpenAI 要求的 tool result 与 tool_call id 的顺序对应关系。
-            const toolResults = await Promise.all(
-                validToolCalls.map(async (tc) => {
-                    const name = tc.function.name;
-                    let args: Record<string, unknown> = {};
-                    try {
-                        args = JSON.parse(tc.function.arguments);
-                    } catch {
-                        /* malformed args */
-                    }
-
-                    const tool = this.toolRegistry.get(name);
-                    if (tool) {
-                        await assertWritable?.();
-                        const result = await tool.execute(args, {
-                            emitter,
-                            datasourceId,
-                            userId,
-                            signal: signal ?? new AbortController().signal,
-                            assertWritable: assertWritable ?? (async () => undefined),
-                        });
-                        return { toolCallId: tc.id, toolResult: result.toolResult, resultBlocks: result.blocks };
-                    }
-                    return { toolCallId: tc.id, toolResult: `工具 ${name} 不存在`, resultBlocks: [] as SSEEvent[] };
-                })
-            );
-
-            for (const { toolCallId, toolResult, resultBlocks } of toolResults) {
+            const parsedCalls = orchestrator.parseBatch(validToolCalls, this.toolRegistry);
+            // Tool calls are intentionally serialized. Their order can carry state dependencies,
+            // and no current tool is declared safe for parallel execution.
+            for (const { call: tc, args } of parsedCalls) {
+                const name = tc.function.name;
+                const tool = this.toolRegistry.get(name)!;
+                orchestrator.beforeTool(name);
+                await assertWritable?.();
+                const result = await tool.execute(args, {
+                    emitter,
+                    datasourceId,
+                    userId,
+                    signal: signal ?? new AbortController().signal,
+                    assertWritable: assertWritable ?? (async () => undefined),
+                });
+                orchestrator.afterTool(name, result.succeeded !== false);
+                const { toolResult, blocks: resultBlocks } = result;
+                const toolCallId = tc.id;
                 blocks.push(...resultBlocks);
                 const toolMsg: OpenAI.Chat.Completions.ChatCompletionMessageParam = {
                     role: 'tool',
-                    tool_call_id: toolCallId,
+                    tool_call_id: toolCallId!,
                     content: toolResult,
                 };
                 messages.push(toolMsg);
                 turnMessages.push(toolMsg);
             }
         }
+        return orchestrator.exhausted();
     }
 }

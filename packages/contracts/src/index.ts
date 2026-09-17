@@ -5,8 +5,8 @@ export const GENERATION_QUEUE_NAME = 'conversation-generations';
  * 都应提升对应版本，并随 generation 一起持久化，便于评测和线上追踪。
  */
 export const AGENT_RUNTIME_VERSIONS = {
-    promptPolicy: 'prompt-policy-v1',
-    toolset: 'toolset-v1',
+    promptPolicy: 'prompt-policy-v2',
+    toolset: 'toolset-v2',
     contextPolicy: 'context-policy-v2',
     memoryPolicy: 'memory-policy-v1',
     schemaContext: 'schema-context-v1',
@@ -20,6 +20,8 @@ export const GENERATION_ERROR_CODES = [
     'MAX_AGENT_ITERATIONS_EXCEEDED',
     'LLM_REQUEST_FAILED',
     'TOOL_EXECUTION_FAILED',
+    'INVALID_TOOL_ARGUMENTS',
+    'INVALID_STATE_TRANSITION',
     'WORKER_LOST',
     'INTERNAL_ERROR',
 ] as const;

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type OpenAI from 'openai';
-import type { Tool, ToolContext, ToolExecutionResult } from './base-tool';
+import { requireRecord, type Tool, type ToolContext, type ToolExecutionResult } from './base-tool';
 
 @Injectable()
 export class AnalyzeResultTool implements Tool {
@@ -33,6 +33,12 @@ export class AnalyzeResultTool implements Tool {
             },
         },
     };
+
+    parseArguments(value: unknown): Record<string, unknown> {
+        const args = requireRecord(value);
+        if (typeof args.needsChart !== 'boolean') throw new Error('needsChart 必须是布尔值');
+        return args;
+    }
 
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
         await ctx.assertWritable();

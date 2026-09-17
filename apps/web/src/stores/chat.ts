@@ -190,8 +190,6 @@ export const useChatStore = defineStore('chat', () => {
             return;
         }
         if (event.type === 'reasoning_chunk') {
-            const last = message.blocks.at(-1);
-            last?.type === 'thinking' ? (last.content = (last.content || '') + (event.content || '')) : message.blocks.push({ type: 'thinking', content: event.content || '' });
             return;
         }
         if (event.type === 'chart_loading') {
