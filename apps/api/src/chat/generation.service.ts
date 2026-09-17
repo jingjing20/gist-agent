@@ -93,6 +93,12 @@ export class GenerationService implements OnModuleDestroy {
                     parent[0]?.response_message_id ?? null,
                 ]
             );
+            await tx.execute(
+                `INSERT INTO conversation_turn (
+                    id,conversation_id,sequence,generation_id,user_message_id,assistant_message_id,status,created_at
+                 ) VALUES (?, ?, (SELECT COALESCE(MAX(sequence),0)+1 FROM conversation_turn WHERE conversation_id=?), ?, ?, ?, 'pending', NOW())`,
+                [randomUUID(), conversationId, conversationId, id, requestMessageId, responseMessageId]
+            );
             await tx.execute("INSERT INTO outbox_event (aggregate_id,type,payload) VALUES (?,'generation.enqueue',?::jsonb)", [
                 id,
                 JSON.stringify({ version: 1, generationId: id }),
@@ -161,7 +167,11 @@ export class GenerationService implements OnModuleDestroy {
         const rows = await this.redis.xrange(this.keys(userId, generationId).generation, `(${after}-0`, '+');
         const events = rows.map(([streamId, fields]) => ({ ...JSON.parse(fields[1]), streamId }));
         const contiguous = events.every((event, index) => event.sequence === after + index + 1);
-        if (contiguous && (events.length || after === Number(generation[0].last_sequence))) return { mode: 'events', events, lastSequence: events.at(-1)?.sequence ?? after };
+        const terminal = ['completed', 'failed', 'cancelled'].includes(generation[0].status);
+        const hasTerminalEvent = events.some((event) => event.type === 'done');
+        if (contiguous && (events.length || after === Number(generation[0].last_sequence)) && (!terminal || hasTerminalEvent)) {
+            return { mode: 'events', events, lastSequence: events.at(-1)?.sequence ?? after };
+        }
         return {
             mode: 'snapshot',
             snapshot: {

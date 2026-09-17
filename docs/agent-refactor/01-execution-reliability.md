@@ -1,6 +1,6 @@
 # 01. 执行与并发可靠性改造
 
-> Phase 1 已完成本文的输入快照、conversation 串行、结构化取消、SQL 真终止和 writer/terminal 写栅栏。实施与验证记录见 [Phase 1 实施记录](./09-phase-1-implementation.md)。迭代耗尽已在 Phase 2 实现；空回答与完整循环出口测试列为 ORC-04 收尾项。
+> Phase 1 已完成本文的输入快照、conversation 串行、结构化取消、SQL 真终止和 writer/terminal 写栅栏。实施与验证记录见 [Phase 1 实施记录](./09-phase-1-implementation.md)。迭代耗尽、空回答失败语义与完整循环出口测试已在 Phase 2 完成。
 >
 > 阅读提示：下文“Phase 1 前的基线证据”和“问题清单”记录的是历史基线，用于说明决策原因，不代表当前代码仍存在这些问题。
 
@@ -148,6 +148,6 @@ type AgentOutcome =
 - 修改当前会话数据源不影响已创建 generation 的数据源。
 - 超时或取消后不再出现 SQL、普通 SSE、checkpoint 或消息内容变化。
 - Worker 租约丢失后，旧 Worker 无法继续写入。
-- 15 轮耗尽返回明确失败；空 LLM 响应不得产生 completed 消息（后半项由 ORC-04 承接）。
+- 15 轮耗尽返回明确失败；空 LLM 响应以 `EMPTY_LLM_RESPONSE` 失败，不产生 completed 消息。
 - 自动化故障测试覆盖：LLM 卡死、SQL 卡死、Redis 暂停、stale writer/心跳丢失、重复队列投递。
-- 真实 Worker 进程 kill、任务回收与旧进程写栅栏需由 EVAL-02 端到端场景覆盖。
+- 真实 Worker 进程 kill、任务回收与旧进程写栅栏将在 Phase 6 的完整端到端评测中覆盖。

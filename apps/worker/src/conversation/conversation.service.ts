@@ -22,6 +22,29 @@ export interface Message {
     created_at: string;
 }
 
+export interface QueryArtifactSummary {
+    id: string;
+    title: string;
+    purpose: string;
+    expectedGrain: string;
+    expectedShape: string;
+    columns: Array<{ name: string; type: string }>;
+    returnedRowCount: number;
+    totalRowCount?: number;
+    isLimited: boolean;
+}
+
+export interface ConversationTurnContext {
+    id: string;
+    sequence: number;
+    generationId: string;
+    status: 'pending' | 'completed';
+    finalAnswer: string | null;
+    userMessage: Message;
+    assistantMessage?: Message;
+    artifacts: QueryArtifactSummary[];
+}
+
 @Injectable()
 export class ConversationService {
     constructor(private readonly db: DatabaseService) {}
@@ -122,6 +145,69 @@ export class ConversationService {
             [conversationId, requestMessageId, contextUpperBound]
         );
         return this.hydrateMessages(rows);
+    }
+
+    async getGenerationContextTurns(conversationId: string, userId: number, contextUpperBound: string, requestMessageId: string): Promise<ConversationTurnContext[]> {
+        const rows = await this.db.query<QueryRow[]>(
+            `SELECT ct.id,ct.sequence,ct.generation_id,ct.status,ct.final_answer,ct.user_message_id,ct.assistant_message_id
+               FROM conversation_turn ct
+               JOIN conversation c ON c.id=ct.conversation_id AND c.user_id=?
+              WHERE ct.conversation_id=?
+                AND (
+                  ct.user_message_id=?
+                  OR (ct.status='completed' AND ct.created_at < ?)
+                )
+              ORDER BY ct.sequence`,
+            [userId, conversationId, requestMessageId, contextUpperBound]
+        );
+        if (!rows.length) return [];
+        const messageIds = rows.flatMap((row) => [row.user_message_id, row.assistant_message_id]);
+        const placeholders = messageIds.map(() => '?').join(',');
+        const messages = await this.hydrateMessages(await this.db.query<QueryRow[]>(`SELECT * FROM message WHERE id IN (${placeholders})`, messageIds));
+        const messageById = new Map(messages.map((message) => [message.id, message]));
+        const generationIds = rows.map((row) => row.generation_id);
+        const artifactPlaceholders = generationIds.map(() => '?').join(',');
+        const artifactRows = await this.db.query<QueryRow[]>(
+            `SELECT id,generation_id,title,purpose,expected_grain,expected_shape,columns_json,
+                    returned_row_count,total_row_count,is_limited
+               FROM query_artifact
+              WHERE generation_id IN (${artifactPlaceholders})
+              ORDER BY created_at,id`,
+            generationIds
+        );
+        const artifactsByGeneration = new Map<string, QueryArtifactSummary[]>();
+        for (const artifact of artifactRows) {
+            const list = artifactsByGeneration.get(artifact.generation_id) ?? [];
+            list.push({
+                id: artifact.id,
+                title: artifact.title,
+                purpose: artifact.purpose,
+                expectedGrain: artifact.expected_grain,
+                expectedShape: artifact.expected_shape,
+                columns: typeof artifact.columns_json === 'string' ? JSON.parse(artifact.columns_json) : artifact.columns_json,
+                returnedRowCount: Number(artifact.returned_row_count),
+                ...(artifact.total_row_count == null ? {} : { totalRowCount: Number(artifact.total_row_count) }),
+                isLimited: artifact.is_limited === true,
+            });
+            artifactsByGeneration.set(artifact.generation_id, list);
+        }
+        return rows.flatMap((row) => {
+            const userMessage = messageById.get(row.user_message_id);
+            if (!userMessage) return [];
+            const assistantMessage = messageById.get(row.assistant_message_id);
+            return [
+                {
+                    id: row.id,
+                    sequence: Number(row.sequence),
+                    generationId: row.generation_id,
+                    status: row.status,
+                    finalAnswer: row.final_answer,
+                    userMessage,
+                    ...(row.status === 'completed' && assistantMessage ? { assistantMessage } : {}),
+                    artifacts: artifactsByGeneration.get(row.generation_id) ?? [],
+                } as ConversationTurnContext,
+            ];
+        });
     }
 
     async getMessage(id: string, conversationId: string, userId: number): Promise<Message | null> {

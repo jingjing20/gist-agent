@@ -6,19 +6,19 @@
 
 ## 2. 阶段总览
 
-| 阶段    | 目标           | 主要事项                                 | 状态                             |
-| ------- | -------------- | ---------------------------------------- | -------------------------------- |
-| Phase 0 | 建立基线       | 错误码、版本字段、最小回归与链路 smoke   | 已完成                           |
-| Phase 1 | 关闭可靠性缺口 | 真取消、输入快照、会话串行、终态栅栏     | 已完成                           |
-| Phase 2 | 确定性编排     | 状态机、工具校验、迭代耗尽、推理展示边界 | 核心完成；ORC-04 待收尾          |
-| Phase 3 | 证据与上下文   | Turn、Query Artifact、图表引用、动态预算 | 待实施；合同已定义               |
-| Phase 4 | 安全与质量     | 只读角色、fail-closed、结果质量检查      | 待实施；SEC-01 可与 Phase 3 并行 |
-| Phase 5 | 记忆升级       | 结构化记忆、版本、纠正与管理             | 待实施                           |
-| Phase 6 | 规模化优化     | Schema 检索调优、成本/延迟、在线评估     | 待实施                           |
+| 阶段    | 目标           | 主要事项                                 | 状态   |
+| ------- | -------------- | ---------------------------------------- | ------ |
+| Phase 0 | 建立基线       | 错误码、版本字段、最小回归与链路 smoke   | 已完成 |
+| Phase 1 | 关闭可靠性缺口 | 真取消、输入快照、会话串行、终态栅栏     | 已完成 |
+| Phase 2 | 确定性编排     | 状态机、工具校验、迭代耗尽、推理展示边界 | 已完成 |
+| Phase 3 | 证据与上下文   | Turn、Query Artifact、图表引用、动态预算 | 已完成 |
+| Phase 4 | 安全与质量     | 只读角色、fail-closed、结果质量检查      | 待实施 |
+| Phase 5 | 记忆升级       | 结构化记忆、版本、纠正与管理             | 待实施 |
+| Phase 6 | 规模化优化     | Schema 检索调优、成本/延迟、在线评估     | 待实施 |
 
 ## 3. Phase 0：建立可比较基线
 
-实施状态：已完成版本、错误码、首 delta、确定性基线和真实链路 smoke。SaaS Growth 真实 Agent 逐 case runner 不属于 Phase 0 完成范围，作为 EVAL-01 保留。详情见 [Phase 0 实施记录](./08-phase-0-implementation.md)。
+实施状态：已完成版本、错误码、首 delta、确定性基线和真实链路 smoke。SaaS Growth 真实 Agent 逐 case runner 不属于 Phase 0 完成范围，由 Phase 6 的完整评测体系承接。详情见 [Phase 0 实施记录](./08-phase-0-implementation.md)。
 
 ### 为什么先做
 
@@ -35,28 +35,28 @@
 
 - 后续改造能关联到明确运行版本和稳定错误码。
 - 行为改造至少有确定性回归与链路 smoke，不再只凭人工体验判断。
-- 真实 Agent 质量前后对比仍依赖 EVAL-01，不在本阶段伪装为已完成。
+- 真实 Agent 质量前后对比仍依赖 Phase 6 的完整评测体系，不在本阶段伪装为已完成。
 
 ## 4. Phase 1：可靠性止血
 
-实施状态：核心能力已完成，并通过 stale writer、超时、取消、Redis 暂停、SQL 后端取消等自动化故障测试与 smoke。真实 Worker 进程 kill/recovery 自动化场景保留到 EVAL-02。详情见 [Phase 1 实施记录](./09-phase-1-implementation.md)。
+实施状态：核心能力已完成，并通过 stale writer、超时、取消、Redis 暂停、SQL 后端取消等自动化故障测试与 smoke。真实 Worker 进程 kill/recovery 自动化场景保留到 Phase 6 的完整端到端评测。详情见 [Phase 1 实施记录](./09-phase-1-implementation.md)。
 
 ### 为什么排在编排之前
 
 错请求、错数据源和终态后继续写入会直接产生错误事实或幽灵副作用，风险高于回答风格和工具效率。Phase 1 先建立不可变输入与副作用边界，为后续状态机提供可靠执行底座。
 
-### 工作包 A：Generation 输入快照
+### 实施内容：Generation 输入快照
 
 - generation 保存 datasource、request message、上下文水位。
 - Worker 不再读取“最后一条用户消息”。
 - 读取上下文只包含水位前已完成 generation 的 request/response 对；正式 Turn 模型由 Phase 3 引入。
 
-### 工作包 B：Conversation 串行
+### 实施内容：Conversation 串行
 
 - conversation 级唯一 active generation。
 - 前端处理 409/429、取消与重试。
 
-### 工作包 C：结构化取消
+### 实施内容：结构化取消
 
 - 同一 AbortSignal 贯穿 LLM、工具和 SQL。
 - 超时先 abort，等待退出后 finalize。
@@ -66,11 +66,11 @@
 
 - 并发、超时、取消、stale writer、Redis 暂停和 SQL 取消测试通过。
 - 终态后零普通事件、零消息变化、零查询副作用。
-- 真实 Worker kill/recovery 作为 EVAL-02 发布门禁补充，不混同于 stale heartbeat 单元/集成测试。
+- 真实 Worker kill/recovery 在 Phase 6 补充为发布测试，不混同于 stale heartbeat 单元/集成测试。
 
 ## 5. Phase 2：确定性编排
 
-实施状态：核心能力已完成。状态机、运行时参数校验、迭代耗尽、原始推理隐藏和 `analyze_result` 下线已落地；空 LLM 响应失败语义和完整 Agent Loop mock 集成测试作为 ORC-04 收尾。详情见 [Phase 2 实施记录](./10-phase-2-implementation.md)。
+实施状态：已完成。状态机、运行时参数校验、迭代耗尽、原始推理隐藏和 `analyze_result` 下线已落地；空 LLM 响应失败语义、依赖失败归一化和完整 Agent Loop mock 集成测试也已补齐。详情见 [Phase 2 实施记录](./10-phase-2-implementation.md)。
 
 ### 为什么这样会更好
 
@@ -89,31 +89,31 @@ Prompt 只能提高模型遵守规则的概率，不能证明工具顺序、参�
 
 - 工作流不变量可通过单元测试证明，而不是依赖 Prompt 文本。
 - 迭代耗尽、非法参数与非法状态具有明确错误码。
-- ORC-04 完成后，空响应不得 completed，且所有 Agent Loop 出口由 mock LLM 集成测试覆盖。
+- 空响应不得 completed，且所有 Agent Loop 出口由 mock LLM 集成测试覆盖。
 
 ## 6. Phase 3：证据与上下文
 
-实施依据：[Phase 3 实施合同](./11-phase-3-implementation-contract.md)。进入编码前必须先通过其中的 Gate 0；Phase 3 不得绕过 ORC-04。
+实施状态：已完成。设计边界见 [Phase 3 实施合同](./11-phase-3-implementation-contract.md)，实际交付与测试证据见 [Phase 3 实施记录](./12-phase-3-implementation.md)。
 
-### 为什么是下一步
+### 为什么当时排在 Phase 2 之后
 
 Phase 2 已保证动作顺序合法，但图表值仍由模型转录，历史压缩也会丢掉原始查询证据。Artifact 让结论和图表引用同一事实源，Turn 则避免消息级裁剪破坏问答完整性。
 
-### 工作包 A：Artifact 双写
+### 实施内容：Artifact 双写
 
 - 新增 Query/Chart Artifact。
 - 现有 blocks 与 artifact 暂时双写，保证兼容。
 
-### 工作包 B：Turn 上下文
+### 实施内容：Turn 上下文
 
 - 引入完整 Turn。
 - PromptBuilder 使用已完成 Turn 和 artifact 摘要。
 - 支持通过 artifact ID 继续分析。
 
-### 工作包 C：动态预算
+### 实施内容：动态预算
 
 - model capability registry。
-- 实际 tokenizer 与工具 schema 计费。
+- 按实际工具 schema 估算 token，不再使用固定工具预留。
 - 按整 Turn 降级。
 
 ### 完成条件
@@ -178,37 +178,24 @@ Schema 检索、模型路由和成本优化会扩大策略空间；如果证据�
 ### 完成条件
 
 - 100 张表规模下 Schema 召回质量、token 成本和延迟达到预先定义阈值。
-- EVAL-01/02 输出机器可读报告并成为行为改造的 CI/发布门禁。
+- 完整 Agent 评测输出机器可读报告，并成为行为改造的 CI/发布门槛。
 - 生产 dashboard 能按运行版本追踪质量、错误、成本和延迟。
 - Artifact、事件和记忆具备可执行的保留、删除与审计策略。
 
-## 10. 推荐拆分的工程任务
+## 10. 当前推进位置
 
-| ID        | 任务                                            | 依赖                          | 状态   | 规模 |
-| --------- | ----------------------------------------------- | ----------------------------- | ------ | ---- |
-| REL-01    | generation 固化 datasource/request/context 水位 | DB migration                  | 已完成 | M    |
-| REL-02    | conversation active generation 唯一约束         | REL-01                        | 已完成 | S    |
-| REL-03    | 统一 cancellation context 与终态写栅栏          | 无                            | 已完成 | M    |
-| REL-04    | PostgreSQL 真取消和 statement timeout           | REL-03                        | 已完成 | M    |
-| ORC-01    | 迭代耗尽错误与核心 outcome                      | 无                            | 已完成 | S    |
-| ORC-02    | Tool runtime schema 校验                        | 无                            | 已完成 | M    |
-| ORC-03    | 轻量显式状态机                                  | ORC-01/02                     | 已完成 | M    |
-| ORC-04    | 空响应失败语义与完整 Agent Loop mock 测试       | ORC-01/03                     | 待完成 | S    |
-| PLAN-01   | 最小 QueryPlan 契约                             | ORC-04                        | 待实施 | S    |
-| ART-01    | Query Artifact 表与双写                         | ORC-04、PLAN-01、DB migration | 待实施 | M    |
-| ART-02    | Chart Artifact 引用查询证据                     | ART-01                        | 待实施 | M    |
-| CTX-01    | Turn 模型与整轮上下文                           | REL-01、ART-01                | 待实施 | L    |
-| CTX-02    | Model capability/tokenizer                      | CTX-01                        | 待实施 | M    |
-| SCHEMA-01 | Schema 目录/详情按需加载接口                    | CTX-02                        | 待实施 | S    |
-| SCHEMA-02 | Schema 召回、缓存与规模化调优                   | SCHEMA-01、EVAL-01            | 待实施 | M    |
-| SEC-01    | SQL fail-closed、只读角色、动态内容隔离         | REL-04                        | 待实施 | M    |
-| SEC-02    | 字段级敏感数据与输出策略                        | SEC-01                        | 待实施 | M    |
-| DQ-01     | ResultQuality 检查                              | ART-01、PLAN-01               | 待实施 | M    |
-| MEM-01    | MemoryRecord 与 patch 协议                      | ART-01、CTX-01、SEC-01        | 待实施 | L    |
-| EVAL-01   | Agent E2E benchmark runner                      | ORC-04、ART-01                | 待实施 | M    |
-| EVAL-02   | 并发/注入/多轮/真实 kill 评测集                 | EVAL-01、SEC-01               | 待实施 | M    |
+Phase 0～3 已完成。Phase 3 已按以下顺序交付，且每一步都有对应的自动化回归：
 
-## 11. 每个改造 PR 的 Definition of Done
+1. 定义 QueryPlan、Query Artifact、Chart Artifact 和 Turn 契约，并建立数据库表与幂等迁移。
+2. 查询成功后双写 Query Artifact 和现有 block，验证内容 hash 一致。
+3. 图表改为引用 Query Artifact 字段，由服务端构造数值。
+4. 上下文改为按完整 Turn 读取和裁剪。
+5. 增加受权限保护的 Artifact 读取能力，支持后续追问。
+6. 建立模型能力与 token 预算，按完整 Turn 降级。
+
+当前下一阶段是 Phase 4：数据库只读角色、fail-closed 以及 ResultQuality。Phase 5、6 不混入 Phase 4 实施；Phase 3 的新表和新字段保持前向兼容，不做破坏性回滚。
+
+## 11. 每个改造 PR 的完成条件
 
 - 有迁移/兼容/回滚说明。
 - 有最小相关单元或集成测试。

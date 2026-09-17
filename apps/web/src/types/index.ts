@@ -10,12 +10,22 @@ export interface ChartData {
     series: ChartSeries[];
 }
 
+export interface ArtifactColumn {
+    name: string;
+    type: 'number' | 'string' | 'date' | 'boolean' | 'unknown';
+}
+
 export interface SSEEvent {
     type: 'sql' | 'table' | 'text' | 'text_chunk' | 'reasoning_chunk' | 'thinking' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading' | 'log_update' | 'log_remove';
     content?: string;
     columns?: string[];
+    columnTypes?: ArtifactColumn[];
     rows?: Record<string, unknown>[];
     rowCount?: number;
+    isLimited?: boolean;
+    queryArtifactId?: string;
+    chartArtifactId?: string;
+    resultContentHash?: string;
     title?: string;
     chartData?: ChartData;
 }
@@ -24,8 +34,13 @@ export interface MessageBlock {
     type: SSEEvent['type'];
     content?: string;
     columns?: string[];
+    columnTypes?: ArtifactColumn[];
     rows?: Record<string, unknown>[];
     rowCount?: number;
+    isLimited?: boolean;
+    queryArtifactId?: string;
+    chartArtifactId?: string;
+    resultContentHash?: string;
     title?: string;
     chartData?: ChartData;
 }

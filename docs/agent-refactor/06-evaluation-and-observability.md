@@ -1,6 +1,6 @@
 # 06. 评测与可观测性改造
 
-> Phase 0 已完成运行版本、稳定错误码、首 delta 指标和最小回归/smoke 基线；Phase 1、2 又分别补充可靠性故障回归与编排回归。完整 Agent E2E 评分、生产 trace、成本指标和发布门禁仍未完成。已实施部分见 [Phase 0 决策与实施记录](./08-phase-0-implementation.md)。
+> Phase 0 已完成运行版本、稳定错误码、首 delta 指标和最小回归/smoke 基线；Phase 1、2 又分别补充可靠性故障回归与编排回归。完整 Agent E2E 评分、生产 trace、成本指标和发布条件仍未完成。已实施部分见 [Phase 0 决策与实施记录](./08-phase-0-implementation.md)。
 >
 > 阅读提示：第 2 节是 Phase 0 实施前的基线证据；后续章节描述该问题域的完整目标，不应全部解读为当前能力。
 
@@ -10,11 +10,11 @@
 | --------------------------------------- | -------------------------------------- | ----------------- |
 | generation 运行版本与基础错误码         | 已完成                                 | Phase 0           |
 | 首 delta 指标                           | 已完成                                 | Phase 0           |
-| 可靠性故障回归                          | 已完成核心场景；真实进程 kill 未自动化 | Phase 1 / EVAL-02 |
+| 可靠性故障回归                          | 已完成核心场景；真实进程 kill 未自动化 | Phase 1 / Phase 6 |
 | 编排器单元回归                          | 已完成                                 | Phase 2           |
-| 完整 Agent Loop mock 集成测试           | 未完成                                 | ORC-04            |
-| SaaS Growth 真实 Agent 逐 case 评测     | 未完成                                 | EVAL-01           |
-| 多轮/注入/恢复评测集                    | 未完成                                 | EVAL-02           |
+| 完整 Agent Loop mock 集成测试           | 已完成                                 | Phase 2           |
+| SaaS Growth 真实 Agent 逐 case 评测     | 未完成                                 | Phase 6           |
+| 多轮/注入/恢复评测集                    | 未完成                                 | Phase 6           |
 | 生产 trace、token、成本和质量 dashboard | 未完成                                 | Phase 6           |
 
 ## 1. 目标
@@ -124,7 +124,7 @@ generation
 
 ## 6. 评测发布门槛
 
-对 Prompt/模型/工具重大改造建立门禁：
+对 Prompt/模型/工具重大改造建立发布条件：
 
 - 核心 SQL case 结果正确率不得下降；
 - 安全用例必须 100% 阻断；
@@ -137,16 +137,16 @@ generation
 
 ## 7. 实施步骤与状态
 
-| 顺序 | 工作                                                       | 状态                    | 任务       |
-| ---- | ---------------------------------------------------------- | ----------------------- | ---------- |
-| 1    | 为 Prompt、工具、上下文、记忆增加版本常量并写入 generation | 已完成                  | Phase 0    |
-| 2    | 写入首 delta timing                                        | 已完成                  | Phase 0    |
-| 3    | 建立基础结构化错误码                                       | 已完成并在 Phase 2 扩展 | Phase 0/2  |
-| 4    | 用 mock LLM 驱动完整 Agent Loop 出口                       | 未完成                  | ORC-04     |
-| 5    | 通过 API/Worker 执行 SaaS Growth benchmark case            | 未完成                  | EVAL-01    |
-| 6    | 增加多轮、注入、并发、真实 Worker kill 和失败恢复 case     | 未完成                  | EVAL-02    |
-| 7    | 输出机器可读 JSON 报告并在 CI 比较基线                     | 未完成                  | EVAL-01/02 |
-| 8    | 接入生产 trace、dashboard 和告警                           | 未完成                  | Phase 6    |
+| 顺序 | 工作                                                       | 状态                    | 任务      |
+| ---- | ---------------------------------------------------------- | ----------------------- | --------- |
+| 1    | 为 Prompt、工具、上下文、记忆增加版本常量并写入 generation | 已完成                  | Phase 0   |
+| 2    | 写入首 delta timing                                        | 已完成                  | Phase 0   |
+| 3    | 建立基础结构化错误码                                       | 已完成并在 Phase 2 扩展 | Phase 0/2 |
+| 4    | 用 mock LLM 驱动完整 Agent Loop 出口                       | 已完成                  | Phase 2   |
+| 5    | 通过 API/Worker 执行 SaaS Growth benchmark case            | 未完成                  | Phase 6   |
+| 6    | 增加多轮、注入、并发、真实 Worker kill 和失败恢复 case     | 未完成                  | Phase 6   |
+| 7    | 输出机器可读 JSON 报告并在 CI 比较基线                     | 未完成                  | Phase 6   |
+| 8    | 接入生产 trace、dashboard 和告警                           | 未完成                  | Phase 6   |
 
 ## 8. 涉及文件
 
@@ -168,4 +168,4 @@ generation
 - `first_token_at`、阶段耗时、token 和成本指标真实可用。
 - 安全、并发、取消和记忆纠正都有稳定回归用例。
 
-这些是本专题的最终验收标准，不是 Phase 0 的完成条件。Phase 0 只承诺版本、错误码、首 delta 和最小链路 smoke；Agent E2E 评分及发布门禁由 EVAL-01/02 和 Phase 6 承接。
+这些是本专题的最终验收标准，不是 Phase 0 的完成条件。Phase 0 只承诺版本、错误码、首 delta 和最小链路 smoke；Agent E2E 评分及发布条件由 Phase 6 承接。

@@ -5,11 +5,11 @@ export const GENERATION_QUEUE_NAME = 'conversation-generations';
  * 都应提升对应版本，并随 generation 一起持久化，便于评测和线上追踪。
  */
 export const AGENT_RUNTIME_VERSIONS = {
-    promptPolicy: 'prompt-policy-v2',
-    toolset: 'toolset-v2',
-    contextPolicy: 'context-policy-v2',
+    promptPolicy: 'prompt-policy-v3',
+    toolset: 'toolset-v3',
+    contextPolicy: 'context-policy-v3',
     memoryPolicy: 'memory-policy-v1',
-    schemaContext: 'schema-context-v1',
+    schemaContext: 'schema-context-v2',
 } as const;
 
 export const GENERATION_ERROR_CODES = [
@@ -17,11 +17,16 @@ export const GENERATION_ERROR_CODES = [
     'CANCELLED',
     'WRITER_OWNERSHIP_LOST',
     'GENERATION_CAPACITY_UNAVAILABLE',
+    'EMPTY_LLM_RESPONSE',
     'MAX_AGENT_ITERATIONS_EXCEEDED',
     'LLM_REQUEST_FAILED',
     'TOOL_EXECUTION_FAILED',
     'INVALID_TOOL_ARGUMENTS',
     'INVALID_STATE_TRANSITION',
+    'ARTIFACT_RESULT_TOO_LARGE',
+    'ARTIFACT_NOT_FOUND',
+    'ARTIFACT_ACCESS_DENIED',
+    'ARTIFACT_FIELD_INVALID',
     'WORKER_LOST',
     'INTERNAL_ERROR',
 ] as const;
@@ -29,6 +34,106 @@ export const GENERATION_ERROR_CODES = [
 export type GenerationErrorCode = (typeof GENERATION_ERROR_CODES)[number];
 
 export type GenerationStatus = 'pending' | 'starting' | 'running' | 'completed' | 'failed' | 'cancel_requested' | 'cancelled';
+
+export type QueryExpectedShape = 'scalar' | 'timeseries' | 'category' | 'detail';
+export type ArtifactColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown';
+export type ChartType = 'line' | 'bar' | 'pie' | 'scatter' | 'radar' | 'funnel';
+
+export interface QueryPlanV1 {
+    purpose: string;
+    expectedGrain: string;
+    expectedShape: QueryExpectedShape;
+}
+
+export interface ExecuteSqlQueryArgsV2 {
+    title: string;
+    sql: string;
+    plan: QueryPlanV1;
+}
+
+export interface ArtifactColumnV1 {
+    name: string;
+    type: ArtifactColumnType;
+}
+
+export interface QueryArtifactV1 {
+    id: string;
+    generationId: string;
+    userId: number;
+    conversationId: string;
+    datasourceId: number;
+    title: string;
+    plan: QueryPlanV1;
+    originalSql: string;
+    executedSql: string;
+    schemaContextVersion: string;
+    columns: ArtifactColumnV1[];
+    returnedRowCount: number;
+    totalRowCount?: number;
+    isLimited: boolean;
+    resultContentHash: string;
+    createdAt: string;
+    expiresAt?: string;
+}
+
+export interface QueryArtifactResultV1 {
+    artifact: QueryArtifactV1;
+    rows: Array<Record<string, unknown>>;
+}
+
+export interface ChartFieldV1 {
+    field: string;
+    label: string;
+}
+
+export interface ArtifactFilterV1 {
+    field: string;
+    operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in';
+    value: unknown;
+}
+
+export interface ArtifactSortV1 {
+    field: string;
+    direction: 'asc' | 'desc';
+}
+
+export interface ChartArtifactV1 {
+    id: string;
+    generationId: string;
+    queryArtifactId: string;
+    chartType: ChartType;
+    title: string;
+    xField: string;
+    yFields: ChartFieldV1[];
+    filters?: ArtifactFilterV1[];
+    sort?: ArtifactSortV1[];
+    createdAt: string;
+}
+
+export interface ConversationTurnV1 {
+    id: string;
+    conversationId: string;
+    sequence: number;
+    generationId: string;
+    userMessageId: string;
+    assistantMessageId: string;
+    status: 'pending' | 'completed' | 'failed' | 'cancelled';
+    finalAnswer: string | null;
+    createdAt: string;
+    completedAt: string | null;
+}
+
+export interface SchemaCatalogSummaryV1 {
+    datasourceId: number;
+    tables: Array<{ schema: string; name: string; displayName: string; description?: string }>;
+}
+
+export interface SchemaDetailV1 {
+    datasourceId: number;
+    schema: string;
+    table: string;
+    columns: Array<{ name: string; type: string; description?: string }>;
+}
 
 export interface GenerationJob {
     version: 1;

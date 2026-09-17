@@ -2,13 +2,13 @@
 
 > 实施日期：2026-09-17
 >
-> 状态：核心能力已完成；ORC-04（空响应失败语义和完整 Agent Loop mock 集成测试）尚未完成
+> 状态：已完成；空响应失败语义和完整 Agent Loop mock 集成测试已通过
 >
 > 对应问题域：[编排与提示词](./02-orchestration-and-prompts.md)
 
 ## 1. 阶段结论
 
-Phase 2 把工具参数、调用顺序和迭代耗尽从“模型应该遵守的提示”升级为“服务端必须验证的执行契约”。模型仍负责理解、规划和表达，但不再拥有改变工具工作流状态或绕过工具前置条件的最终权限。完整退出契约仍需 ORC-04 收尾。
+Phase 2 把工具参数、调用顺序和循环出口从“模型应该遵守的提示”升级为“服务端必须验证的执行契约”。模型仍负责理解、规划和表达，但不再拥有改变工具工作流状态、绕过工具前置条件或把空响应伪装成成功的最终权限。
 
 ## 2. 重构前为什么不够可靠
 
@@ -103,10 +103,11 @@ UNDERSTANDING
 ### 4.4 明确 outcome
 
 - 无工具调用的正常回答返回 `{ kind: 'completed', state: 'COMPLETED' }`。
+- 无可展示文本且无工具调用（包括 empty stream、空白文本和 reasoning-only）抛出 `EMPTY_LLM_RESPONSE`。
 - 达到最大轮次抛出 `MAX_AGENT_ITERATIONS_EXCEEDED`。
-- 其他非法状态和参数使用稳定机器错误码，由 generation 统一进入 failed。
-
-当前限制：LLM 返回空 stream 时也会进入 `complete()`，且 `AgentOutcome.failed` 尚未由 Agent Loop 直接返回；失败主要通过 `GenerationExecutionError` 交给 generation 外层归一化。ORC-04 必须补齐空响应错误码和完整循环出口测试后，才能声称“所有退出路径都有明确 outcome”。
+- LLM 建连/流读取失败归一为 `LLM_REQUEST_FAILED`，工具抛错归一为 `TOOL_EXECUTION_FAILED`。
+- 非法状态和参数使用稳定机器错误码。
+- 循环边界只有一种失败表达：成功返回 `AgentOutcome`；失败抛 `GenerationExecutionError`，由 generation 外层统一写入 failed/cancelled 终态。`AgentOutcome.failed` 已移除，避免返回值和异常双重语义。
 
 ### 4.5 版本变更
 
@@ -117,16 +118,18 @@ UNDERSTANDING
 
 ## 5. 重构前后对比
 
-| 场景             | 重构前                 | 重构后                               | 为什么更好                   |
-| ---------------- | ---------------------- | ------------------------------------ | ---------------------------- |
-| 非法 JSON        | 解析失败后以 `{}` 继续 | `INVALID_TOOL_ARGUMENTS`，不执行工具 | 不可信输入无法进入副作用层   |
-| 空 SQL/错误图表  | 主要依赖模型 schema    | 服务端类型和跨字段校验               | 更换模型也不降低底线         |
-| 工具顺序         | Prompt 建议            | Orchestrator 按状态拒绝              | 流程不变量可以单元测试       |
-| 同批依赖工具     | `Promise.all` 同时启动 | 默认串行，且 query/chart 跨迭代      | 模型必须先观察数据再画图     |
-| 查询失败后画图   | 可能继续               | 失败查询不产生 chart 前置证据        | 避免基于不存在的数据生成图表 |
-| 迭代耗尽         | 可能被记为 completed   | 明确失败码                           | 终态语义与用户结果一致       |
-| `analyze_result` | 增加一次无证据循环     | 不再注册                             | 降低延迟和无效失败面         |
-| raw reasoning    | SSE、block 和 UI 展示  | 仅在内部协议需要时保留               | 降低泄露和供应商耦合风险     |
+| 场景             | 重构前                 | 重构后                                       | 为什么更好                   |
+| ---------------- | ---------------------- | -------------------------------------------- | ---------------------------- |
+| 非法 JSON        | 解析失败后以 `{}` 继续 | `INVALID_TOOL_ARGUMENTS`，不执行工具         | 不可信输入无法进入副作用层   |
+| 空 SQL/错误图表  | 主要依赖模型 schema    | 服务端类型和跨字段校验                       | 更换模型也不降低底线         |
+| 工具顺序         | Prompt 建议            | Orchestrator 按状态拒绝                      | 流程不变量可以单元测试       |
+| 同批依赖工具     | `Promise.all` 同时启动 | 默认串行，且 query/chart 跨迭代              | 模型必须先观察数据再画图     |
+| 查询失败后画图   | 可能继续               | 失败查询不产生 chart 前置证据                | 避免基于不存在的数据生成图表 |
+| 空/仅推理响应    | 可能被记为 completed   | `EMPTY_LLM_RESPONSE`                         | 成功终态必须有用户可见结果   |
+| LLM/工具抛错     | 可能落入泛化内部错误   | `LLM_REQUEST_FAILED`/`TOOL_EXECUTION_FAILED` | 失败来源可观测、可聚合       |
+| 迭代耗尽         | 可能被记为 completed   | 明确失败码                                   | 终态语义与用户结果一致       |
+| `analyze_result` | 增加一次无证据循环     | 不再注册                                     | 降低延迟和无效失败面         |
+| raw reasoning    | SSE、block 和 UI 展示  | 仅在内部协议需要时保留                       | 降低泄露和供应商耦合风险     |
 
 收益来自“权限重新分配”：模型擅长提出语义动作，代码擅长保证结构、顺序和终态。把二者分开后，模型输出波动不再直接等于系统控制流波动。
 
@@ -138,7 +141,7 @@ UNDERSTANDING
 pnpm test:phase2-orchestration
 ```
 
-当前专项回归直接覆盖 Orchestrator 与工具参数解析：
+专项命令同时运行 Orchestrator 契约回归和 `ChatService.runAgentLoop` mock 集成测试，覆盖：
 
 - malformed JSON 在执行前拒绝；
 - 空 SQL 在执行前拒绝；
@@ -147,9 +150,13 @@ pnpm test:phase2-orchestration
 - 查询失败后画图被拒绝；
 - query、chart 和 complete 的合法状态转换；
 - chart 轴/序列长度不一致被拒绝；
-- 迭代耗尽返回稳定错误码。
-
-它尚未用 mock LLM 驱动 `ChatService.runAgentLoop`，因此不证明空 stream、流式 tool call 拼接、异常传播和最终 generation status 的完整接线；这些属于 ORC-04。
+- 直接文字回答、空 stream、reasoning-only 与空白回答；
+- 流式 tool call arguments 分片拼接；
+- 单次/多次查询、查询失败后重试、成功查询后画图；
+- 非法工具参数在完整循环内被拒绝；
+- LLM 建连失败、流中断、工具抛错和取消的稳定错误码；
+- 15 轮迭代耗尽；
+- 空响应经过 `runGeneration` 后最终写入 `failed / EMPTY_LLM_RESPONSE`，terminal 与 block 使用同一错误码。
 
 完整验证结果：
 
@@ -161,9 +168,9 @@ pnpm test:phase2-orchestration
 - `pnpm test:phase2-orchestration`：通过
 - `pnpm --filter @gist/api test:init-db`：1/1 通过
 - `pnpm benchmark:analytics`：40 个 SQL case、6 个语义 case 通过
-- `pnpm smoke:conversation`：两次完整并发 smoke 均为 2/2 generation completed
+- 隔离 `LLM_PROVIDER=mock` API/Worker 的 `pnpm smoke:conversation`：2/2 generation completed
 
-最终 smoke 曾因沙箱禁止本地端口连接出现 `EPERM`，在获准的本地环境重跑后通过；这是执行环境限制，不是应用失败。
+环境说明：部分本机网络/IPC 测试首次在沙箱内因 `EPERM` 失败，获准后通过。连接当前常驻外部模型 Worker 的 smoke 连续两次超过脚本固定的 15 秒等待窗；数据库未留下 active generation。为排除常驻多 Worker 与外部模型延迟，使用独立 API 端口和 Redis DB 的 mock Worker 重跑同一 smoke，2/2 通过。因此 Phase 2 的确定性测试已通过，但这两次外部模型运行不记为成功证据。
 
 ## 7. 兼容与回滚
 
@@ -182,9 +189,9 @@ Phase 2 解决的是控制流可信，不等于分析证据已经可信：
 - Prompt 尚未完全拆成独立、可快照的安全/分析/工作流层。
 - 工具校验为手写等价校验；工具数量扩大后可评估统一 schema validator，避免定义与运行时规则漂移。
 - `AnalyzeResultTool` 文件和旧 Thinking 组件仍是兼容期死代码，需要后续清理。
-- 空 LLM stream 当前可能产生 completed 空回答；ORC-04 必须在 Phase 3 Artifact 编码前修复。
-- `AgentOutcome.failed` 与异常归一化存在双重失败表达；ORC-04 应选择并记录唯一的循环边界契约。
 
 ## 9. 下一阶段为什么是 Phase 3
+
+> 后续状态：Phase 3 已完成，详见 [Phase 3 实施记录](./12-phase-3-implementation.md)。本节保留 Phase 2 收口时的决策背景。
 
 现在系统能保证“动作合法并按顺序执行”，但还不能保证“回答、表格和图表引用的是同一份可追溯证据”。Phase 3 应引入 Turn、Query Artifact 和 Chart Artifact，让状态机的 `RESULT_VALIDATION` 真正绑定结构化结果，并消除模型复制图表数值的最后一段漂移风险。

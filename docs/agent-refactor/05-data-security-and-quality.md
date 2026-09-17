@@ -179,7 +179,7 @@ LIMIT 控制返回行数，不控制扫描、排序、聚合和 JOIN 成本。`s
 - 数据库角色和连接池迁移需要灰度与回滚方案，避免影响元数据管理连接。
 - 安全测试必须是发布阻断项；质量警告则需要区分阻断、重查和仅提示三种级别。
 - 在 Phase 5 记忆重构前，Phase 4 必须先把现有 `semantic_state` 放入 untrusted data section 并验证无法覆盖系统策略，不能把记忆注入测试推迟到 Phase 5。
-- SEC-01（fail-closed、只读角色、动态内容隔离）不依赖 Artifact，可与 Phase 3 并行；DQ-01（ResultQuality）依赖 ART-01 和最小 QueryPlan。
+- Phase 4 的 fail-closed、只读角色和动态内容隔离不依赖 Artifact，可在 Phase 3 后半段提前准备；ResultQuality 则依赖 Phase 3 的 Query Artifact 和最小 QueryPlan。
 
 ## 13. 专题最终验收标准
 

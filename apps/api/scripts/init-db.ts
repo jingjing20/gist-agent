@@ -1,6 +1,7 @@
 import { Client } from 'pg';
 import { loadWorkspaceEnv } from '@gist/config';
 import { initializeDemoData } from './demo-data';
+import { applyPhase3Schema } from '@gist/database';
 
 loadWorkspaceEnv();
 const database = process.env.DB_NAME || 'gist_agent';
@@ -136,6 +137,7 @@ async function initDB() {
       );
       CREATE INDEX IF NOT EXISTS idx_generation_event_user_id ON generation_event(user_id, id);
     `);
+    await applyPhase3Schema(db);
     await db.query(
         `INSERT INTO data_source (name, host, port, "user", password, database_name, is_local, description)
       SELECT '本地默认库', $1, $2, $3, $4, $5, 1, '系统默认 PostgreSQL 数据库'

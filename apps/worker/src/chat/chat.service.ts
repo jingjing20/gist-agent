@@ -114,6 +114,7 @@ export class ChatService {
             const messages = await this.promptBuilder.buildMessages(conversationId, userId, systemPrompt, {
                 reasoningEnabled: reasoningActive,
                 excludeMessageIds: [messageId],
+                toolDefinitions: this.toolRegistry.getDefinitions(),
                 generationSnapshot: {
                     contextUpperBound: generation.contextUpperBound,
                     requestMessageId: generation.requestMessageId,
@@ -130,7 +131,12 @@ export class ChatService {
                 signal,
                 () => this.generations.checkpointMessage(generation, blocks, turnMessages),
                 () => this.generations.markFirstDelta(generation),
-                () => this.generations.assertWritable(generation)
+                () => this.generations.assertWritable(generation),
+                {
+                    generationId: generation.id,
+                    conversationId: generation.conversationId,
+                    schemaContextVersion: generation.schemaContextVersion,
+                }
             );
             if (signal.aborted) throw new GenerationExecutionError('CANCELLED', '已取消');
         } catch (err: unknown) {
@@ -178,7 +184,8 @@ export class ChatService {
         signal?: AbortSignal,
         checkpoint?: () => Promise<void>,
         onFirstDelta?: () => Promise<void>,
-        assertWritable?: () => Promise<void>
+        assertWritable?: () => Promise<void>,
+        generationContext?: { generationId: string; conversationId: string; schemaContextVersion: string }
     ): Promise<AgentOutcome> {
         const tools = this.toolRegistry.getDefinitions();
         const orchestrator = new AgentOrchestrator();
@@ -186,16 +193,30 @@ export class ChatService {
         let firstDeltaRecorded = false;
 
         for (let iteration = 0; iteration < MAX_AGENT_ITERATIONS; iteration++) {
-            if (signal?.aborted) throw new Error('已取消');
+            this.throwIfAborted(signal);
             await assertWritable?.();
-            const stream = await this.llm.streamWithTools(messages, tools, { signal, reasoningEnabled });
+            let stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
+            try {
+                stream = await this.llm.streamWithTools(messages, tools, { signal, reasoningEnabled });
+            } catch (error) {
+                this.throwAgentDependencyError(error, 'LLM_REQUEST_FAILED', 'LLM 请求失败', signal);
+            }
 
             let content = ''; // 累积本次迭代的文本输出
             let reasoningContent = ''; // thinking 模式下的推理链（DeepSeek / Moonshot 等）
             const toolCalls: any[] = []; // 按 index 稀疏存储，流式 delta 逐步拼接 arguments
 
-            for await (const chunk of stream) {
-                if (signal?.aborted) throw new Error('已取消');
+            const iterator = stream![Symbol.asyncIterator]();
+            while (true) {
+                let next: IteratorResult<OpenAI.Chat.Completions.ChatCompletionChunk>;
+                try {
+                    next = await iterator.next();
+                } catch (error) {
+                    this.throwAgentDependencyError(error, 'LLM_REQUEST_FAILED', 'LLM 流式响应失败', signal);
+                }
+                if (next!.done) break;
+                const chunk = next!.value;
+                this.throwIfAborted(signal);
                 const delta = chunk.choices[0]?.delta as any;
                 if (!delta) continue;
 
@@ -257,12 +278,14 @@ export class ChatService {
             const validToolCalls = toolCalls.filter(Boolean);
 
             if (validToolCalls.length === 0) {
-                if (content || reasoningContent) {
-                    const msg: any = { role: 'assistant', content };
-                    if (reasoningContent) msg.reasoning_content = reasoningContent;
-                    messages.push(msg);
-                    turnMessages.push(msg);
+                // 原始 reasoning 不会展示给用户，因此 reasoning-only 也不是一个有效回答。
+                if (!content.trim()) {
+                    throw new GenerationExecutionError('EMPTY_LLM_RESPONSE', '模型未返回可展示内容或工具调用');
                 }
+                const msg: any = { role: 'assistant', content };
+                if (reasoningContent) msg.reasoning_content = reasoningContent;
+                messages.push(msg);
+                turnMessages.push(msg);
                 return orchestrator.complete();
             }
 
@@ -296,13 +319,21 @@ export class ChatService {
                 const tool = this.toolRegistry.get(name)!;
                 orchestrator.beforeTool(name);
                 await assertWritable?.();
-                const result = await tool.execute(args, {
-                    emitter,
-                    datasourceId,
-                    userId,
-                    signal: signal ?? new AbortController().signal,
-                    assertWritable: assertWritable ?? (async () => undefined),
-                });
+                let result;
+                try {
+                    result = await tool.execute(args, {
+                        emitter,
+                        datasourceId,
+                        userId,
+                        generationId: generationContext?.generationId,
+                        conversationId: generationContext?.conversationId,
+                        schemaContextVersion: generationContext?.schemaContextVersion,
+                        signal: signal ?? new AbortController().signal,
+                        assertWritable: assertWritable ?? (async () => undefined),
+                    });
+                } catch (error) {
+                    this.throwAgentDependencyError(error, 'TOOL_EXECUTION_FAILED', `工具 ${name} 执行失败`, signal);
+                }
                 orchestrator.afterTool(name, result.succeeded !== false);
                 const { toolResult, blocks: resultBlocks } = result;
                 const toolCallId = tc.id;
@@ -317,5 +348,18 @@ export class ChatService {
             }
         }
         return orchestrator.exhausted();
+    }
+
+    private throwIfAborted(signal?: AbortSignal): void {
+        if (!signal?.aborted) return;
+        if (signal.reason instanceof Error) throw signal.reason;
+        throw new GenerationExecutionError('CANCELLED', '已取消');
+    }
+
+    private throwAgentDependencyError(error: unknown, code: 'LLM_REQUEST_FAILED' | 'TOOL_EXECUTION_FAILED', prefix: string, signal?: AbortSignal): never {
+        this.throwIfAborted(signal);
+        if (error instanceof GenerationExecutionError) throw error;
+        const detail = error instanceof Error ? error.message : String(error);
+        throw new GenerationExecutionError(code, `${prefix}: ${detail}`);
     }
 }

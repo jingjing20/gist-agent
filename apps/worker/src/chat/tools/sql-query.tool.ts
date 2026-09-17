@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type OpenAI from 'openai';
 import { requireNonEmptyString, requireRecord, type Tool, type ToolContext, type ToolExecutionResult, type SSEEvent } from './base-tool';
 import { SqlExecutorAgent } from '../agents/sql-executor';
+import type { QueryExpectedShape, QueryPlanV1 } from '@gist/contracts';
+import { ArtifactRepository } from '../artifact.repository';
+import { GenerationExecutionError } from '../generation-errors';
 
 const MAX_TOOL_RESULT_CHARS = 60000;
 
@@ -22,19 +25,40 @@ export class SqlQueryTool implements Tool {
                         description: '本次查询的简短动作标题，使用明确的中文动宾短语（建议 6-15 个字），例如“查询所有平台类型”；不要包含“SQL”“查询结果”等后缀',
                     },
                     sql: { type: 'string', description: '安全的只读 PostgreSQL 查询语句' },
+                    plan: {
+                        type: 'object',
+                        description: '本次查询的目标、预期粒度和结果形态，用于证据追踪与后续质量检查',
+                        properties: {
+                            purpose: { type: 'string', description: '查询要回答的具体问题' },
+                            expectedGrain: { type: 'string', description: '每一行代表什么，例如“每天×平台”' },
+                            expectedShape: { type: 'string', enum: ['scalar', 'timeseries', 'category', 'detail'] },
+                        },
+                        required: ['purpose', 'expectedGrain', 'expectedShape'],
+                    },
                 },
-                required: ['title', 'sql'],
+                required: ['title', 'sql', 'plan'],
             },
         },
     };
 
-    constructor(private readonly sqlExecutor: SqlExecutorAgent) {}
+    constructor(
+        private readonly sqlExecutor: SqlExecutorAgent,
+        private readonly artifacts: ArtifactRepository
+    ) {}
 
     parseArguments(value: unknown): Record<string, unknown> {
         const args = requireRecord(value);
+        const plan = requireRecord(args.plan);
+        const expectedShape = requireNonEmptyString(plan.expectedShape, 'plan.expectedShape') as QueryExpectedShape;
+        if (!['scalar', 'timeseries', 'category', 'detail'].includes(expectedShape)) throw new Error('plan.expectedShape 不受支持');
         return {
             title: requireNonEmptyString(args.title, 'title'),
             sql: requireNonEmptyString(args.sql, 'sql'),
+            plan: {
+                purpose: requireNonEmptyString(plan.purpose, 'plan.purpose'),
+                expectedGrain: requireNonEmptyString(plan.expectedGrain, 'plan.expectedGrain'),
+                expectedShape,
+            } satisfies QueryPlanV1,
         };
     }
 
@@ -68,6 +92,33 @@ export class SqlQueryTool implements Tool {
             const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId, ctx.signal);
             await ctx.assertWritable();
 
+            let queryArtifactId: string | undefined;
+            let resultContentHash: string | undefined;
+            if (process.env.ARTIFACT_DUAL_WRITE_ENABLED !== '0') {
+                if (!ctx.generationId || !ctx.conversationId || !ctx.userId || !ctx.schemaContextVersion) {
+                    throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询证据缺少 generation 上下文');
+                }
+                const artifact = await this.artifacts.createQueryArtifact({
+                    generationId: ctx.generationId,
+                    userId: ctx.userId,
+                    conversationId: ctx.conversationId,
+                    datasourceId: ctx.datasourceId ?? null,
+                    title: queryTitle,
+                    plan: args.plan as QueryPlanV1,
+                    originalSql: sql,
+                    executedSql: r.finalSql,
+                    schemaContextVersion: ctx.schemaContextVersion,
+                    columns: r.columns,
+                    rows: r.rows,
+                    returnedRowCount: r.rowCount,
+                    isLimited: r.isLimited,
+                });
+                queryArtifactId = artifact.id;
+                resultContentHash = artifact.resultContentHash;
+                // Artifact 写入可能与取消/超时竞争；发送 table 之前再次验证 writer fence。
+                await ctx.assertWritable();
+            }
+
             if (r.wasFixed) {
                 const fixLog: SSEEvent = {
                     type: 'log',
@@ -85,9 +136,12 @@ export class SqlQueryTool implements Tool {
             const tableEvent: SSEEvent = {
                 type: 'table',
                 title: `${queryTitle} · 查询结果`,
-                columns: r.columns,
+                columns: r.columns.map((column) => column.name),
+                columnTypes: r.columns,
                 rows: r.rows,
                 rowCount: r.rowCount,
+                isLimited: r.isLimited,
+                ...(queryArtifactId ? { queryArtifactId, resultContentHash } : {}),
             };
             ctx.emitter.send(tableEvent);
             blocks.push(tableEvent);
@@ -103,24 +157,32 @@ export class SqlQueryTool implements Tool {
                 truncationNote = `\n[注意：完整查询共 ${r.rowCount} 条，因数据体积超限仅提供前 ${fitCount} 条用于分析，请在结论中注明数据未完整展示。]`;
             }
 
-            const toolResult = r.wasFixed
-                ? JSON.stringify({
-                      systemMessage: `注意：由于你写的原始 SQL 存在特定语法错误，已被系统防腐代理自动拦截修复！最终成功执行的 SQL 为: ${r.finalSql}。请在最终结论中以此为准。${truncationNote}`,
-                      data: resultRows,
-                  })
-                : truncationNote
-                  ? JSON.stringify({
-                        systemMessage: truncationNote.trim(),
-                        data: resultRows,
-                    })
-                  : JSON.stringify(resultRows);
+            const toolResult = JSON.stringify({
+                ...(queryArtifactId ? { queryArtifactId } : {}),
+                columns: r.columns,
+                returnedRowCount: r.rowCount,
+                isLimited: r.isLimited,
+                ...(r.wasFixed
+                    ? { systemMessage: `原始 SQL 存在语法错误，最终执行 SQL 为: ${r.finalSql}。请以最终 SQL 为准。${truncationNote}` }
+                    : truncationNote
+                      ? { systemMessage: truncationNote.trim() }
+                      : {}),
+                data: resultRows,
+            });
 
             return { toolResult, blocks, succeeded: true };
         } catch (e: any) {
             if (ctx.signal.aborted) throw ctx.signal.reason ?? e;
             execLog.content = `查询失败: ${e.message}`;
             ctx.emitter.send({ ...execLog, type: 'log_update' } as any);
-            return { toolResult: `SQL 执行出错: ${e.message}`, blocks, succeeded: false };
+            return {
+                toolResult: JSON.stringify({
+                    errorCode: e instanceof GenerationExecutionError ? e.code : 'TOOL_EXECUTION_FAILED',
+                    message: e.message,
+                }),
+                blocks,
+                succeeded: false,
+            };
         }
     }
 }

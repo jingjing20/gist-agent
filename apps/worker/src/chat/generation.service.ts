@@ -17,6 +17,7 @@ export interface GenerationIdentity {
     contextUpperBound: string;
     parentMessageId: string | null;
     reasoningEnabled: boolean;
+    schemaContextVersion: string;
     writerToken: string;
 }
 
@@ -46,7 +47,7 @@ export class GenerationService implements OnModuleDestroy {
     async candidate(id: string): Promise<(Omit<GenerationIdentity, 'writerToken'> & { status: GenerationStatus }) | null> {
         const rows = await this.db.query<QueryRow[]>(
             `SELECT id,user_id,status,conversation_id,request_message_id,response_message_id,reasoning_enabled,
-                    datasource_id,context_upper_bound,parent_message_id
+                    datasource_id,context_upper_bound,parent_message_id,schema_context_version
                FROM generation WHERE id=?`,
             [id]
         );
@@ -62,6 +63,7 @@ export class GenerationService implements OnModuleDestroy {
             contextUpperBound: rows[0].context_upper_bound,
             parentMessageId: rows[0].parent_message_id ?? null,
             reasoningEnabled: rows[0].reasoning_enabled === true,
+            schemaContextVersion: rows[0].schema_context_version,
         };
     }
 
@@ -71,7 +73,7 @@ export class GenerationService implements OnModuleDestroy {
       SET status='starting',writer_token=?,writer_heartbeat_at=NOW(),started_at=COALESCE(started_at,NOW()),updated_at=NOW()
       WHERE g.id=? AND g.status='pending' AND g.writer_token IS NULL
       RETURNING g.id,g.user_id,g.conversation_id,g.request_message_id,g.response_message_id,g.reasoning_enabled,
-                g.datasource_id,g.context_upper_bound,g.parent_message_id`,
+                g.datasource_id,g.context_upper_bound,g.parent_message_id,g.schema_context_version`,
             [writerToken, id]
         );
         if (!rows.length) return null;
@@ -91,6 +93,7 @@ export class GenerationService implements OnModuleDestroy {
             contextUpperBound: rows[0].context_upper_bound,
             parentMessageId: rows[0].parent_message_id ?? null,
             reasoningEnabled: rows[0].reasoning_enabled === true,
+            schemaContextVersion: rows[0].schema_context_version,
             writerToken,
         };
     }
@@ -182,13 +185,21 @@ export class GenerationService implements OnModuleDestroy {
                 [status, error ?? null, errorCode ?? null, identity.id, identity.writerToken, identity.writerToken, identity.writerToken]
             );
             if (updated.rowCount !== 1) return false;
+            const finalAnswer = status === 'completed' && messageState ? extractFinalAnswer(messageState.blocks) : null;
             if (messageState) {
-                await transaction.execute('UPDATE message SET blocks=?::jsonb,llm_messages=?::jsonb WHERE id=?', [
+                await transaction.execute('UPDATE message SET content=?,blocks=?::jsonb,llm_messages=?::jsonb WHERE id=?', [
+                    finalAnswer ?? '',
                     JSON.stringify(messageState.blocks),
                     JSON.stringify(messageState.llmMessages),
                     identity.messageId,
                 ]);
             }
+            await transaction.execute(
+                `UPDATE conversation_turn
+                    SET status=?,final_answer=?,completed_at=NOW()
+                  WHERE generation_id=? AND status='pending'`,
+                [status, finalAnswer, identity.id]
+            );
             await transaction.execute('UPDATE generation_attempt SET status=?,error=?,completed_at=NOW() WHERE generation_id=? AND completed_at IS NULL', [
                 status,
                 error ?? null,
@@ -211,30 +222,35 @@ export class GenerationService implements OnModuleDestroy {
     }
 
     async failStale(timeoutMs: number): Promise<number> {
-        const rows = await this.db.query<QueryRow[]>(
-            `UPDATE generation
-      SET status='failed',error='生成进程意外中断，已保留收到的部分内容',error_code='WORKER_LOST',completed_at=NOW(),updated_at=NOW(),writer_token=NULL
-      WHERE status IN ('starting','running') AND writer_token IS NOT NULL
-        AND writer_heartbeat_at < NOW() - (? * INTERVAL '1 millisecond')
-      RETURNING id,user_id,conversation_id,response_message_id`,
-            [timeoutMs]
-        );
-        for (const row of rows) {
-            await this.db.execute("UPDATE generation_attempt SET status='failed',error='WORKER_LOST',completed_at=NOW() WHERE generation_id=? AND completed_at IS NULL", [row.id]);
-            await this.db.execute("INSERT INTO outbox_event (aggregate_id,type,payload) VALUES (?,'generation.terminal',?::jsonb)", [
-                row.id,
-                JSON.stringify({
-                    version: 1,
-                    kind: 'generation.terminal',
-                    generationId: row.id,
-                    userId: row.user_id,
-                    conversationId: row.conversation_id,
-                    messageId: row.response_message_id,
-                    event: { type: 'done', status: 'failed', error: '生成进程意外中断，已保留收到的部分内容', errorCode: 'WORKER_LOST' },
-                }),
-            ]);
-        }
-        return rows.length;
+        return this.db.withTransaction(async (transaction) => {
+            const [updated] = await transaction.execute(
+                `UPDATE generation
+          SET status='failed',error='生成进程意外中断，已保留收到的部分内容',error_code='WORKER_LOST',completed_at=NOW(),updated_at=NOW(),writer_token=NULL
+          WHERE status IN ('starting','running') AND writer_token IS NOT NULL
+            AND writer_heartbeat_at < NOW() - (? * INTERVAL '1 millisecond')
+          RETURNING id,user_id,conversation_id,response_message_id`,
+                [timeoutMs]
+            );
+            for (const row of updated.rows) {
+                await transaction.execute("UPDATE generation_attempt SET status='failed',error='WORKER_LOST',completed_at=NOW() WHERE generation_id=? AND completed_at IS NULL", [
+                    row.id,
+                ]);
+                await transaction.execute("UPDATE conversation_turn SET status='failed',completed_at=NOW() WHERE generation_id=? AND status='pending'", [row.id]);
+                await transaction.execute("INSERT INTO outbox_event (aggregate_id,type,payload) VALUES (?,'generation.terminal',?::jsonb)", [
+                    row.id,
+                    JSON.stringify({
+                        version: 1,
+                        kind: 'generation.terminal',
+                        generationId: row.id,
+                        userId: row.user_id,
+                        conversationId: row.conversation_id,
+                        messageId: row.response_message_id,
+                        event: { type: 'done', status: 'failed', error: '生成进程意外中断，已保留收到的部分内容', errorCode: 'WORKER_LOST' },
+                    }),
+                ]);
+            }
+            return updated.rows.length;
+        });
     }
 
     private keys(userId: number, generationId: string) {
@@ -282,4 +298,13 @@ export class GenerationService implements OnModuleDestroy {
         if (this.redis.status === 'ready') await this.redis.quit();
         else this.redis.disconnect();
     }
+}
+
+function extractFinalAnswer(blocks: SSEEvent[]): string | null {
+    const content = blocks
+        .filter((block) => block.type === 'text')
+        .map((block) => String(block.content ?? ''))
+        .join('')
+        .trim();
+    return content || null;
 }

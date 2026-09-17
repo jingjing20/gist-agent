@@ -12,22 +12,26 @@ import { GenerateChartTool } from './tools/generate-chart.tool';
 import { SqlQueryTool } from './tools/sql-query.tool';
 import { TOOL_INSTANCES, type Tool } from './tools/base-tool';
 import { ToolRegistry } from './tools/tool-registry';
+import { ArtifactRepository } from './artifact.repository';
+import { ReadQueryArtifactTool } from './tools/read-query-artifact.tool';
 
 @Module({
-  imports: [ConversationModule],
-  providers: [
-    ChatService,
-    GenerationService,
-    GenerationWorkerService,
-    GenerationReliabilityService,
-    ZombieGenerationMonitorService,
-    SqlExecutorAgent,
-    SemanticDistillerService,
-    PromptBuilder,
-    SqlQueryTool,
-    GenerateChartTool,
-    { provide: TOOL_INSTANCES, useFactory: (...tools: Tool[]) => tools, inject: [SqlQueryTool, GenerateChartTool] },
-    ToolRegistry,
-  ],
+    imports: [ConversationModule],
+    providers: [
+        ChatService,
+        GenerationService,
+        GenerationWorkerService,
+        GenerationReliabilityService,
+        ZombieGenerationMonitorService,
+        SqlExecutorAgent,
+        SemanticDistillerService,
+        PromptBuilder,
+        ArtifactRepository,
+        SqlQueryTool,
+        GenerateChartTool,
+        ReadQueryArtifactTool,
+        { provide: TOOL_INSTANCES, useFactory: (...tools: Tool[]) => tools, inject: [SqlQueryTool, GenerateChartTool, ReadQueryArtifactTool] },
+        ToolRegistry,
+    ],
 })
 export class ChatModule {}

@@ -1,8 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { SchemaService } from '../database/schema.service';
-import { ConversationService, Message } from '../conversation/conversation.service';
-import { estimateMessageTokens, estimateMessagesTokens } from './token-estimator';
+import { ConversationService, type ConversationTurnContext, Message } from '../conversation/conversation.service';
+import { estimateMessageTokens, estimateMessagesTokens, estimateTokens } from './token-estimator';
 import type OpenAI from 'openai';
+import { resolveModelCapability } from './model-capabilities';
 
 type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 
@@ -11,10 +12,6 @@ type ChatMessage = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 //   - RESPONSE_RESERVE: 留给模型生成回复的预算
 //   - TOOLS_RESERVE: 工具定义（function calling schema）的预算
 //   - 剩余: 历史消息预算，按距离远近分配压缩级别
-const MAX_CONTEXT_TOKENS = Number(process.env.MAX_CONTEXT_TOKENS) || 32000;
-const RESPONSE_RESERVE = 4000;
-const TOOLS_RESERVE = 1500;
-
 // 时间窗口：最近 FULL_WINDOW 条保留完整 tool chain，
 // FULL_WINDOW ~ MEDIUM_WINDOW 条保留 SQL+行数+结论，
 // 超过 MEDIUM_WINDOW 的只保留纯文字摘要
@@ -74,9 +71,10 @@ ${statePrompt}
 
 - 与数据无关的问题（打招呼、询问能力、闲聊）直接用文字回答，不要查库。
 - 每次调用工具前，**必须**先用一句话说明你打算做什么（如"我来查一下最近30天各平台的日活数据"）。
-- 需要数据时调用 execute_sql_query，并用 title 写清本次查询的具体动作；当一次查询不足以回答（需先看样本、再做聚合、或交叉验证），可多次调用，每次查询的 title 必须能明确区分其目的。
+- 需要数据时调用 execute_sql_query，并同时提交 title、SQL 和 QueryPlan（purpose、expectedGrain、expectedShape）；当一次查询不足以回答（需先看样本、再做聚合、或交叉验证），可多次调用，每次查询的 title 和 plan 必须能明确区分其目的。
 - 拿到工具结果后，**必须**用一句话说明你观察到什么或下一步打算做什么（如"数据已拿到63条，接下来分析趋势"）。
-- 仅当用户要求图表，或数据明显属于趋势、分类比较或分布时调用 generate_chart；其 series/xAxis 必须严格来自已经完成的 SQL 结果，不得编造。
+- execute_sql_query 会返回 queryArtifactId。仅当用户要求图表，或数据明显属于趋势、分类比较或分布时调用 generate_chart，并提交 queryArtifactId、xField 和 yFields；不得复制或编造数值数组。
+- 历史上下文只提供 Query Artifact 摘要。需要读取历史行数据或基于历史结果画图时，必须先调用 read_query_artifact；不得仅凭模型记住的 Artifact ID 假定读取成功。
 
 ## 输出要求
 - 关键数字加粗；多结论用要点列出，避免长段落。
@@ -94,11 +92,32 @@ ${statePrompt}
             reasoningEnabled?: boolean;
             excludeMessageIds?: readonly string[];
             generationSnapshot?: { contextUpperBound: string; requestMessageId: string };
+            toolDefinitions?: OpenAI.Chat.Completions.ChatCompletionTool[];
         } = {}
     ): Promise<ChatMessage[]> {
         const systemMsg: ChatMessage = { role: 'system', content: systemPrompt };
         const systemTokens = estimateMessageTokens(systemMsg);
-        const budgetForHistory = MAX_CONTEXT_TOKENS - systemTokens - RESPONSE_RESERVE - TOOLS_RESERVE;
+        const capability = resolveModelCapability();
+        const toolTokens = estimateTokens(JSON.stringify(options.toolDefinitions ?? []));
+        const budgetForHistory = Math.max(0, capability.contextWindow - systemTokens - capability.responseReserve - toolTokens);
+
+        if (options.generationSnapshot && process.env.TURN_CONTEXT_READ_ENABLED !== '0') {
+            const turns = await this.conversationService.getGenerationContextTurns(
+                conversationId,
+                userId,
+                options.generationSnapshot.contextUpperBound,
+                options.generationSnapshot.requestMessageId
+            );
+            const entries = turns.map((turn) => this.toTurnHistoryEntry(turn, options.reasoningEnabled === true)).filter((entry): entry is HistoryEntry => entry !== null);
+            const selected = this.selectEntriesWithinBudget(entries, budgetForHistory, options.reasoningEnabled === true);
+            const messages: ChatMessage[] = [systemMsg];
+            for (const { index, level } of selected) messages.push(...this.getMessagesForLevel(entries[index], level));
+            this.logger.debug(
+                `Turn context: ${turns.length} turns, ${selected.length} included (${selected.map((item) => item.level[0]).join('')}), ` +
+                    `budget ${budgetForHistory} tokens, system ${systemTokens}, tools ${toolTokens}, window ${capability.contextWindow}`
+            );
+            return messages;
+        }
 
         const excluded = new Set(options.excludeMessageIds ?? []);
         const sourceMessages = options.generationSnapshot
@@ -126,6 +145,52 @@ ${statePrompt}
         );
 
         return messages;
+    }
+
+    private toTurnHistoryEntry(turn: ConversationTurnContext, reasoningEnabled: boolean): HistoryEntry | null {
+        const user: ChatMessage = { role: 'user', content: turn.userMessage.content };
+        if (turn.status === 'pending' || !turn.assistantMessage) {
+            const tokens = estimateMessageTokens(user);
+            return {
+                fullMessages: [user],
+                mediumMessages: [user],
+                compactMessages: [user],
+                fullTokens: tokens,
+                mediumTokens: tokens,
+                compactTokens: tokens,
+            };
+        }
+        const assistant = this.toHistoryEntry(turn.assistantMessage, reasoningEnabled);
+        if (!assistant) return null;
+        const evidence = this.formatArtifactSummary(turn);
+        const finalAnswer = turn.finalAnswer || this.extractCompactText(turn.assistantMessage) || '(无文字回复)';
+        const fullMessages = [user, ...assistant.fullMessages];
+        if (evidence) {
+            const lastAssistant = [...fullMessages].reverse().find((message) => message.role === 'assistant');
+            if (lastAssistant && typeof lastAssistant.content === 'string') lastAssistant.content = `${lastAssistant.content}\n${evidence}`;
+        }
+        const mediumMessages: ChatMessage[] = [user, { role: 'assistant', content: `${finalAnswer}${evidence ? `\n${evidence}` : ''}` }];
+        const compactMessages: ChatMessage[] = [user, { role: 'assistant', content: `${finalAnswer.slice(0, 800)}${evidence ? `\n${evidence}` : ''}` }];
+        return {
+            fullMessages,
+            mediumMessages,
+            compactMessages,
+            fullTokens: estimateMessagesTokens(fullMessages),
+            mediumTokens: estimateMessagesTokens(mediumMessages),
+            compactTokens: estimateMessagesTokens(compactMessages),
+        };
+    }
+
+    private formatArtifactSummary(turn: ConversationTurnContext): string {
+        if (!turn.artifacts.length) return '[本轮没有可复用的查询证据]';
+        return [
+            '[本轮可复用查询证据；需要行数据时先调用 read_query_artifact]',
+            ...turn.artifacts.map(
+                (artifact) =>
+                    `- ${artifact.id} | ${artifact.title} | 目的: ${artifact.purpose} | 粒度: ${artifact.expectedGrain} | ` +
+                    `列: ${artifact.columns.map((column) => `${column.name}:${column.type}`).join(', ')} | 返回 ${artifact.returnedRowCount} 行${artifact.isLimited ? '（受限）' : ''}`
+            ),
+        ].join('\n');
     }
 
     /**
@@ -270,18 +335,20 @@ ${statePrompt}
         }
     }
 
-    /**
-     * 移除工具调用参数中的重负载内容（如 generate_chart 中的 data 数组）。
-     */
+    /** 历史图表仅保留 Artifact 引用和字段映射，不回放旧协议的数值数组。 */
     private dehydrateToolCall(call: any): any {
         if (call.function?.name === 'generate_chart' && call.function.arguments) {
             try {
                 const args = JSON.parse(call.function.arguments);
                 const skeleton = {
+                    queryArtifactId: args.queryArtifactId,
                     chartType: args.chartType,
                     title: args.title,
-                    xAxisName: args.xAxisName,
-                    _note: '[图表数据已省略]',
+                    xField: args.xField,
+                    yFields: args.yFields,
+                    filters: args.filters,
+                    sort: args.sort,
+                    _note: '[图表数据由 Query Artifact 在服务端生成]',
                 };
                 return {
                     ...call,

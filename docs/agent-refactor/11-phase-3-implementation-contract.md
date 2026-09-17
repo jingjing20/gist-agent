@@ -1,8 +1,8 @@
 # Phase 3 实施合同：证据与上下文
 
-> 合同状态：待实施；本文通过评审后作为 Phase 3 编码、测试和验收依据
+> 合同状态：已执行并验收通过
 >
-> 目标周期：Phase 2 ORC-04 完成后开始
+> 当前进度：Phase 0～3 已完成；实际交付见 [Phase 3 实施记录](./12-phase-3-implementation.md)
 >
 > 对应专题：[上下文与查询 Artifact](./03-context-and-artifacts.md)
 
@@ -12,16 +12,16 @@ Phase 3 必须交付一条可追溯证据链：一次成功查询生成唯一 Qu
 
 完成后必须能回答：某个图表数字来自哪个 generation、哪条最终 SQL、哪个 Query Artifact 和哪个字段。
 
-## 2. 进入条件（Gate 0）
+## 2. Phase 3 开始条件
 
-以下条件全部满足后才允许开始 Artifact 数据库迁移：
+以下条件已于 2026-09-17 满足，可以开始 Phase 3；仍需先完成数据契约和迁移测试，不能直接进入双写：
 
-- ORC-04 完成：空 LLM 响应以稳定错误码失败，不得 completed。
+- Phase 2 已完成：空 LLM 响应以稳定错误码失败，不得 completed。
 - mock LLM 集成测试覆盖直接回答、单次/多次查询、查询失败重试、图表、迭代耗尽、取消和非法工具调用。
 - Phase 1、Phase 2 现有回归继续通过。
 - QueryPlan、Query Artifact、Chart Artifact 和 Turn 的 TypeScript/数据库字段评审通过。
 
-Gate 0 不通过时可以编写设计和测试夹具，但不得合并数据库迁移或切换生产读取链路。
+验证证据为 `pnpm test:phase2-orchestration`（含完整 mock Agent Loop）、Phase 1/2 回归、全仓 typecheck/build 和隔离 mock API/Worker smoke。外部模型质量在 Phase 6 建立完整评测，不用随机模型输出替代确定性测试。
 
 ## 3. 范围与非目标
 
@@ -168,56 +168,52 @@ Turn 与 generation 一对一，`(conversationId, sequence)` 唯一。Artifact �
 - 不从历史 blocks 创建 Artifact；历史 Turn 允许零 Artifact。
 - 迁移必须幂等，重复执行不改变已分配 sequence 和 Artifact。
 
-## 6. 工作包与合并顺序
+## 6. Phase 3 实施步骤
 
-### WP0：ORC-04 收尾
+以下步骤都属于 Phase 3，只表示实现先后顺序，不另设缩写编号。
 
-- 修复空 stream completed。
-- 统一 Agent Loop 的失败表达：选择“返回判别联合”或“异常 + 外层归一化”之一，不保留双重语义。
-- 增加完整 mock LLM 集成测试。
-
-### WP1：Contracts 与数据库
+### 第一步：数据契约与数据库
 
 - 在 `@gist/contracts` 定义 v1 类型和稳定错误码。
 - 增加幂等迁移与历史 Turn 回填测试。
 - 只建表，不改变现有读取或 UI。
 
-### WP2：Query Artifact 双写
+### 第二步：Query Artifact 双写
 
 - SQL 成功后先持久化 Query Artifact，再发送 table event。
 - SQL Executor 返回 PostgreSQL field metadata，并规范化为 `number/string/date/boolean/unknown`；numeric/bigint 等驱动字符串只有在可有限、无精度损失转换时才能作为 chart number，其他情况保留 string/unknown。
 - 持久化失败时工具失败，不允许只显示无法追溯的表格。
 - `blocks` 继续写入；增加 block/artifact hash 一致性测试。
 
-### WP3：Chart Artifact
+### 第三步：Chart Artifact
 
 - 发布新版 `generate_chart` 参数。
 - 服务端从 Query Artifact 生成 chart data。
 - 模型提交未知字段、跨 conversation Artifact 或不兼容类型时拒绝。
 - `toolset` 版本提升。
 
-### WP4：Turn Context
+### 第四步：Turn Context
 
 - generation 创建时创建 pending Turn，finalize 时在同一事务更新状态和 final answer。
 - PromptBuilder 只消费 completed Turn；failed/cancelled Turn 默认不进入模型历史。
 - 预算不足时按 `full -> structured summary -> omit` 整 Turn 降级。
 - 历史无 Artifact Turn 仍可使用最终文本，但必须标记无可复用数据证据。
 
-### WP5：Artifact Read 与后续追问
+### 第五步：Artifact Read 与后续追问
 
 - 增加受权限保护的 Artifact repository/read tool。
 - 返回摘要、列和受限样本；默认不把完整结果重新塞入 Prompt。
 - 撤权、conversation 不匹配、过期或不存在时使用稳定错误码。
 - Orchestrator 只有在授权读取成功后才把历史 Artifact 视为当前 generation 的可用查询证据；仅由模型提供 Artifact ID 不得解锁 chart。
 
-### WP6：Capability 与预算
+### 第六步：Capability 与预算
 
 - 建立 model capability registry。
 - 计算 system、history、tool schema 和 Artifact 摘要 token。
 - 对至少两种不同 context window 配置做边界测试。
 - 只建立 Schema 目录/详情加载接口；召回调优留给 Phase 6。
 
-合并顺序必须为 `WP0 -> WP1 -> WP2 -> WP3 -> WP4 -> WP5 -> WP6`。SEC-01 可与 WP1～WP6 并行，但不得绕过各自测试门禁。
+实施顺序必须为“数据契约与数据库 → Query Artifact 双写 → Chart Artifact → Turn Context → Artifact Read → Capability 与预算”。每一步通过对应自动化测试后再进入下一步。Phase 4 的安全与质量改造不混入 Phase 3 主线。
 
 ## 7. 双写、开关与回滚
 
@@ -260,11 +256,11 @@ Turn 与 generation 一对一，`(conversationId, sequence)` 唯一。Artifact �
 
 完整验收继续运行 Phase 0～2 回归、全仓 typecheck/build、analytics benchmark 和真实 API/Worker smoke。浏览器交互验收由用户执行，自动化必须提供可检查的 API/数据库证据。
 
-## 9. 完成门禁（Definition of Done）
+## 9. Phase 3 完成条件
 
 Phase 3 只有同时满足以下条件才能标记完成：
 
-1. ORC-04 完成且所有旧回归通过。
+1. Phase 0～2 的既有回归全部通过。
 2. 新表迁移、历史 Turn 回填和重复执行测试通过。
 3. 每个新查询 table block 都能关联唯一 Query Artifact；双写一致性为 100%。
 4. 每个新图表都引用 Query Artifact，模型不再提交数值数组。
@@ -277,7 +273,13 @@ Phase 3 只有同时满足以下条件才能标记完成：
 11. `promptPolicy`、`toolset`、`contextPolicy`、`schemaContext` 按实际变更提升版本。
 12. 更新路线图、专题状态和 Phase 3 实施记录，列出测试证据与遗留项。
 
-## 10. 已关闭的 Phase 3 v1 设计决策
+## 10. 验收结论
+
+2026-09-17 已通过三组 Phase 3 专项回归、Phase 0～2 兼容回归、全仓 typecheck/build、40 SQL + 6 semantic analytics benchmark，以及隔离 mock API/Worker 真实队列 smoke。完成条件的逐项映射、命令和输出摘要记录在 [Phase 3 实施记录](./12-phase-3-implementation.md)。
+
+Phase 3 验收不表示 SQL 业务口径已自动正确，也不表示数据库最小权限已完成；这两项仍由 Phase 4 承接。
+
+## 11. 已关闭的 Phase 3 v1 设计决策
 
 - **保留与删除**：Artifact 默认与 conversation 同寿命；删除 conversation 或用户时数据库级联物理删除。Phase 3 不启用自动 TTL，`expiresAt` 仅为未来保留策略预留。Phase 6 再引入可配置保留期和清理任务。
 - **JSONB 上限**：规范化结果 JSON 单 Artifact 最大 5 MiB；超限返回稳定错误码 `ARTIFACT_RESULT_TOO_LARGE`，要求模型缩小字段、粒度或时间范围，不保存不完整证据冒充完整结果。
@@ -288,16 +290,15 @@ Phase 3 只有同时满足以下条件才能标记完成：
 
 任何需要改变上述决策的实现必须先更新本合同并说明迁移和兼容影响。
 
-## 11. 文件与模块落点
+## 12. 文件与模块落点
 
-| 工作包 | 主要文件/模块                                                                                      | 预期职责                               |
-| ------ | -------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| WP0    | `apps/worker/src/chat/chat.service.ts`、`agent-orchestrator.ts`、Phase 2 regression                | 统一循环出口并补 mock LLM 测试         |
-| WP1    | `packages/contracts/src/index.ts`、`apps/api/scripts/init-db.ts`                                   | v1 类型、错误码、三张表和幂等回填      |
-| WP2    | `packages/database/src/index.ts`、`sql-executor.ts`、`sql-query.tool.ts`、新增 Artifact repository | 字段类型、结果持久化、hash 和双写      |
-| WP3    | `generate-chart.tool.ts`、ToolRegistry、Prompt、前端 chart block                                   | Artifact 字段映射和兼容协议            |
-| WP4    | API/Worker generation service、conversation service、PromptBuilder                                 | Turn 创建/finalize、历史读取和整轮裁剪 |
-| WP5    | 新增 Artifact read tool/service、Orchestrator                                                      | 授权读取、历史证据和状态转换           |
-| WP6    | `token-estimator.ts`、PromptBuilder、新增 capability/schema context service                        | 实际预算和目录/详情加载接口            |
+| 实施步骤                 | 主要文件/模块                                                                                      | 预期职责                               |
+| ------------------------ | -------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| 数据契约与数据库         | `packages/contracts/src/index.ts`、`apps/api/scripts/init-db.ts`                                   | v1 类型、错误码、三张表和幂等回填      |
+| Query Artifact 双写      | `packages/database/src/index.ts`、`sql-executor.ts`、`sql-query.tool.ts`、新增 Artifact repository | 字段类型、结果持久化、hash 和双写      |
+| Chart Artifact           | `generate-chart.tool.ts`、ToolRegistry、Prompt、前端 chart block                                   | Artifact 字段映射和兼容协议            |
+| Turn Context             | API/Worker generation service、conversation service、PromptBuilder                                 | Turn 创建/finalize、历史读取和整轮裁剪 |
+| Artifact Read 与后续追问 | 新增 Artifact read tool/service、Orchestrator                                                      | 授权读取、历史证据和状态转换           |
+| Capability 与预算        | `token-estimator.ts`、PromptBuilder、新增 capability/schema context service                        | 实际预算和目录/详情加载接口            |
 
 新增模块命名可以按仓库约定调整，但职责边界不能合并回单个 ChatService。数据库读写、授权、上下文选择和图表构造必须保持可独立测试。

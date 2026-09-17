@@ -74,6 +74,7 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
         columns: block.columns,
         rows: block.rows,
         rowCount: block.rowCount,
+        isLimited: block.isLimited,
     };
 }
 </script>

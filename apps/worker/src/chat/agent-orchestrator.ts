@@ -3,7 +3,9 @@ import { GenerationExecutionError } from './generation-errors';
 import type { ToolRegistry } from './tools/tool-registry';
 
 export type AgentState = 'UNDERSTANDING' | 'QUERYING' | 'RESULT_VALIDATION' | 'CHART_PLANNING' | 'SYNTHESIZING' | 'COMPLETED' | 'FAILED';
-export type AgentOutcome = { kind: 'completed'; state: 'COMPLETED' } | { kind: 'failed'; state: 'FAILED'; code: GenerationErrorCode };
+// Agent Loop 只有成功路径返回 outcome；所有失败路径统一抛出
+// GenerationExecutionError，由 generation 边界归一化并写入终态。
+export type AgentOutcome = { kind: 'completed'; state: 'COMPLETED' };
 
 export interface ProposedToolCall {
     id?: string;
@@ -43,9 +45,9 @@ export class AgentOrchestrator {
     }
 
     beforeTool(name: string): void {
-        if (name === 'execute_sql_query') {
+        if (name === 'execute_sql_query' || name === 'read_query_artifact') {
             if (!['UNDERSTANDING', 'RESULT_VALIDATION', 'SYNTHESIZING'].includes(this.state)) {
-                this.fail('INVALID_STATE_TRANSITION', `状态 ${this.state} 不允许执行查询`);
+                this.fail('INVALID_STATE_TRANSITION', `状态 ${this.state} 不允许获取查询证据`);
             }
             this.state = 'QUERYING';
             return;
@@ -61,7 +63,7 @@ export class AgentOrchestrator {
     }
 
     afterTool(name: string, succeeded = true): void {
-        if (name === 'execute_sql_query') {
+        if (name === 'execute_sql_query' || name === 'read_query_artifact') {
             this.hasQueryResult ||= succeeded;
             this.state = 'RESULT_VALIDATION';
         } else if (name === 'generate_chart') {

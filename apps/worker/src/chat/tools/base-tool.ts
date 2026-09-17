@@ -29,6 +29,9 @@ export interface ToolContext {
     emitter: SSEEmitter;
     datasourceId?: number | null;
     userId?: number;
+    generationId?: string;
+    conversationId?: string;
+    schemaContextVersion?: string;
     signal: AbortSignal;
     assertWritable(): Promise<void>;
 }

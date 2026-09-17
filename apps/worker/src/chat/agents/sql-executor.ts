@@ -4,6 +4,8 @@ import { SchemaService } from '../../database/schema.service';
 import { LlmService } from '../../llm/llm.service';
 import { QueryRow as RowDataPacket } from '../../database/database.service';
 import { Parser } from 'node-sql-parser';
+import type { ArtifactColumnV1 } from '@gist/contracts';
+import type { DetailedQueryResult, QueryFieldMetadata } from '@gist/database';
 
 // SQL 查询返回给前端的上限行数，通过 AST 注入 LIMIT 子句强制生效
 const MAX_ROWS = 1000;
@@ -11,9 +13,10 @@ const MAX_ROWS = 1000;
 export interface QueryResult {
     finalSql: string;
     wasFixed: boolean;
-    columns: string[];
+    columns: ArtifactColumnV1[];
     rows: Record<string, unknown>[];
     rowCount: number;
+    isLimited: boolean;
 }
 
 @Injectable()
@@ -26,16 +29,16 @@ export class SqlExecutorAgent {
         private readonly schemaService: SchemaService
     ) {}
 
-    private async queryWithTimeout<T>(sql: string, datasourceId?: number | null, timeoutMs = 15000, signal?: AbortSignal): Promise<T> {
+    private async queryWithTimeout(sql: string, datasourceId?: number | null, timeoutMs = 15000, signal?: AbortSignal): Promise<DetailedQueryResult<RowDataPacket[]>> {
         const database = this.db as DatabaseService & {
-            queryReadOnly<R extends RowDataPacket[]>(
+            queryReadOnlyWithFields<R extends RowDataPacket[]>(
                 statement: string,
                 params: unknown[],
                 selectedDatasourceId: number | null | undefined,
                 options: { timeoutMs: number; signal?: AbortSignal }
-            ): Promise<R>;
+            ): Promise<DetailedQueryResult<R>>;
         };
-        return database.queryReadOnly<T extends RowDataPacket[] ? T : any>(sql, [], datasourceId, { timeoutMs, signal }) as Promise<T>;
+        return database.queryReadOnlyWithFields<RowDataPacket[]>(sql, [], datasourceId, { timeoutMs, signal });
     }
 
     /**
@@ -198,20 +201,23 @@ export class SqlExecutorAgent {
                 const { astResult, parser } = this.validate(currentSql, allowedTables);
                 const safeSql = this.ensureLimit(astResult, parser);
 
-                let rows = await this.queryWithTimeout<RowDataPacket[]>(safeSql, datasourceId, 15000, signal);
+                const detailed = await this.queryWithTimeout(safeSql, datasourceId, 15000, signal);
+                let rows = detailed.rows;
 
                 if (allowedTables !== 'ALL' && this.isShowTables(safeSql)) {
                     rows = this.filterShowTablesRows(rows as Record<string, unknown>[], allowedTables) as RowDataPacket[];
                 }
 
-                const columns = rows.length > 0 ? Object.keys(rows[0]) : [];
+                const normalized = this.normalizeRows(rows as Record<string, unknown>[], detailed.fields);
+                const limit = this.extractLimit(safeSql);
 
                 return {
                     finalSql: safeSql,
                     wasFixed: currentSql !== sql,
-                    columns,
-                    rows: rows as Record<string, unknown>[],
-                    rowCount: rows.length,
+                    columns: normalized.columns,
+                    rows: normalized.rows,
+                    rowCount: normalized.rows.length,
+                    isLimited: limit !== null && normalized.rows.length >= limit,
                 };
             } catch (error: any) {
                 attempt++;
@@ -237,5 +243,65 @@ export class SqlExecutorAgent {
         }
 
         throw new Error('超出最大 SQL 执行重试限制');
+    }
+
+    private extractLimit(sql: string): number | null {
+        const match = sql.match(/\bLIMIT\s+(\d+)\b/i);
+        return match ? Number(match[1]) : null;
+    }
+
+    private normalizeRows(rows: Record<string, unknown>[], fields: QueryFieldMetadata[]): { rows: Record<string, unknown>[]; columns: ArtifactColumnV1[] } {
+        const normalizedRows = rows.map((row) => ({ ...row }));
+        const columns = fields.map((field) => {
+            const values = normalizedRows.map((row) => row[field.name]).filter((value) => value !== null && value !== undefined);
+            const type = this.normalizeColumn(field.dataTypeID, values);
+            if (type === 'number') {
+                for (const row of normalizedRows) {
+                    const value = row[field.name];
+                    if (typeof value === 'string') row[field.name] = Number(value);
+                }
+            } else if (type === 'date') {
+                for (const row of normalizedRows) {
+                    const value = row[field.name];
+                    if (value instanceof Date) row[field.name] = value.toISOString();
+                }
+            }
+            return { name: field.name, type };
+        });
+        return { rows: normalizedRows, columns };
+    }
+
+    private normalizeColumn(dataTypeId: number, values: unknown[]): ArtifactColumnV1['type'] {
+        if (dataTypeId === 16) return 'boolean';
+        if ([1082, 1083, 1114, 1184, 1266].includes(dataTypeId)) return 'date';
+        if ([20, 21, 23, 26, 700, 701, 1700].includes(dataTypeId)) {
+            return values.every((value) => this.isLosslessNumber(value)) ? 'number' : 'unknown';
+        }
+        if ([18, 19, 25, 1042, 1043, 2950, 3802].includes(dataTypeId)) return 'string';
+        if (values.every((value) => typeof value === 'number' && Number.isFinite(value))) return 'number';
+        if (values.every((value) => typeof value === 'boolean')) return 'boolean';
+        if (values.every((value) => typeof value === 'string')) return 'string';
+        return 'unknown';
+    }
+
+    private isLosslessNumber(value: unknown): boolean {
+        if (typeof value === 'number') return Number.isFinite(value);
+        if (typeof value !== 'string' || !/^[+-]?\d+(?:\.\d+)?$/.test(value.trim())) return false;
+        const input = value.trim();
+        const numeric = Number(input);
+        if (!Number.isFinite(numeric)) return false;
+        if (/^[+-]?\d+$/.test(input)) {
+            try {
+                return Number.isSafeInteger(numeric) && BigInt(input) === BigInt(numeric);
+            } catch {
+                return false;
+            }
+        }
+        const normalizedInput = input
+            .replace(/^\+/, '')
+            .replace(/^(-?)0+(?=\d)/, '$1')
+            .replace(/(\.\d*?)0+$/, '$1')
+            .replace(/\.$/, '');
+        return String(numeric) === normalizedInput;
     }
 }

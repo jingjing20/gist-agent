@@ -1,6 +1,6 @@
 # 03. 上下文与查询 Artifact 改造
 
-> 规划状态：对应 Phase 3，尚未实施。本文描述目标设计与验收口径，不代表当前系统已经具备 Turn、Query Artifact 或 Chart Artifact。
+> 实施状态：对应 Phase 3，已完成。冻结契约见 [Phase 3 实施合同](./11-phase-3-implementation-contract.md)，实现与测试证据见 [Phase 3 实施记录](./12-phase-3-implementation.md)。
 >
 > 前置基础：Phase 1 已提供 generation 输入快照，Phase 2 已提供确定性工具顺序；Phase 3 在此基础上解决“合法执行之后，证据如何保存和复用”。
 
@@ -8,14 +8,14 @@
 
 把“聊天连续性”和“分析证据连续性”分开管理：对话历史保持语义连贯，查询 artifact 保持数据可追溯，避免依赖被压缩或被模型改写的历史文本。
 
-## 2. 当前实现证据
+## 2. 重构前的实现证据
 
 - 历史以数据库中的单条 user/assistant message 为单位构造 `HistoryEntry`。
 - 最近消息为 full，中距为 medium，远距为 compact：`apps/worker/src/chat/prompt-builder.ts`。
 - full 模式也会把工具结果脱水为行数和列名：`dehydrateToolResult`。
 - medium 模式保存 SQL、返回数组长度和最终文字结论。
 - 选择历史时某条放不下会 skip，并继续尝试更老消息。
-- Token 预算使用固定 `MAX_CONTEXT_TOKENS`、`RESPONSE_RESERVE=4000`、`TOOLS_RESERVE=1500`。
+- Token 预算使用固定窗口和工具预留，不按实际模型与 schema 计费。
 - reasoning 模式只接受 full 历史，并丢弃缺少完整 reasoning 的旧 assistant 消息。
 
 ## 3. 问题清单
@@ -54,13 +54,12 @@ interface ConversationTurn {
     generationId: string;
     status: 'pending' | 'completed' | 'failed' | 'cancelled';
     finalAnswer: string | null;
-    artifactIds: string[];
     createdAt: string;
     completedAt: string | null;
 }
 ```
 
-PromptBuilder 只消费已完成 Turn，并以 Turn 为最小裁剪单位。
+PromptBuilder 只消费已完成的历史 Turn 和当前 pending Turn 的确切 user request，并以完整 Turn 为历史裁剪单位。
 
 ### 4.2 Query Artifact
 
@@ -71,19 +70,21 @@ interface QueryArtifact {
     userId: number;
     conversationId: string;
     datasourceId: number;
-    purpose: string;
+    title: string;
+    plan: {
+        purpose: string;
+        expectedGrain: string;
+        expectedShape: 'scalar' | 'timeseries' | 'category' | 'detail';
+    };
     originalSql: string;
     executedSql: string;
     schemaContextVersion: string;
-    authorizationVersion?: string;
     columns: Array<{ name: string; type: 'number' | 'string' | 'date' | 'boolean' | 'unknown' }>;
     returnedRowCount: number;
     totalRowCount?: number;
     isLimited: boolean;
     resultContentHash: string;
-    sampleRows: unknown[];
-    summary: object;
-    executedAt: string;
+    createdAt: string;
     expiresAt?: string;
 }
 ```
@@ -148,25 +149,22 @@ interface ChartArtifact {
 ```ts
 interface ModelCapabilities {
     contextWindow: number;
-    maxOutputTokens: number;
-    tokenizer: string;
-    supportsReasoning: boolean;
-    requiresHistoricalReasoningContent: boolean;
+    responseReserve: number;
 }
 ```
 
-运行时计算实际工具 schema token，不再固定预留 1500。预算不足时按整 Turn 降级：`full turn -> structured summary -> omit`，禁止拆散一轮。
+运行时对实际工具 JSON schema 做统一 token 估算，不再固定预留 1500。当前估算器是保守的字符权重算法，不声称等同供应商 tokenizer；精确 tokenizer 校准可随 Phase 6 模型路由评测补充。预算不足时按整 Turn 降级：`full turn -> structured summary -> omit`，禁止拆散一轮。
 
 ## 8. 实施步骤
 
-具体编码顺序、迁移门禁和回滚条件以 [Phase 3 实施合同](./11-phase-3-implementation-contract.md) 为准。本专题固定以下顺序原则：
+具体编码顺序、迁移验收和回滚条件以 [Phase 3 实施合同](./11-phase-3-implementation-contract.md) 为准。本专题固定以下顺序原则：
 
 1. 先确定 QueryPlan/Artifact/Turn 契约和授权边界，再建表。
 2. 先双写并校验一致性，不立即删除现有 `llm_messages/blocks`。
 3. SQL Tool 成功后原子落 Query Artifact，再返回 artifact ID。
 4. 图表改为只消费 artifact 字段映射。
 5. PromptBuilder 改为按完整 Turn 组装上下文。
-6. 最后接入 model capability registry、tokenizer 和历史清理；清理必须晚于读取链路稳定。
+6. 最后接入 model capability registry、统一 token 估算和历史清理；清理必须晚于读取链路稳定。
 
 ## 9. 涉及文件
 
@@ -204,7 +202,7 @@ Phase 2 能证明“先成功查询、再生成图表”，却不能证明图表
 
 ### 11.5 Schema 两阶段加载可以在本阶段奠基，但规模化调优留到 Phase 6
 
-职责边界固定为：Phase 3 只建立 `SchemaCatalogSummary`/`SchemaDetail` 契约和按需加载接口，以便上下文预算不再强依赖全量 Schema；Phase 6 才实现和调优检索排序、召回评测、缓存、成本阈值与大规模数据源策略。Phase 3 不以“100 张表召回质量”作为完成门禁。
+职责边界固定为：Phase 3 只建立 `SchemaCatalogSummary`/`SchemaDetail` 契约和按需加载接口，以便上下文预算不再强依赖全量 Schema；Phase 6 才实现和调优检索排序、召回评测、缓存、成本阈值与大规模数据源策略。“100 张表召回质量”不属于 Phase 3 的完成条件。
 
 ## 12. 预期前后对比
 
@@ -219,7 +217,7 @@ Phase 2 能证明“先成功查询、再生成图表”，却不能证明图表
 ## 13. 非目标、风险与实施门槛
 
 - Artifact 解决证据身份，不自动证明 SQL 口径正确；ResultQuality 属于 Phase 4。
-- QueryPlan 的最小字段（purpose、grain、expectedShape、涉及表）必须在 Phase 3 定义并随 Query Artifact 保存；复杂 JOIN 基数与质量规则由 Phase 4 扩展。
+- QueryPlan 的最小字段（purpose、expectedGrain、expectedShape）已在 Phase 3 定义并随 Query Artifact 保存；涉及表、复杂 JOIN 基数与质量规则由 Phase 4 扩展。
 - Artifact 不能绕过权限。读取、保留和删除都必须继承 datasource/user 授权，并定义清理策略。
 - 不在本阶段建立长期业务记忆；稳定口径治理属于 Phase 5。
 - 双写期间必须增加一致性校验，防止 blocks 与 artifact 静默分叉。
@@ -232,4 +230,4 @@ Phase 2 能证明“先成功查询、再生成图表”，却不能证明图表
 - UI 表格、最终结论和图表都能追溯到同一 Query Artifact。
 - returned row count、total row count 和 truncated/limited 状态不会混淆。
 - 在不同上下文窗口模型上均不会超过模型 token 上限。
-- Phase 3 建立目录/详情按需加载接口，不再无条件注入全部字段；100 张表规模的召回质量和成本阈值由 Phase 6 验收。
+- Phase 3 已建立目录/详情接口契约；Prompt 真正切换为按需检索、100 张表规模的召回质量和成本阈值由 Phase 6 验收。

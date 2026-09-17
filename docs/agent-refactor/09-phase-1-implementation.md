@@ -2,7 +2,7 @@
 
 > 实施日期：2026-09-16
 >
-> 状态：核心能力已完成；stale writer 等自动化故障场景通过，真实 Worker 进程 kill/recovery 测试由 EVAL-02 承接
+> 状态：核心能力已完成；stale writer 等自动化故障场景通过，真实 Worker 进程 kill/recovery 测试由 Phase 6 的完整端到端评测承接
 >
 > 对应问题域：[执行与并发可靠性](./01-execution-reliability.md)
 
@@ -132,7 +132,7 @@ pnpm test:phase1-reliability
 
 首次 smoke 暴露出当时环境中 Nest watch 外层存活但 Worker 子进程退出的问题。现场证据显示 outbox 已发布但 attempt 为 0；重启 Worker 后通过。这一记录说明 smoke 同时验证了“进程存活”和“任务真正被消费”之间的差异。
 
-该现场故障不是可重复的自动化 Worker kill 测试。真实启动进程、SIGKILL、stale recovery、旧 writer 拒写和任务最终终态的端到端场景仍由 EVAL-02 承接。
+该现场故障不是可重复的自动化 Worker kill 测试。真实启动进程、SIGKILL、stale recovery、旧 writer 拒写和任务最终终态的端到端场景仍由 Phase 6 的完整端到端评测承接。
 
 ## 9. 边界与遗留问题
 

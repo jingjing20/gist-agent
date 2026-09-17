@@ -16,7 +16,12 @@
         "test:reasoning": "pnpm --filter @gist/llm build && pnpm --filter @gist/worker build && node scripts/reasoning-context-regression.mjs",
         "test:generation-baseline": "pnpm --filter @gist/contracts build && pnpm --filter @gist/worker build && node scripts/generation-baseline-regression.mjs",
         "test:phase1-reliability": "pnpm --filter @gist/database build && pnpm --filter @gist/worker build && CHAT_TIMEOUT_MS=1000 node scripts/phase1-reliability-regression.mjs",
-        "test:phase2-orchestration": "pnpm --filter @gist/contracts build && pnpm --filter @gist/worker build && node scripts/phase2-orchestration-regression.mjs",
+        "test:phase2-orchestration": "pnpm --filter @gist/contracts build && pnpm --filter @gist/worker build && node scripts/phase2-orchestration-regression.mjs && node scripts/phase2-agent-loop-integration.mjs",
+        "test:phase3-migrations": "pnpm --filter @gist/database build && node scripts/phase3-migrations-regression.mjs",
+        "test:phase3-artifacts": "pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/phase3-artifacts-regression.mjs",
+        "test:phase3-context": "pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/phase3-context-regression.mjs",
+        "test:phase3": "pnpm test:phase3-migrations && pnpm test:phase3-artifacts && pnpm test:phase3-context",
+        "smoke:phase3": "pnpm test:phase3 && pnpm smoke:conversation",
         "init-db": "pnpm --filter @gist/api init-db",
         "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\""
     },

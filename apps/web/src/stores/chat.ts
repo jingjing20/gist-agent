@@ -215,15 +215,31 @@ export const useChatStore = defineStore('chat', () => {
         }
         if (event.type === 'chart') {
             const item = [...message.blocks].reverse().find((b) => b.type === 'chart' && !b.chartData);
-            item ? (item.chartData = event.chartData) : message.blocks.push({ type: 'chart', chartData: event.chartData });
+            if (item) {
+                item.chartData = event.chartData;
+                item.queryArtifactId = event.queryArtifactId;
+                item.chartArtifactId = event.chartArtifactId;
+            } else {
+                message.blocks.push({
+                    type: 'chart',
+                    chartData: event.chartData,
+                    queryArtifactId: event.queryArtifactId,
+                    chartArtifactId: event.chartArtifactId,
+                });
+            }
             return;
         }
         const block: MessageBlock = {
             type: event.type,
             content: event.content,
             columns: event.columns,
+            columnTypes: event.columnTypes,
             rows: event.rows,
             rowCount: event.rowCount,
+            isLimited: event.isLimited,
+            queryArtifactId: event.queryArtifactId,
+            chartArtifactId: event.chartArtifactId,
+            resultContentHash: event.resultContentHash,
             title: event.title,
             chartData: event.chartData,
         };

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from './database.service';
 import { getAgentVisibleCatalogTables, type DataSourceTableCatalogEntry } from '@gist/database';
+import { resolveCatalogDatasourceId } from '@gist/database';
+import type { SchemaCatalogSummaryV1, SchemaDetailV1 } from '@gist/contracts';
 
 interface SchemaCacheEntry {
     prompt: string;
@@ -124,6 +126,35 @@ export class SchemaService {
         }
 
         return Array.from(tablesMap.values());
+    }
+
+    async getSchemaCatalogSummary(datasourceId: number | null, _userId: number): Promise<SchemaCatalogSummaryV1> {
+        const resolved = await resolveCatalogDatasourceId(this.db, datasourceId);
+        if (resolved == null) return { datasourceId: 0, tables: [] };
+        const tables = await getAgentVisibleCatalogTables(this.db, resolved);
+        return {
+            datasourceId: resolved,
+            tables: tables.map((table) => ({
+                schema: table.schema_name,
+                name: table.table_name,
+                displayName: table.display_name,
+                ...(table.description ? { description: table.description } : {}),
+            })),
+        };
+    }
+
+    async getSchemaDetail(datasourceId: number | null, userId: number, tableName: string): Promise<SchemaDetailV1 | null> {
+        const resolved = await resolveCatalogDatasourceId(this.db, datasourceId);
+        if (resolved == null) return null;
+        const tables = await this.getStructuredSchema(resolved, userId);
+        const table = tables.find((candidate) => candidate.tableName === tableName);
+        if (!table) return null;
+        return {
+            datasourceId: resolved,
+            schema: 'public',
+            table: table.tableName,
+            columns: table.fields.map((field: any) => ({ name: field.name, type: field.type, ...(field.comment ? { description: field.comment } : {}) })),
+        };
     }
 
     /**

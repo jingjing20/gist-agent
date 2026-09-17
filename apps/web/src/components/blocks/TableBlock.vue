@@ -6,7 +6,7 @@
                 <span class="table-label">{{ title || '查询结果预览' }}</span>
             </div>
             <div class="header-right">
-                <span class="row-count">共 {{ rowCount || rows?.length || 0 }} 条记录</span>
+                <span class="row-count"> 已返回 {{ rowCount ?? rows?.length ?? 0 }} 条记录<span v-if="isLimited">（查询结果受限，可能还有更多）</span> </span>
                 <button v-if="rows && rows.length > 0" class="export-btn" @click="exportToExcel"><i class="fas fa-download"></i> 导出</button>
             </div>
         </div>
@@ -26,7 +26,7 @@
                 </tbody>
             </table>
         </div>
-        <div v-if="rows && rows.length > MAX_DISPLAY" class="table-footer">仅展示前 {{ MAX_DISPLAY }} 条，完整数据可导出或进一步分析</div>
+        <div v-if="rows && rows.length > MAX_DISPLAY" class="table-footer">仅展示前 {{ MAX_DISPLAY }} 条，当前返回的全部数据可导出或进一步分析</div>
     </div>
 </template>
 
@@ -40,6 +40,7 @@ const props = defineProps<{
     columns?: string[];
     rows?: Record<string, unknown>[];
     rowCount?: number;
+    isLimited?: boolean;
 }>();
 
 const displayRows = computed(() => {

@@ -1,6 +1,6 @@
 # 02. 编排与提示词改造
 
-> Phase 2 已完成轻量状态机、工具运行时校验、迭代耗尽失败、`analyze_result` 下线和 raw reasoning 产品隐藏。空回答失败语义与完整 Agent Loop mock 集成测试尚未完成，编号 ORC-04；实施与验证见 [Phase 2 决策与实施记录](./10-phase-2-implementation.md)。Query/Chart Artifact、完整 Prompt 分层和结构化 Planner 仍由 Phase 3 及后续阶段承接。
+> Phase 2 已完成轻量状态机、工具运行时校验、明确循环失败边界、`analyze_result` 下线、raw reasoning 产品隐藏、空回答失败语义和完整 Agent Loop mock 集成测试。实施与验证见 [Phase 2 决策与实施记录](./10-phase-2-implementation.md)。Query/Chart Artifact、完整 Prompt 分层和结构化 Planner 仍由 Phase 3 及后续阶段承接。
 >
 > 阅读提示：第 2～3 节记录的是 Phase 2 实施前的基线；第 4～7 节描述完整目标设计，其中并非全部属于 Phase 2 已交付范围。
 
@@ -157,15 +157,15 @@ interface QueryPlan {
 
 ## 9. 完整目标与当前状态
 
-| 验收项                                                            | 当前状态                     | 承接阶段                   |
-| ----------------------------------------------------------------- | ---------------------------- | -------------------------- |
-| 任意工具都不能在非法状态执行                                      | Phase 2 已完成               | Phase 2                    |
-| 无效 JSON 不触发工具副作用                                        | Phase 2 已完成               | Phase 2                    |
-| 未声明并行安全的工具不得并发执行                                  | Phase 2 已完成；当前全部串行 | Phase 2                    |
-| 前端不显示原始 reasoning                                          | Phase 2 已完成               | Phase 2                    |
-| 图表中的每个数值可追溯至指定 artifact 字段                        | 未完成                       | Phase 3                    |
-| Prompt 模板分层、独立版本和快照测试                               | 未完成                       | Phase 3/4                  |
-| QuestionInterpreter、QueryPlanner、AnswerSynthesizer 结构化分工   | 未完成                       | Phase 3 及后续             |
-| 空 LLM 响应不进入 completed，完整 Agent Loop 出口有 mock 集成测试 | 未完成                       | ORC-04（Phase 3 进入门禁） |
+| 验收项                                                            | 当前状态                     | 承接阶段       |
+| ----------------------------------------------------------------- | ---------------------------- | -------------- |
+| 任意工具都不能在非法状态执行                                      | Phase 2 已完成               | Phase 2        |
+| 无效 JSON 不触发工具副作用                                        | Phase 2 已完成               | Phase 2        |
+| 未声明并行安全的工具不得并发执行                                  | Phase 2 已完成；当前全部串行 | Phase 2        |
+| 前端不显示原始 reasoning                                          | Phase 2 已完成               | Phase 2        |
+| 图表中的每个数值可追溯至指定 artifact 字段                        | Phase 3 已完成               | Phase 3        |
+| Prompt 模板分层、独立版本和快照测试                               | 版本已完成；分层/快照待补    | Phase 4/6      |
+| QuestionInterpreter、QueryPlanner、AnswerSynthesizer 结构化分工   | 未完成                       | Phase 3 及后续 |
+| 空 LLM 响应不进入 completed，完整 Agent Loop 出口有 mock 集成测试 | 已完成                       | Phase 2        |
 
 这里刻意区分“Phase 2 交付完成”和“本专题最终设计完成”。前者表示当前阶段承诺的不变量已经落地，不表示编排与 Prompt 领域再无后续工作。
