@@ -1,0 +1,46 @@
+docs/agent-refactor/06-evaluation-and-observability.md
+  107e5f4576e137db 3-19,24,60-69,89-97,138,140-149,171
+docs/agent-refactor/08-phase-0-implementation.md
+  107e5f4576e137db 1,5-7,9,11,13,15,17-20,22,24-27,29,31,33,35,37,39,41-44,46,48,50,52-57,59,61,63,65,67,69-70,72,74,76-90,105,107,116-120,122,124-128,130,132
+docs/agent-refactor/01-execution-reliability.md
+  107e5f4576e137db 3-5,11,15-19,151-153
+docs/agent-refactor/09-phase-1-implementation.md
+  107e5f4576e137db 1,5-37,39-53,59-61,63,65,67,69,72-74,76,78-82,84,86-90,92,94-101,103-114,120,122,133-142,144,146
+docs/agent-refactor/10-phase-2-implementation.md
+  107e5f4576e137db 1,3-7,9,11,13,15,17,19,21,23-190
+docs/agent-refactor/04-memory.md
+  107e5f4576e137db 3-6,14,17,49-56,64-80,92-95,107-108,142-184
+docs/agent-refactor/05-data-security-and-quality.md
+  107e5f4576e137db 3-6,97-104,108-109,135-184,193
+docs/agent-refactor/07-delivery-roadmap.md
+  107e5f4576e137db 9-17,21-25,32,36-38,42-46,52,67,69,73-77,91-92,96-101,123,127-130,135,138,148-151,167-170,178-184,187-209,221-222
+docs/agent-refactor/README.md
+  107e5f4576e137db 3,5,11,13,15,17-19,21,23,25,27-65,89,107,115-132
+docs/agent-refactor/02-orchestration-and-prompts.md
+  107e5f4576e137db 3-6,11,13,15,89-95,158-169,171
+docs/agent-refactor/03-context-and-artifacts.md
+  107e5f4576e137db 3-6,49-59,69-87,91-92,101-118,150-154,162-169,181-228,235
+docs/agent-refactor/11-phase-3-implementation-contract.md
+  107e5f4576e137db 1-303
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "22be8c8aa7e636c08610d03d399673635c794cc0",
+  "prompts": {
+    "107e5f4576e137db": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0ad2c-3986-7930-8c84-70a3d4c46ef9",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1554,
+      "total_deletions": 706,
+      "accepted_lines": 1347,
+      "overriden_lines": 0
+    }
+  }
+}
