@@ -1,6 +1,6 @@
 # 06. 评测与可观测性改造
 
-> Phase 0 已完成运行版本、稳定错误码、首 delta 指标和最小回归/smoke 基线；Phase 6 已补齐真实 Agent E2E JSON 报告、发布门禁、生产 trace、成本/延迟聚合和 Worker kill 发布测试。见 [Phase 6 实施记录](./15-phase-6-implementation.md)。
+> Phase 0 已完成运行版本、稳定错误码、首 delta 指标和最小回归/smoke 基线；Phase 6 提供了真实 Agent runner、指标和发布测试入口，但没有完成真实模型全量验收。完整评测平台暂时后置，当前只保留服务核心模块迭代的薄评测。见 [学习主线重构路线图](./16-learning-focused-roadmap.md)。
 >
 > 阅读提示：第 2 节是 Phase 0 实施前的基线证据；后续章节描述该问题域的完整目标，不应全部解读为当前能力。
 
@@ -10,12 +10,12 @@
 | --------------------------------------- | -------------------------------------- | ----------------- |
 | generation 运行版本与基础错误码         | 已完成                                 | Phase 0           |
 | 首 delta 指标                           | 已完成                                 | Phase 0           |
-| 可靠性故障回归                          | 已完成核心场景；真实进程 kill 未自动化 | Phase 1 / Phase 6 |
+| 可靠性故障回归                          | 已完成核心场景；真实进程 kill 有脚本但未验收 | Phase 1 / Optional |
 | 编排器单元回归                          | 已完成                                 | Phase 2           |
 | 完整 Agent Loop mock 集成测试           | 已完成                                 | Phase 2           |
-| SaaS Growth 真实 Agent 逐 case 评测     | 已完成 runner 与发布门禁               | Phase 6           |
-| 多轮/注入/恢复评测集                    | 已完成确定性回归与发布 E2E 入口         | Phase 2/4/6       |
-| 生产 trace、token、成本和质量 dashboard | 已完成                                 | Phase 6           |
+| SaaS Growth 真实 Agent 逐 case 评测     | runner 已实现，真实模型全量验收未执行   | 独立评测专题      |
+| 多轮/注入/恢复评测集                    | 有分散回归，尚未形成统一评测集          | 独立评测专题      |
+| 生产 trace、token、成本和质量 dashboard | 探索实现；不再是当前核心目标            | Optional          |
 
 ## 1. 目标
 
@@ -143,10 +143,10 @@ generation
 | 2    | 写入首 delta timing                                        | 已完成                  | Phase 0   |
 | 3    | 建立基础结构化错误码                                       | 已完成并在 Phase 2 扩展 | Phase 0/2 |
 | 4    | 用 mock LLM 驱动完整 Agent Loop 出口                       | 已完成                  | Phase 2   |
-| 5    | 通过 API/Worker 执行 SaaS Growth benchmark case            | 已完成                  | Phase 6   |
-| 6    | 增加多轮、注入、并发、真实 Worker kill 和失败恢复 case     | 已完成                  | Phase 6   |
-| 7    | 输出机器可读 JSON 报告并在 CI 比较基线                     | 已完成                  | Phase 6   |
-| 8    | 接入生产 trace、dashboard 和告警                           | 已完成 trace/dashboard；告警由部署平台读取门禁与指标 | Phase 6   |
+| 5    | 通过 API/Worker 执行 SaaS Growth benchmark case            | runner 已实现，待独立评测专题完善 | L4 |
+| 6    | 增加多轮、注入、并发、真实 Worker kill 和失败恢复 case     | 分散覆盖，未形成统一矩阵 | L4 / Optional |
+| 7    | 输出机器可读 JSON 报告并在 CI 比较基线                     | 原型已实现，完整门禁后置 | L4 |
+| 8    | 接入生产 trace、dashboard 和告警                           | 探索实现，移入 Optional | Optional |
 
 ## 8. 涉及文件
 
