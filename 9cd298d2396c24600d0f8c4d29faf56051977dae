@@ -1,0 +1,32 @@
+docs/agent-refactor/07-delivery-roadmap.md
+  4d1aa4d1f7ffd940 5,17,167-169,200
+docs/agent-refactor/15-phase-6-implementation.md
+  4d1aa4d1f7ffd940 1,3-5,48,50-64
+docs/agent-refactor/06-evaluation-and-observability.md
+  4d1aa4d1f7ffd940 3,13,16-18,146-149
+docs/agent-refactor/16-learning-focused-roadmap.md
+  4d1aa4d1f7ffd940 1-133
+docs/agent-refactor/README.md
+  4d1aa4d1f7ffd940 3,5,18-20,28,30-35,47,68,87,89-93
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "9cd298d2396c24600d0f8c4d29faf56051977dae",
+  "prompts": {
+    "4d1aa4d1f7ffd940": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0b31f-e756-70a0-942c-2ba932944b2f",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 188,
+      "total_deletions": 30,
+      "accepted_lines": 188,
+      "overriden_lines": 0
+    }
+  }
+}
