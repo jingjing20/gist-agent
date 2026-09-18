@@ -18,7 +18,16 @@ export interface GenerationIdentity {
     parentMessageId: string | null;
     reasoningEnabled: boolean;
     schemaContextVersion: string;
+    modelName: string;
     writerToken: string;
+}
+
+export interface GenerationExecutionMetrics {
+    llmCallCount: number;
+    toolCallCount: number;
+    sqlCallCount: number;
+    inputTokensEstimated: number;
+    outputTokensEstimated: number;
 }
 
 const PUBLISH_SCRIPT = `
@@ -47,7 +56,7 @@ export class GenerationService implements OnModuleDestroy {
     async candidate(id: string): Promise<(Omit<GenerationIdentity, 'writerToken'> & { status: GenerationStatus }) | null> {
         const rows = await this.db.query<QueryRow[]>(
             `SELECT id,user_id,status,conversation_id,request_message_id,response_message_id,reasoning_enabled,
-                    datasource_id,context_upper_bound,parent_message_id,schema_context_version
+                    datasource_id,context_upper_bound,parent_message_id,schema_context_version,model_name
                FROM generation WHERE id=?`,
             [id]
         );
@@ -64,6 +73,7 @@ export class GenerationService implements OnModuleDestroy {
             parentMessageId: rows[0].parent_message_id ?? null,
             reasoningEnabled: rows[0].reasoning_enabled === true,
             schemaContextVersion: rows[0].schema_context_version,
+            modelName: rows[0].model_name,
         };
     }
 
@@ -73,7 +83,7 @@ export class GenerationService implements OnModuleDestroy {
       SET status='starting',writer_token=?,writer_heartbeat_at=NOW(),started_at=COALESCE(started_at,NOW()),updated_at=NOW()
       WHERE g.id=? AND g.status='pending' AND g.writer_token IS NULL
       RETURNING g.id,g.user_id,g.conversation_id,g.request_message_id,g.response_message_id,g.reasoning_enabled,
-                g.datasource_id,g.context_upper_bound,g.parent_message_id,g.schema_context_version`,
+                g.datasource_id,g.context_upper_bound,g.parent_message_id,g.schema_context_version,g.model_name`,
             [writerToken, id]
         );
         if (!rows.length) return null;
@@ -94,6 +104,7 @@ export class GenerationService implements OnModuleDestroy {
             parentMessageId: rows[0].parent_message_id ?? null,
             reasoningEnabled: rows[0].reasoning_enabled === true,
             schemaContextVersion: rows[0].schema_context_version,
+            modelName: rows[0].model_name,
             writerToken,
         };
     }
@@ -122,6 +133,42 @@ export class GenerationService implements OnModuleDestroy {
                 [identity.id, identity.writerToken]
             );
         });
+    }
+
+    async recordExecutionMetrics(identity: GenerationIdentity, metrics: GenerationExecutionMetrics): Promise<void> {
+        const inputRate = Math.max(0, Number(process.env.LLM_INPUT_COST_PER_MILLION_USD) || 0);
+        const outputRate = Math.max(0, Number(process.env.LLM_OUTPUT_COST_PER_MILLION_USD) || 0);
+        const estimatedCostMicrousd = Math.round(metrics.inputTokensEstimated * inputRate + metrics.outputTokensEstimated * outputRate);
+        await this.db.execute(
+            `INSERT INTO generation_metric (
+                generation_id,llm_call_count,tool_call_count,sql_call_count,input_tokens_estimated,output_tokens_estimated,estimated_cost_microusd
+             ) VALUES (?,?,?,?,?,?,?)
+             ON CONFLICT(generation_id) DO UPDATE SET
+                llm_call_count=EXCLUDED.llm_call_count,
+                tool_call_count=EXCLUDED.tool_call_count,
+                sql_call_count=EXCLUDED.sql_call_count,
+                input_tokens_estimated=EXCLUDED.input_tokens_estimated,
+                output_tokens_estimated=EXCLUDED.output_tokens_estimated,
+                estimated_cost_microusd=EXCLUDED.estimated_cost_microusd,
+                updated_at=NOW()`,
+            [
+                identity.id,
+                metrics.llmCallCount,
+                metrics.toolCallCount,
+                metrics.sqlCallCount,
+                metrics.inputTokensEstimated,
+                metrics.outputTokensEstimated,
+                estimatedCostMicrousd,
+            ]
+        );
+    }
+
+    async recordSpan(identity: GenerationIdentity, name: string, startedAt: number, status: 'ok' | 'error', metadata: Record<string, unknown> = {}): Promise<void> {
+        await this.db.execute(
+            `INSERT INTO generation_trace_span(generation_id,name,status,duration_ms,metadata)
+             VALUES (?,?,?,?,?::jsonb)`,
+            [identity.id, name, status, Math.max(0, Date.now() - startedAt), JSON.stringify(metadata)]
+        );
     }
 
     async isCancelRequested(id: string): Promise<boolean> {
@@ -291,6 +338,12 @@ export class GenerationService implements OnModuleDestroy {
                 identity.writerToken,
                 sequence,
             ]);
+            await transaction.execute(
+                `INSERT INTO generation_event(generation_id,user_id,conversation_id,message_id,sequence,event_type,payload)
+                 VALUES (?,?,?,?,?,?,?::jsonb)
+                 ON CONFLICT(generation_id,sequence) DO NOTHING`,
+                [identity.id, identity.userId, identity.conversationId, identity.messageId, sequence, event.type, JSON.stringify(payload)]
+            );
         });
     }
 

@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import { loadWorkspaceEnv } from '@gist/config';
 import { initializeDemoData } from './demo-data';
-import { applyPhase3Schema, applyPhase4Schema, applyPhase5Schema } from '@gist/database';
+import { applyPhase3Schema, applyPhase4Schema, applyPhase5Schema, applyPhase6Schema } from '@gist/database';
 
 loadWorkspaceEnv();
 const database = process.env.DB_NAME || 'gist_agent';
@@ -140,6 +140,7 @@ async function initDB() {
     await applyPhase3Schema(db);
     await applyPhase4Schema(db);
     await applyPhase5Schema(db);
+    await applyPhase6Schema(db);
     await db.query(
         `INSERT INTO data_source (name, host, port, "user", password, database_name, is_local, description)
       SELECT '本地默认库', $1, $2, $3, $4, $5, 1, '系统默认 PostgreSQL 数据库'

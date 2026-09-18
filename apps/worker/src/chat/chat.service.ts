@@ -14,6 +14,8 @@ import type { GenerationStatus } from '@gist/contracts';
 import type { GenerationErrorCode } from '@gist/contracts';
 import { GenerationExecutionError, normalizeGenerationError } from './generation-errors';
 import { AgentOrchestrator, type AgentOutcome } from './agent-orchestrator';
+import { estimateMessagesTokens, estimateTokens } from './token-estimator';
+import type { GenerationExecutionMetrics } from './generation.service';
 
 // Agent 循环上限：防止 LLM 陷入无限 tool_call 循环（如反复查错 SQL 又反复修）
 const MAX_AGENT_ITERATIONS = 15;
@@ -105,12 +107,20 @@ export class ChatService {
         let finalStatus: GenerationStatus = 'completed';
         let errorDetail: string | undefined;
         let errorCode: GenerationErrorCode | undefined;
+        const metrics: GenerationExecutionMetrics = {
+            llmCallCount: 0,
+            toolCallCount: 0,
+            sqlCallCount: 0,
+            inputTokensEstimated: 0,
+            outputTokensEstimated: 0,
+        };
 
         // 全局定时器与用户取消共用同一 AbortController。
         // 超时时先 abort LLM/工具/SQL，等执行栈退出后再写终态。
         try {
             const reasoningActive = this.llm.isReasoningActive(reasoningEnabled);
-            const systemPrompt = await this.promptBuilder.buildSystemPrompt(datasourceId, userId, conversationId);
+            const contextStartedAt = Date.now();
+            const systemPrompt = await this.promptBuilder.buildSystemPrompt(datasourceId, userId, conversationId, message, generation.id);
             const messages = await this.promptBuilder.buildMessages(conversationId, userId, systemPrompt, {
                 reasoningEnabled: reasoningActive,
                 excludeMessageIds: [messageId],
@@ -120,6 +130,8 @@ export class ChatService {
                     requestMessageId: generation.requestMessageId,
                 },
             });
+            await this.generations.recordSpan(generation, 'context.select', contextStartedAt, 'ok', { messageCount: messages.length });
+            const agentStartedAt = Date.now();
             await this.runAgentLoop(
                 emitter,
                 messages,
@@ -136,8 +148,11 @@ export class ChatService {
                     generationId: generation.id,
                     conversationId: generation.conversationId,
                     schemaContextVersion: generation.schemaContextVersion,
-                }
+                    modelName: generation.modelName,
+                },
+                metrics
             );
+            await this.generations.recordSpan(generation, 'agent.loop', agentStartedAt, 'ok', { llmCalls: metrics.llmCallCount, toolCalls: metrics.toolCallCount });
             if (signal.aborted) throw new GenerationExecutionError('CANCELLED', '已取消');
         } catch (err: unknown) {
             const cause = signal.aborted && signal.reason instanceof Error ? signal.reason : err;
@@ -147,6 +162,7 @@ export class ChatService {
             finalStatus = normalized.code === 'CANCELLED' ? 'cancelled' : 'failed';
             errorDetail = normalized.message;
             errorCode = normalized.code;
+            await this.generations.recordSpan(generation, 'generation.error', Date.now(), 'error', { errorCode: normalized.code }).catch(() => undefined);
             terminal =
                 finalStatus === 'cancelled'
                     ? { type: 'done', status: 'cancelled', errorCode: normalized.code }
@@ -154,6 +170,12 @@ export class ChatService {
         }
         clearInterval(cancelPoll);
         clearTimeout(timeout);
+
+        try {
+            await this.generations.recordExecutionMetrics(generation, metrics);
+        } catch (metricError) {
+            this.logger.warn(`Failed to persist generation metrics: ${metricError instanceof Error ? metricError.message : metricError}`);
+        }
 
         try {
             await this.generations.drain(generation);
@@ -191,7 +213,8 @@ export class ChatService {
         checkpoint?: () => Promise<void>,
         onFirstDelta?: () => Promise<void>,
         assertWritable?: () => Promise<void>,
-        generationContext?: { generationId: string; conversationId: string; schemaContextVersion: string }
+        generationContext?: { generationId: string; conversationId: string; schemaContextVersion: string; modelName: string },
+        metrics: GenerationExecutionMetrics = { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 }
     ): Promise<AgentOutcome> {
         const tools = this.toolRegistry.getDefinitions();
         const orchestrator = new AgentOrchestrator();
@@ -203,7 +226,9 @@ export class ChatService {
             await assertWritable?.();
             let stream: AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
             try {
-                stream = await this.llm.streamWithTools(messages, tools, { signal, reasoningEnabled });
+                metrics.llmCallCount += 1;
+                metrics.inputTokensEstimated += estimateMessagesTokens(messages) + estimateTokens(JSON.stringify(tools));
+                stream = await this.createModelStreamWithRetry(messages, tools, { signal, reasoningEnabled, model: generationContext?.modelName });
             } catch (error) {
                 this.throwAgentDependencyError(error, 'LLM_REQUEST_FAILED', 'LLM 请求失败', signal);
             }
@@ -228,10 +253,12 @@ export class ChatService {
 
                 if (delta.reasoning_content) {
                     reasoningContent += delta.reasoning_content;
+                    metrics.outputTokensEstimated += estimateTokens(delta.reasoning_content);
                 }
 
                 if (delta.content) {
                     content += delta.content;
+                    metrics.outputTokensEstimated += estimateTokens(delta.content);
                     emitter.send({ type: 'text_chunk', content: delta.content });
                     const last = blocks[blocks.length - 1];
                     if (last?.type === 'text') last.content = String(last.content ?? '') + delta.content;
@@ -265,6 +292,7 @@ export class ChatService {
                         }
                         if (tc.function?.arguments) {
                             toolCalls[tc.index].function.arguments += tc.function.arguments;
+                            metrics.outputTokensEstimated += estimateTokens(tc.function.arguments);
                         }
                     }
                 }
@@ -318,6 +346,8 @@ export class ChatService {
             }
 
             const parsedCalls = orchestrator.parseBatch(validToolCalls, this.toolRegistry);
+            metrics.toolCallCount += parsedCalls.length;
+            metrics.sqlCallCount += parsedCalls.filter(({ call }) => call.function.name === 'execute_sql_query').length;
             // Tool calls are intentionally serialized. Their order can carry state dependencies,
             // and no current tool is declared safe for parallel execution.
             for (const { call: tc, args } of parsedCalls) {
@@ -367,5 +397,25 @@ export class ChatService {
         if (error instanceof GenerationExecutionError) throw error;
         const detail = error instanceof Error ? error.message : String(error);
         throw new GenerationExecutionError(code, `${prefix}: ${detail}`);
+    }
+
+    private async createModelStreamWithRetry(
+        messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
+        tools: OpenAI.Chat.Completions.ChatCompletionTool[],
+        options: { signal?: AbortSignal; reasoningEnabled: boolean; model?: string }
+    ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
+        const attempts = Math.min(3, Math.max(1, Number(process.env.LLM_REQUEST_MAX_ATTEMPTS) || 2));
+        let lastError: unknown;
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+            this.throwIfAborted(options.signal);
+            try {
+                return await this.llm.streamWithTools(messages, tools, options);
+            } catch (error) {
+                lastError = error;
+                if (attempt === attempts) break;
+                await new Promise((resolve) => setTimeout(resolve, 100 * attempt));
+            }
+        }
+        throw lastError;
     }
 }

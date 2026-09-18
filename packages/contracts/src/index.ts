@@ -5,12 +5,48 @@ export const GENERATION_QUEUE_NAME = 'conversation-generations';
  * 都应提升对应版本，并随 generation 一起持久化，便于评测和线上追踪。
  */
 export const AGENT_RUNTIME_VERSIONS = {
-    promptPolicy: 'prompt-policy-v4',
+    promptPolicy: 'prompt-policy-v5',
     toolset: 'toolset-v4',
-    contextPolicy: 'context-policy-v3',
+    contextPolicy: 'context-policy-v4',
     memoryPolicy: 'memory-policy-v2',
-    schemaContext: 'schema-context-v3',
+    schemaContext: 'schema-context-v4',
 } as const;
+
+export interface GenerationMetricV1 {
+    generationId: string;
+    llmCallCount: number;
+    toolCallCount: number;
+    sqlCallCount: number;
+    inputTokensEstimated: number;
+    outputTokensEstimated: number;
+    estimatedCostMicrousd: number;
+    schemaCandidateCount: number;
+    schemaSelectedCount: number;
+    schemaPromptTokensEstimated: number;
+    schemaRetrievalMs: number;
+}
+
+export interface OperationsDashboardBucketV1 {
+    modelProvider: string;
+    modelName: string;
+    promptPolicyVersion: string;
+    toolsetVersion: string;
+    contextPolicyVersion: string;
+    memoryPolicyVersion: string;
+    schemaContextVersion: string;
+    generations: number;
+    completed: number;
+    failed: number;
+    cancelled: number;
+    successRate: number;
+    p95TotalLatencyMs: number;
+    p95FirstTokenMs: number;
+    inputTokensEstimated: number;
+    outputTokensEstimated: number;
+    estimatedCostMicrousd: number;
+    toolCalls: number;
+    sqlCalls: number;
+}
 
 export const MEMORY_TYPES = ['metric_definition', 'dimension_definition', 'analysis_preference', 'locale_preference'] as const;
 export type MemoryType = (typeof MEMORY_TYPES)[number];

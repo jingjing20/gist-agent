@@ -45,9 +45,9 @@ export class PromptBuilder {
     ) {}
 
     /** 构建系统提示词：包含实时表结构、相关结构化记忆和强制执行规则。 */
-    async buildSystemPrompt(datasourceId: number | null, userId: number, conversationId?: string): Promise<string> {
+    async buildSystemPrompt(datasourceId: number | null, userId: number, conversationId?: string, query = '', generationId?: string): Promise<string> {
         const today = new Date().toISOString().split('T')[0];
-        const schemaPrompt = await this.schemaService.getDatabaseSchemaPrompt(datasourceId, userId);
+        const schemaPrompt = await this.schemaService.getDatabaseSchemaPrompt(datasourceId, userId, query, generationId);
 
         let statePrompt = '';
         if (conversationId) {

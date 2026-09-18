@@ -65,6 +65,9 @@ export class GenerationService implements OnModuleDestroy {
                 conversationId,
                 'assistant',
             ]);
+            const modelName = reasoningEnabled
+                ? process.env.OPENAI_REASONING_MODEL || process.env.OPENAI_MODEL || 'gpt-4o'
+                : process.env.OPENAI_FAST_MODEL || process.env.OPENAI_MODEL || 'gpt-4o';
             await tx.execute(
                 `INSERT INTO generation (
                     id,user_id,conversation_id,request_message_id,response_message_id,status,
@@ -82,7 +85,7 @@ export class GenerationService implements OnModuleDestroy {
                     requestHash,
                     reasoningEnabled,
                     process.env.LLM_PROVIDER || 'openai-compatible',
-                    process.env.OPENAI_MODEL || 'gpt-4o',
+                    modelName,
                     AGENT_RUNTIME_VERSIONS.promptPolicy,
                     AGENT_RUNTIME_VERSIONS.toolset,
                     AGENT_RUNTIME_VERSIONS.contextPolicy,

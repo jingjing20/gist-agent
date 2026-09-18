@@ -1,6 +1,6 @@
 # Gist Agent 数据分析链路改造规划
 
-> 状态：分阶段实施中（Phase 0～5 已完成；下一阶段为 Phase 6 规模化优化）
+> 状态：Phase 0～6 已完成；进入基于评测与线上指标的持续优化
 >
 > 最近复盘：2026-09-17
 >
@@ -24,10 +24,10 @@
 
 当前系统已经具备较好的工程骨架：API/Worker 分离、事务 Outbox、Redis Stream、generation 幂等、心跳与取消、AST SQL 只读校验、分层上下文压缩和结构化记忆治理。这些能力足以支持 Demo 和内部试用。
 
-Phase 0～5 已经解决输入串话、假取消、终态后写入、非法工具调用、证据丢失、图表数值复制、SQL fail-open、截断结果误读和记忆不可治理等确定性问题。当前主要剩余问题是：
+Phase 0～6 已经解决输入串话、假取消、终态后写入、非法工具调用、证据丢失、图表数值复制、SQL fail-open、截断结果误读、记忆不可治理和大目录全量注入等确定性问题，并建立真实 Agent 发布评测、运行成本指标与保留策略。当前工作转为持续运营：
 
-1. 大规模 Schema 检索、成本和延迟策略尚未完成。
-2. 现有 benchmark 验证参考 SQL，不验证真实 Agent 回答质量。
+1. 每次模型、Prompt 或检索策略变更运行真实 Agent benchmark，并在发布环境校验质量、成本和延迟门槛。
+2. 根据线上召回报告决定是否需要引入向量检索，而不是预先增加复杂度。
 
 ## 4. 阶段决策索引
 
@@ -59,6 +59,7 @@ Phase 0～5 已经解决输入串话、假取消、终态后写入、非法工�
 | [12-phase-3-implementation.md](./12-phase-3-implementation.md)                   | Phase 3 实施记录   | Turn、Artifact、动态预算、验证证据与遗留项    |
 | [13-phase-4-implementation.md](./13-phase-4-implementation.md)                   | Phase 4 实施记录   | 只读角色、fail-closed、字段策略与结果质量      |
 | [14-phase-5-implementation.md](./14-phase-5-implementation.md)                   | Phase 5 实施记录   | 结构化记忆、版本冲突、纠正与遗忘              |
+| [15-phase-6-implementation.md](./15-phase-6-implementation.md)                   | Phase 6 实施记录   | Schema 检索、评测门禁、运行指标与保留策略     |
 
 ## 6. 优先级摘要
 

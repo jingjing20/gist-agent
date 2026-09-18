@@ -1,0 +1,7 @@
+{
+    "minimumOverallScore": 80,
+    "minimumPassRate": 0.9,
+    "minimumSchemaRecall": 0.95,
+    "maximumP95TotalLatencyMs": 120000,
+    "maximumAverageCostMicrousd": 50000
+}

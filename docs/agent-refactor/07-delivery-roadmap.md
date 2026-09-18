@@ -14,7 +14,7 @@
 | Phase 3 | 证据与上下文   | Turn、Query Artifact、图表引用、动态预算 | 已完成 |
 | Phase 4 | 安全与质量     | 只读角色、fail-closed、结果质量检查      | 已完成 |
 | Phase 5 | 记忆升级       | 结构化记忆、版本、纠正与管理             | 已完成 |
-| Phase 6 | 规模化优化     | Schema 检索调优、成本/延迟、在线评估     | 待实施 |
+| Phase 6 | 规模化优化     | Schema 检索调优、成本/延迟、在线评估     | 已完成 |
 
 ## 3. Phase 0：建立可比较基线
 
@@ -195,7 +195,7 @@ Phase 0～4 已完成。Phase 4 已按以下顺序交付，且每一步都有对
 5. Schema、记忆和查询值标记为 untrusted data，并加入攻击回归。
 6. 真实 PostgreSQL 验证只读角色不可写、不可读取未授权表且 statement timeout 生效。
 
-Phase 5 已完成结构化、可追溯、可纠正和可删除的长期记忆。当前下一阶段是 Phase 6；Phase 4 的查询池在未配置独立账号的非生产环境保留兼容回退，生产环境则严格 fail closed。
+Phase 5 已完成结构化、可追溯、可纠正和可删除的长期记忆。Phase 6 已完成分层 Schema 检索、真实 Agent 机器可读评测与发布门禁、版本化运行 dashboard、模型路由/有界重试及可审计保留清理。实施证据见 [Phase 6 实施记录](./15-phase-6-implementation.md)。
 
 ## 11. 每个改造 PR 的完成条件
 
