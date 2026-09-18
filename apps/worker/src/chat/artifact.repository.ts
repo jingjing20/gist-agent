@@ -10,6 +10,7 @@ import type {
     QueryArtifactResultV1,
     QueryArtifactV1,
     QueryPlanV1,
+    ResultQualityV1,
 } from '@gist/contracts';
 import { resolveCatalogDatasourceId } from '@gist/database';
 import { DatabaseService, type QueryRow } from '../database/database.service';
@@ -32,6 +33,7 @@ interface CreateQueryArtifactInput {
     returnedRowCount: number;
     totalRowCount?: number;
     isLimited: boolean;
+    resultQuality?: ResultQualityV1;
 }
 
 interface CreateChartArtifactInput {
@@ -60,12 +62,14 @@ export class ArtifactRepository {
         }
         const id = randomUUID();
         const hash = createHash('sha256').update(canonicalRows).digest('hex');
+        const qualityColumn = input.resultQuality ? ',result_quality' : '';
+        const qualityValue = input.resultQuality ? ',?::jsonb' : '';
         const rows = await this.db.query<QueryRow[]>(
             `INSERT INTO query_artifact (
                 id,generation_id,user_id,conversation_id,datasource_id,title,purpose,expected_grain,expected_shape,
                 original_sql,executed_sql,schema_context_version,columns_json,result_rows,returned_row_count,
-                total_row_count,is_limited,result_content_hash
-             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?,?,?,?)
+                total_row_count,is_limited,result_content_hash${qualityColumn}
+             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?,?,?,?${qualityValue})
              RETURNING created_at,expires_at`,
             [
                 id,
@@ -86,6 +90,7 @@ export class ArtifactRepository {
                 input.totalRowCount ?? null,
                 input.isLimited,
                 hash,
+                ...(input.resultQuality ? [JSON.stringify(input.resultQuality)] : []),
             ]
         );
         return {
@@ -103,6 +108,7 @@ export class ArtifactRepository {
             returnedRowCount: input.returnedRowCount,
             ...(input.totalRowCount === undefined ? {} : { totalRowCount: input.totalRowCount }),
             isLimited: input.isLimited,
+            ...(input.resultQuality ? { resultQuality: input.resultQuality } : {}),
             resultContentHash: hash,
             createdAt: toIso(rows[0].created_at),
             ...(rows[0].expires_at ? { expiresAt: toIso(rows[0].expires_at) } : {}),
@@ -204,6 +210,7 @@ export class ArtifactRepository {
             returnedRowCount: Number(row.returned_row_count),
             ...(row.total_row_count == null ? {} : { totalRowCount: Number(row.total_row_count) }),
             isLimited: row.is_limited === true,
+            ...(row.result_quality ? { resultQuality: parseJson<ResultQualityV1>(row.result_quality, {} as ResultQualityV1) } : {}),
             resultContentHash: row.result_content_hash,
             createdAt: toIso(row.created_at),
             ...(row.expires_at ? { expiresAt: toIso(row.expires_at) } : {}),

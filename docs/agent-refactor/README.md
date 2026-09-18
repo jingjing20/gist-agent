@@ -1,6 +1,6 @@
 # Gist Agent 数据分析链路改造规划
 
-> 状态：分阶段实施中（Phase 0～3 已完成；下一阶段为 Phase 4 安全与分析质量）
+> 状态：分阶段实施中（Phase 0～4 已完成；下一阶段为 Phase 5 结构化记忆）
 >
 > 最近复盘：2026-09-17
 >
@@ -24,12 +24,11 @@
 
 当前系统已经具备较好的工程骨架：API/Worker 分离、事务 Outbox、Redis Stream、generation 幂等、心跳与取消、AST SQL 只读校验、分层上下文压缩、业务口径蒸馏。这些能力足以支持 Demo 和内部试用。
 
-Phase 0～3 已经解决输入串话、假取消、终态后写入、非法工具调用、证据丢失和图表数值复制等确定性问题。当前阻碍系统进入“可信数据分析”阶段的主要剩余问题是：
+Phase 0～4 已经解决输入串话、假取消、终态后写入、非法工具调用、证据丢失、图表数值复制、SQL fail-open 和截断结果误读等确定性问题。当前主要剩余问题是：
 
-1. 数据库最小权限、fail-closed 和结果质量检查尚未形成完整防线。
-2. 长期记忆缺少来源、版本、冲突、撤销和并发更新语义。
-3. Schema、记忆和数据内容仍存在 Prompt Injection 风险。
-4. 现有 benchmark 验证参考 SQL，不验证真实 Agent 回答质量。
+1. 长期记忆缺少来源、版本、冲突、撤销和并发更新语义。
+2. 大规模 Schema 检索、成本和延迟策略尚未完成。
+3. 现有 benchmark 验证参考 SQL，不验证真实 Agent 回答质量。
 
 ## 4. 阶段决策索引
 
@@ -59,6 +58,7 @@ Phase 0～3 已经解决输入串话、假取消、终态后写入、非法工�
 | [10-phase-2-implementation.md](./10-phase-2-implementation.md)                   | Phase 2 决策与实施 | 状态机、工具校验、明确终态、推理展示边界      |
 | [11-phase-3-implementation-contract.md](./11-phase-3-implementation-contract.md) | Phase 3 实施合同   | 数据契约、实施顺序、迁移、测试与回滚          |
 | [12-phase-3-implementation.md](./12-phase-3-implementation.md)                   | Phase 3 实施记录   | Turn、Artifact、动态预算、验证证据与遗留项    |
+| [13-phase-4-implementation.md](./13-phase-4-implementation.md)                   | Phase 4 实施记录   | 只读角色、fail-closed、字段策略与结果质量      |
 
 ## 6. 优先级摘要
 

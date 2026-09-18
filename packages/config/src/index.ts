@@ -38,6 +38,20 @@ export function databaseConfig(): DatabaseConfig {
   };
 }
 
+/** Dedicated least-privilege connection used only for Agent-authored queries. */
+export function agentDatabaseConfig(): DatabaseConfig {
+  const base = databaseConfig();
+  if (process.env.NODE_ENV === 'production' && (!process.env.AGENT_DB_USER || !process.env.AGENT_DB_PASSWORD)) {
+    throw new Error('生产环境必须配置 AGENT_DB_USER 和 AGENT_DB_PASSWORD，禁止 Agent 复用应用数据库账号');
+  }
+  return {
+    ...base,
+    user: process.env.AGENT_DB_USER || base.user,
+    password: process.env.AGENT_DB_PASSWORD || base.password,
+    max: numberEnv('AGENT_DB_POOL_MAX', 4),
+  };
+}
+
 export interface WorkerConfig {
   redisUrl: string;
   eventKeyPrefix: string;

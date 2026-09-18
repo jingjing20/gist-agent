@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { DatabaseClient } from '@gist/database';
+import { applyPhase4Schema, DatabaseClient } from '@gist/database';
 import { loadWorkspaceEnv } from '@gist/config';
 
 loadWorkspaceEnv();
@@ -13,6 +13,7 @@ const { SqlQueryTool } = require('../apps/worker/dist/chat/tools/sql-query.tool.
 const { SqlExecutorAgent } = require('../apps/worker/dist/chat/agents/sql-executor.js');
 
 const database = new DatabaseClient();
+await applyPhase4Schema(database);
 const email = `phase3-artifacts-${randomUUID()}@example.test`;
 const ownerEmail = `phase3-owner-${randomUUID()}@example.test`;
 let privateDatasourceId;
@@ -272,9 +273,9 @@ try {
             }),
         },
         { chat: async () => '' },
-        { getAllowedTableNames: async () => [] }
+        { getAllowedTableNames: async () => [], getColumnPolicies: async () => [] }
     );
-    const normalized = await executor.execute('SELECT 1');
+    const normalized = await executor.execute('SELECT 1', null, 1);
     assert.deepEqual(normalized.columns, [
         { name: 'safe', type: 'number' },
         { name: 'unsafe', type: 'unknown' },

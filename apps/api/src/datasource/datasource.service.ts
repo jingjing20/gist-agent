@@ -229,6 +229,7 @@ export class DataSourceService {
                  VALUES (?, 'public', ?, ?, ?, 'uploaded', TRUE, ?) RETURNING id`,
                 [datasourceId, tableName, displayName, displayName, userId]
             );
+            await this.grantAgentReadAccess(tableName);
 
             this.schemaService.clearDatasourceCache(datasourceId);
             this.schemaEnrichmentService.enrichTableSchemaAsync(tableName);
@@ -250,6 +251,15 @@ export class DataSourceService {
             await this.db.execute(`DROP TABLE IF EXISTS \`${tableName}\``);
             throw error;
         }
+    }
+
+    private async grantAgentReadAccess(tableName: string): Promise<void> {
+        const role = process.env.AGENT_DB_USER;
+        if (!role) return;
+        if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(role) || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tableName)) {
+            throw new Error('只读角色或数据表名称不合法');
+        }
+        await this.db.execute(`GRANT SELECT ON TABLE public.\`${tableName}\` TO \`${role}\``);
     }
 
     async listTables(datasourceId: number, userId: number): Promise<DataSourceTable[]> {

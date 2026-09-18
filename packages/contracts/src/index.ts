@@ -5,11 +5,11 @@ export const GENERATION_QUEUE_NAME = 'conversation-generations';
  * 都应提升对应版本，并随 generation 一起持久化，便于评测和线上追踪。
  */
 export const AGENT_RUNTIME_VERSIONS = {
-    promptPolicy: 'prompt-policy-v3',
-    toolset: 'toolset-v3',
+    promptPolicy: 'prompt-policy-v4',
+    toolset: 'toolset-v4',
     contextPolicy: 'context-policy-v3',
     memoryPolicy: 'memory-policy-v1',
-    schemaContext: 'schema-context-v2',
+    schemaContext: 'schema-context-v3',
 } as const;
 
 export const GENERATION_ERROR_CODES = [
@@ -27,6 +27,8 @@ export const GENERATION_ERROR_CODES = [
     'ARTIFACT_NOT_FOUND',
     'ARTIFACT_ACCESS_DENIED',
     'ARTIFACT_FIELD_INVALID',
+    'SQL_SECURITY_REJECTED',
+    'DATASOURCE_ACCESS_CHANGED',
     'WORKER_LOST',
     'INTERNAL_ERROR',
 ] as const;
@@ -43,6 +45,26 @@ export interface QueryPlanV1 {
     purpose: string;
     expectedGrain: string;
     expectedShape: QueryExpectedShape;
+}
+
+export type ResultQualitySeverity = 'info' | 'warning' | 'blocking';
+export interface ResultQualityWarningV1 {
+    code: 'RESULT_LIMITED' | 'TOOL_RESULT_TRUNCATED' | 'NULL_VALUES' | 'DUPLICATE_GRAIN' | 'JOIN_FANOUT_RISK' | 'TIMEZONE_ASSUMED' | 'EMPTY_RESULT';
+    severity: ResultQualitySeverity;
+    message: string;
+    action: string;
+}
+
+export interface ResultQualityV1 {
+    expectedGrain: string;
+    expectedShape: QueryExpectedShape;
+    observedRowCount: number;
+    isLimited: boolean;
+    toolResultTruncated: boolean;
+    nullRates: Record<string, number>;
+    duplicateKeyCount?: number;
+    timeRange?: { column: string; min: string; max: string; timezone: string };
+    warnings: ResultQualityWarningV1[];
 }
 
 export interface ExecuteSqlQueryArgsV2 {
@@ -71,6 +93,7 @@ export interface QueryArtifactV1 {
     returnedRowCount: number;
     totalRowCount?: number;
     isLimited: boolean;
+    resultQuality?: ResultQualityV1;
     resultContentHash: string;
     createdAt: string;
     expiresAt?: string;

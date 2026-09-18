@@ -1,4 +1,4 @@
-import { databaseConfig, type DatabaseConfig } from '@gist/config';
+import { agentDatabaseConfig, databaseConfig, type DatabaseConfig } from '@gist/config';
 import { Pool, type PoolClient, type QueryResult } from 'pg';
 
 export const PHASE3_SCHEMA_SQL = `
@@ -100,6 +100,24 @@ FROM ranked WHERE ranked.id=ct.id;
 UPDATE conversation_turn SET sequence=-sequence WHERE sequence < 0;
 `;
 
+export const PHASE4_SCHEMA_SQL = `
+ALTER TABLE query_artifact ADD COLUMN IF NOT EXISTS result_quality JSONB;
+
+CREATE TABLE IF NOT EXISTS datasource_column_policy (
+  datasource_id INTEGER NOT NULL REFERENCES data_source(id) ON DELETE CASCADE,
+  schema_name VARCHAR(63) NOT NULL DEFAULT 'public',
+  table_name VARCHAR(63) NOT NULL,
+  column_name VARCHAR(63) NOT NULL,
+  classification VARCHAR(20) NOT NULL CHECK(classification IN ('public','internal','sensitive','restricted')),
+  agent_access VARCHAR(20) NOT NULL CHECK(agent_access IN ('allow','mask','deny')),
+  mask_type VARCHAR(20) CHECK(mask_type IS NULL OR mask_type IN ('redact','last4','hash')),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY(datasource_id, schema_name, table_name, column_name)
+);
+CREATE INDEX IF NOT EXISTS idx_column_policy_lookup
+  ON datasource_column_policy(datasource_id, schema_name, table_name);
+`;
+
 export interface SchemaQueryable {
     query(sql: string): Promise<unknown>;
 }
@@ -107,6 +125,10 @@ export interface SchemaQueryable {
 export async function applyPhase3Schema(db: SchemaQueryable): Promise<void> {
     await db.query(PHASE3_SCHEMA_SQL);
     await db.query(PHASE3_TURN_BACKFILL_SQL);
+}
+
+export async function applyPhase4Schema(db: SchemaQueryable): Promise<void> {
+    await db.query(PHASE4_SCHEMA_SQL);
 }
 
 export type QueryRow = Record<string, any>;
@@ -169,16 +191,18 @@ export async function getAgentVisibleCatalogTables(db: CatalogQueryable, datasou
 
 export class DatabaseClient {
     private readonly pool: Pool;
+    private readonly agentPool: Pool;
 
     constructor(configuration: DatabaseConfig = databaseConfig()) {
         this.pool = new Pool(configuration);
+        this.agentPool = new Pool(agentDatabaseConfig());
     }
 
     async connect(): Promise<void> {
         await this.pool.query('SELECT 1');
     }
     async close(): Promise<void> {
-        await this.pool.end();
+        await Promise.all([this.pool.end(), this.agentPool.end()]);
     }
     async getPool(_datasourceId?: number | null): Promise<Pool> {
         return this.pool;
@@ -198,11 +222,11 @@ export class DatabaseClient {
         _datasourceId?: number | null,
         options: { timeoutMs?: number; signal?: AbortSignal } = {}
     ): Promise<T> {
-        const client = await this.pool.connect();
+        const client = await this.agentPool.connect();
         const timeoutMs = Math.max(1, Math.floor(options.timeoutMs ?? 15_000));
         let backendPid: number | null = null;
         const cancel = () => {
-            if (backendPid != null) void this.pool.query('SELECT pg_cancel_backend($1)', [backendPid]).catch(() => undefined);
+            if (backendPid != null) void this.agentPool.query('SELECT pg_cancel_backend($1)', [backendPid]).catch(() => undefined);
         };
         if (options.signal?.aborted) {
             client.release();
@@ -233,11 +257,11 @@ export class DatabaseClient {
         _datasourceId?: number | null,
         options: { timeoutMs?: number; signal?: AbortSignal } = {}
     ): Promise<DetailedQueryResult<T>> {
-        const client = await this.pool.connect();
+        const client = await this.agentPool.connect();
         const timeoutMs = Math.max(1, Math.floor(options.timeoutMs ?? 15_000));
         let backendPid: number | null = null;
         const cancel = () => {
-            if (backendPid != null) void this.pool.query('SELECT pg_cancel_backend($1)', [backendPid]).catch(() => undefined);
+            if (backendPid != null) void this.agentPool.query('SELECT pg_cancel_backend($1)', [backendPid]).catch(() => undefined);
         };
         if (options.signal?.aborted) {
             client.release();

@@ -1,6 +1,6 @@
 # 05. 数据安全与分析质量改造
 
-> 规划状态：对应 Phase 4，尚未完整实施。Phase 1 已完成单次 SQL 的只读事务、`statement_timeout` 和后端取消，但独立最小权限角色、全面 fail-closed、敏感字段策略与 ResultQuality 仍未完成。
+> 实施状态：Phase 4 已完成。独立查询连接池与只读角色、全面 fail-closed、字段策略、动态内容隔离和 ResultQuality 已落地；验证证据见 [Phase 4 实施记录](./13-phase-4-implementation.md)。
 >
 > 前置依赖：Phase 3 的 Query Artifact 为质量摘要和证据审计提供稳定载体；安全底线中不依赖 Artifact 的部分可以提前实施。
 

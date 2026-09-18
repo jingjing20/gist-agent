@@ -12,7 +12,7 @@
 | Phase 1 | 关闭可靠性缺口 | 真取消、输入快照、会话串行、终态栅栏     | 已完成 |
 | Phase 2 | 确定性编排     | 状态机、工具校验、迭代耗尽、推理展示边界 | 已完成 |
 | Phase 3 | 证据与上下文   | Turn、Query Artifact、图表引用、动态预算 | 已完成 |
-| Phase 4 | 安全与质量     | 只读角色、fail-closed、结果质量检查      | 待实施 |
+| Phase 4 | 安全与质量     | 只读角色、fail-closed、结果质量检查      | 已完成 |
 | Phase 5 | 记忆升级       | 结构化记忆、版本、纠正与管理             | 待实施 |
 | Phase 6 | 规模化优化     | Schema 检索调优、成本/延迟、在线评估     | 待实施 |
 
@@ -124,6 +124,8 @@ Phase 2 已保证动作顺序合法，但图表值仍由模型转录，历史压
 
 ## 7. Phase 4：安全与分析质量
 
+实施状态：已完成。独立查询池、生产配置 fail-closed、SQL/表/字段校验、字段策略、ResultQuality 与注入回归均已落地。详情见 [Phase 4 实施记录](./13-phase-4-implementation.md)。
+
 ### 为什么不能只靠应用校验
 
 应用规则可能存在遗漏或解析失败；数据库最小权限才是最终写保护。同时，“SQL 能执行”不等于“结果适合下结论”，因此需要截断、空值、JOIN 扇出和时区等结果质量检查。
@@ -184,16 +186,16 @@ Schema 检索、模型路由和成本优化会扩大策略空间；如果证据�
 
 ## 10. 当前推进位置
 
-Phase 0～3 已完成。Phase 3 已按以下顺序交付，且每一步都有对应的自动化回归：
+Phase 0～4 已完成。Phase 4 已按以下顺序交付，且每一步都有对应的自动化回归：
 
-1. 定义 QueryPlan、Query Artifact、Chart Artifact 和 Turn 契约，并建立数据库表与幂等迁移。
-2. 查询成功后双写 Query Artifact 和现有 block，验证内容 hash 一致。
-3. 图表改为引用 Query Artifact 字段，由服务端构造数值。
-4. 上下文改为按完整 Turn 读取和裁剪。
-5. 增加受权限保护的 Artifact 读取能力，支持后续追问。
-6. 建立模型能力与 token 预算，按完整 Turn 降级。
+1. Agent 查询使用独立连接池和最小权限数据库角色；生产环境缺少独立凭据时拒绝启动。
+2. SQL 仅接受单条 SELECT，解析、表、schema、函数或字段范围不确定时 fail closed。
+3. 引入字段 allow/mask/deny 策略，并在 Schema 暴露、查询校验和结果输出三处执行。
+4. Query Artifact 持久化 ResultQuality，阻断截断、重复粒度等不可靠结论。
+5. Schema、记忆和查询值标记为 untrusted data，并加入攻击回归。
+6. 真实 PostgreSQL 验证只读角色不可写、不可读取未授权表且 statement timeout 生效。
 
-当前下一阶段是 Phase 4：数据库只读角色、fail-closed 以及 ResultQuality。Phase 5、6 不混入 Phase 4 实施；Phase 3 的新表和新字段保持前向兼容，不做破坏性回滚。
+当前下一阶段是 Phase 5：结构化、可追溯、可纠正和可删除的长期记忆。Phase 6 不混入 Phase 5 实施；Phase 4 的查询池在未配置独立账号的非生产环境保留兼容回退，生产环境则严格 fail closed。
 
 ## 11. 每个改造 PR 的完成条件
 
