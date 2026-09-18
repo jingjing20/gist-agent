@@ -1,0 +1,62 @@
+scripts/phase4-security-quality-regression.mjs
+  6efc6fdf8e998673 1-96
+docs/agent-refactor/05-data-security-and-quality.md
+  6efc6fdf8e998673 3
+docs/agent-refactor/README.md
+  6efc6fdf8e998673 3,27,29-31,61
+apps/worker/src/database/schema.service.ts
+  6efc6fdf8e998673 12-18,50-51,72,77-103,128-129,148-149,165,204,210,215-216,225
+packages/contracts/src/index.ts
+  6efc6fdf8e998673 8-9,12,30-31,50-69,96
+apps/worker/src/chat/result-quality.ts
+  6efc6fdf8e998673 1-78
+.env.example
+  6efc6fdf8e998673 22-25
+apps/api/src/datasource/datasource.service.ts
+  6efc6fdf8e998673 232,256-264
+package.json
+  6efc6fdf8e998673 24
+packages/config/src/index.ts
+  6efc6fdf8e998673 41-54
+scripts/phase4-database-integration.mjs
+  6efc6fdf8e998673 1-54
+apps/worker/src/chat/tools/sql-query.tool.ts
+  6efc6fdf8e998673 8,96-113,134,164,171,176
+scripts/phase3-artifacts-regression.mjs
+  6efc6fdf8e998673 4,16,276,278
+apps/api/scripts/init-db.ts
+  6efc6fdf8e998673 4,141,149,155-183
+apps/worker/src/chat/artifact.repository.ts
+  6efc6fdf8e998673 13,36,65-66,71-72,93,111,213
+apps/worker/src/chat/prompt-builder.ts
+  6efc6fdf8e998673 60-61,68-69,71,82-83
+docs/agent-refactor/07-delivery-roadmap.md
+  6efc6fdf8e998673 15,127-128,189,191-196,198
+apps/worker/src/chat/agents/sql-executor.ts
+  6efc6fdf8e998673 9-11,52,58,63,67,70-72,74,76-90,94-109,202-205,207-213,218,222,225,321-349
+packages/database/src/index.ts
+  6efc6fdf8e998673 1,103-120,130-133,194,198,205,225,229,260,264
+docs/agent-refactor/13-phase-4-implementation.md
+  6efc6fdf8e998673 1-51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "63ace936a2b6036cdafc45e7b3e1e223ede83d27",
+  "prompts": {
+    "6efc6fdf8e998673": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0b21c-85e7-7e22-b13b-a1f570ad1513",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 611,
+      "total_deletions": 110,
+      "accepted_lines": 609,
+      "overriden_lines": 0
+    }
+  }
+}
