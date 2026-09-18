@@ -1,0 +1,72 @@
+apps/api/src/operations/operations.service.ts
+  4d1aa4d1f7ffd940 1-91
+apps/worker/src/database/schema.service.ts
+  4d1aa4d1f7ffd940 10-21,32-64,80-86,89-98,101,103-107,110-112,117-125,128,130-131,135-138,250,265-280
+apps/worker/src/chat/generation.service.ts
+  4d1aa4d1f7ffd940 21,25-32,59,76,86,107,138-173,341-346
+apps/worker/src/retention/retention.service.ts
+  4d1aa4d1f7ffd940 1-71
+apps/api/src/operations/operations.controller.ts
+  4d1aa4d1f7ffd940 1-21
+apps/api/src/app.module.ts
+  4d1aa4d1f7ffd940 12,15
+apps/api/src/chat/generation.service.ts
+  4d1aa4d1f7ffd940 68-70,88
+docs/agent-refactor/README.md
+  4d1aa4d1f7ffd940 3,27,29-30,62
+packages/database/src/index.ts
+  4d1aa4d1f7ffd940 163-236,254-257
+apps/worker/src/chat/chat.module.ts
+  4d1aa4d1f7ffd940 18,35
+packages/llm/src/index.ts
+  4d1aa4d1f7ffd940 47,50,54,61
+apps/worker/src/chat/prompt-builder.ts
+  4d1aa4d1f7ffd940 48,50
+docs/agent-refactor/06-evaluation-and-observability.md
+  4d1aa4d1f7ffd940 3,16-18,146-149
+docs/agent-refactor/07-delivery-roadmap.md
+  4d1aa4d1f7ffd940 17,198
+scripts/phase6-evaluation-core.mjs
+  4d1aa4d1f7ffd940 1-69
+package.json
+  4d1aa4d1f7ffd940 26-28
+apps/worker/src/chat/chat.service.ts
+  4d1aa4d1f7ffd940 17-18,110-116,122-123,133-134,151-153,155,165,174-179,216-217,229-231,256,261,295,349-350,401-420
+scripts/phase6-regression.mjs
+  4d1aa4d1f7ffd940 1-59
+docs/agent-refactor/15-phase-6-implementation.md
+  4d1aa4d1f7ffd940 1-48
+scripts/phase6-worker-kill-e2e.mjs
+  4d1aa4d1f7ffd940 1-80
+apps/api/src/operations/operations.module.ts
+  4d1aa4d1f7ffd940 1-6
+scripts/phase6-agent-evaluation.mjs
+  4d1aa4d1f7ffd940 1-108
+apps/api/scripts/init-db.ts
+  4d1aa4d1f7ffd940 4,143
+packages/contracts/src/index.ts
+  4d1aa4d1f7ffd940 8,10,12,15-50
+benchmarks/saas-growth/release-thresholds.json
+  4d1aa4d1f7ffd940 1-7
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "c1897e666c41c78ed5b5669b7ba76b9584dba0f7",
+  "prompts": {
+    "4d1aa4d1f7ffd940": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0b31f-e756-70a0-942c-2ba932944b2f",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 946,
+      "total_deletions": 51,
+      "accepted_lines": 946,
+      "overriden_lines": 0
+    }
+  }
+}
