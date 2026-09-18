@@ -160,7 +160,7 @@ LLM 生成 SQL 天然不可信。这个项目有哪些防线？这些防线是�
 
 **问题深挖**
 
-`SemanticDistillerService` 每轮对话后异步更新 `semantic_state`。它到底解决什么问题？为什么不直接依赖历史消息压缩？
+`SemanticDistillerService` 每轮对话后异步提出结构化 Memory Patch。它到底解决什么问题？为什么不直接依赖历史消息压缩？
 
 **参考答案**
 
@@ -174,20 +174,20 @@ LLM 生成 SQL 天然不可信。这个项目有哪些防线？这些防线是�
 
 这些定义可能出现在很早之前，但后续所有 SQL 和结论都要遵守。仅靠 compact 历史很容易丢掉这些口径。
 
-`SemanticDistillerService` 的做法是：每轮结束后，用一个后台 LLM 从用户消息里抽取业务名词定义，写入 `conversation.semantic_state.definitions`。下一轮 `PromptBuilder.buildSystemPrompt` 会把这些 definitions 注入 System Prompt。
+`SemanticDistillerService` 的做法是：每轮结束后，用后台 LLM 从本轮用户消息提出 add/supersede/delete patch。服务端校验类型、字段、来源、版本和注入风险，再事务写入 `memory_record`。下一轮 `PromptBuilder` 只解析相关 active 记录，并作为 untrusted JSON 数据注入。
 
 它和 RAG 的区别是：
 
-- 语义蒸馏是结构化状态更新，写入的是当前会话的业务口径。
+- 语义蒸馏是结构化状态更新，写入的是按 user/datasource/conversation 作用域管理的业务口径。
 - RAG 是从外部知识库检索相关文档，通常是无状态或弱状态。
-- 蒸馏强调“会话内长期记忆”，RAG 强调“外部知识召回”。
+- 蒸馏强调“用户确认信息的长期记忆”，RAG 强调“外部知识召回”。
 
 当前实现的风险也很明确：
 
 - 它是 fire-and-forget，失败不会影响本轮回答，但下一轮可能缺记忆。
 - 它只看 `userMessage`，没有看 assistant 最终结论和工具结果，因此不会沉淀查询事实。
-- JSON 解析靠正则截取 `{...}`，对模型输出格式依赖较强。
-- 并发多轮请求可能出现状态覆盖问题。
+- 提取仍依赖模型，错误候选需要通过 proposed 状态和管理界面确认或纠正。
+- fire-and-forget 失败不会影响本轮回答，但下一轮可能暂时缺少新记忆。
 
 如果生产化，应当引入版本号或乐观锁，并把“业务定义”和“数据事实”分开存储，避免用户口径和查询结果混在一起。
 
@@ -274,7 +274,7 @@ Agent 执行天然是多阶段、长耗时的。一次数据分析可能包含�
 
 第三是上下文和记忆一致性不足。
 
-`PromptBuilder` 的 token 估算是粗略的，`SemanticDistillerService` 异步更新可能失败或并发覆盖。应使用真实 tokenizer，按 turn 级别裁剪历史，并给 `semantic_state` 加版本控制。业务口径更新还应支持冲突处理，例如用户重新定义“活跃用户”时，需要覆盖旧定义，而不是简单合并。
+`PromptBuilder` 的 token 估算仍是粗略的，但记忆已改为增量 patch、版本链和冲突候选。下一步应使用真实 tokenizer、按相关性召回，并把记忆提取准确率纳入评测。
 
 如果继续深挖，还可以补：
 
@@ -293,7 +293,7 @@ Agent 执行天然是多阶段、长耗时的。一次数据分析可能包含�
 4. 为什么 SQL 修复 Agent 不能拥有完整 Schema？如果给它完整 Schema 会有什么代价？
 5. `blocks` 和 `llm_messages` 为什么要分开存？只存一种行不行？
 6. 语义蒸馏为什么只抽业务定义，不抽查询结果？
-7. 如果用户在第 10 轮重新定义业务口径，旧的 `semantic_state` 应该怎么处理？
+7. 如果用户在第 10 轮重新定义业务口径，如何用 expectedVersion、superseded 和 proposed 处理并发冲突？
 8. 如何防止模型在 `generate_chart` 里传入非 SQL 结果的数据？
 9. 如果 OpenAI stream 中断，前端历史应该如何保持一致？
 10. 这个 Agent 如果接入更多工具，`ToolRegistry` 还够不够？什么时候应该升级为 Planner / Executor 架构？
@@ -306,7 +306,7 @@ Agent 执行天然是多阶段、长耗时的。一次数据分析可能包含�
 - 工具系统用 OpenAI Function Calling 暴露能力。
 - SQL 执行通过 AST 白名单、权限校验、LIMIT 注入和语法自愈做防腐。
 - 上下文通过 full / medium / compact 三层压缩控制 token。
-- 长期业务口径通过语义蒸馏写入 `semantic_state`。
+- 长期业务口径通过语义蒸馏提出 patch，并写入有来源和版本的 `memory_record`。
 - 前端体验通过 SSE 事件流和 `blocks` 持久化统一建模。
 
 面试回答时不要只说“用了 ReAct”或“用了 Function Calling”。真正有价值的是讲清楚：哪些约束交给 Prompt，哪些约束必须下沉到代码；哪些错误可以自动修，哪些错误必须暴露；哪些上下文应该保留证据链，哪些可以压缩成摘要。这才是 Agent 工程和普通 LLM Demo 的分水岭。

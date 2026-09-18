@@ -7,7 +7,6 @@ export interface Conversation {
     id: string;
     title: string;
     datasource_id: number | null;
-    semantic_state?: Record<string, any> | null;
     created_at: string;
     updated_at: string;
 }
@@ -67,10 +66,6 @@ export class ConversationService {
 
     async updateTitle(id: string, title: string, datasourceId: number | null = null): Promise<void> {
         await this.db.execute('UPDATE conversation SET title = ?, datasource_id = ? WHERE id = ?', [title, datasourceId, id]);
-    }
-
-    async updateSemanticState(id: string, state: Record<string, any>): Promise<void> {
-        await this.db.execute('UPDATE conversation SET semantic_state = ? WHERE id = ?', [JSON.stringify(state), id]);
     }
 
     async remove(id: string, userId: number): Promise<void> {

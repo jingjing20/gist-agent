@@ -8,9 +8,39 @@ export const AGENT_RUNTIME_VERSIONS = {
     promptPolicy: 'prompt-policy-v4',
     toolset: 'toolset-v4',
     contextPolicy: 'context-policy-v3',
-    memoryPolicy: 'memory-policy-v1',
+    memoryPolicy: 'memory-policy-v2',
     schemaContext: 'schema-context-v3',
 } as const;
+
+export const MEMORY_TYPES = ['metric_definition', 'dimension_definition', 'analysis_preference', 'locale_preference'] as const;
+export type MemoryType = (typeof MEMORY_TYPES)[number];
+export type MemoryScope = 'user' | 'datasource' | 'conversation';
+export type MemoryStatus = 'proposed' | 'active' | 'superseded' | 'deleted';
+
+export interface MemoryRecordV1 {
+    id: string;
+    userId: number;
+    scope: MemoryScope;
+    scopeId?: string;
+    type: MemoryType;
+    key: string;
+    value: Record<string, unknown>;
+    sourceMessageId: string;
+    sourceQuote?: string;
+    status: MemoryStatus;
+    version: number;
+    supersedesId?: string;
+    confirmedAt?: string;
+    createdAt: string;
+    updatedAt: string;
+    expiresAt?: string;
+}
+
+export type MemoryPatchV1 =
+    | { op: 'add'; type: MemoryType; key: string; value: Record<string, unknown>; evidence: string }
+    | { op: 'supersede'; targetId: string; expectedVersion: number; value: Record<string, unknown>; evidence: string }
+    | { op: 'delete'; targetId: string; expectedVersion: number; evidence: string }
+    | { op: 'noop' };
 
 export const GENERATION_ERROR_CODES = [
     'ANALYSIS_TIMEOUT',

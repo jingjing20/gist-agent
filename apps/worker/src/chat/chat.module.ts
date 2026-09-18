@@ -14,9 +14,10 @@ import { TOOL_INSTANCES, type Tool } from './tools/base-tool';
 import { ToolRegistry } from './tools/tool-registry';
 import { ArtifactRepository } from './artifact.repository';
 import { ReadQueryArtifactTool } from './tools/read-query-artifact.tool';
+import { MemoryModule } from '../memory/memory.module';
 
 @Module({
-    imports: [ConversationModule],
+    imports: [ConversationModule, MemoryModule],
     providers: [
         ChatService,
         GenerationService,

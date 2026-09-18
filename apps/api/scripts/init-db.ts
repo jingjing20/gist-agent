@@ -1,7 +1,7 @@
 import { Client } from 'pg';
 import { loadWorkspaceEnv } from '@gist/config';
 import { initializeDemoData } from './demo-data';
-import { applyPhase3Schema, applyPhase4Schema } from '@gist/database';
+import { applyPhase3Schema, applyPhase4Schema, applyPhase5Schema } from '@gist/database';
 
 loadWorkspaceEnv();
 const database = process.env.DB_NAME || 'gist_agent';
@@ -60,7 +60,7 @@ async function initDB() {
       );
       CREATE TABLE IF NOT EXISTS conversation (
         id UUID PRIMARY KEY, user_id INTEGER REFERENCES app_user(id) ON DELETE CASCADE, datasource_id INTEGER REFERENCES data_source(id) ON DELETE SET NULL,
-        title VARCHAR(200) NOT NULL DEFAULT '新对话', semantic_state JSONB, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        title VARCHAR(200) NOT NULL DEFAULT '新对话', created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
       CREATE TABLE IF NOT EXISTS message (
         id UUID PRIMARY KEY, conversation_id UUID NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
@@ -139,6 +139,7 @@ async function initDB() {
     `);
     await applyPhase3Schema(db);
     await applyPhase4Schema(db);
+    await applyPhase5Schema(db);
     await db.query(
         `INSERT INTO data_source (name, host, port, "user", password, database_name, is_local, description)
       SELECT '本地默认库', $1, $2, $3, $4, $5, 1, '系统默认 PostgreSQL 数据库'

@@ -162,9 +162,15 @@ export class ChatService {
         }
         const finalized = await this.generations.finalize(generation, finalStatus, errorDetail, errorCode, terminal, { blocks, llmMessages: turnMessages });
 
-        // Fire-and-forget：蒸馏器异步提取业务口径定义，写入 conversation.semantic_state
-        // 不 await 是因为蒸馏失败不应影响本次对话的响应
-        if (finalized && finalStatus === 'completed') this.distiller.updateStateAsync(conversationId, userId, message);
+        // 记忆提取失败不影响主回答；服务端只接受有来源的结构化增量 patch。
+        if (finalized && finalStatus === 'completed')
+            this.distiller.updateStateAsync({
+                conversationId,
+                userId,
+                datasourceId,
+                sourceMessageId: generation.requestMessageId,
+                userMessage: message,
+            });
     }
 
     /**

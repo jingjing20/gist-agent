@@ -22,6 +22,7 @@
         "test:phase3-context": "pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/phase3-context-regression.mjs",
         "test:phase3": "pnpm test:phase3-migrations && pnpm test:phase3-artifacts && pnpm test:phase3-context",
         "test:phase4": "pnpm --filter @gist/config build && pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/phase4-security-quality-regression.mjs && node scripts/phase4-database-integration.mjs",
+        "test:phase5": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/phase5-memory-regression.mjs",
         "smoke:phase3": "pnpm test:phase3 && pnpm smoke:conversation",
         "init-db": "pnpm --filter @gist/api init-db",
         "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\""

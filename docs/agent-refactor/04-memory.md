@@ -1,6 +1,6 @@
 # 04. 记忆系统改造
 
-> 规划状态：对应 Phase 5，尚未实施。当前仍使用 conversation 级 `semantic_state`；本文的 MemoryRecord、patch 协议和管理能力是目标设计。
+> 实施状态：Phase 5 已完成。MemoryRecord、patch、版本冲突和管理入口已经落地；详情见 [Phase 5 实施记录](./14-phase-5-implementation.md)。
 >
 > 排序原因：记忆会把一次理解长期放大，必须等待 Phase 3 的证据引用和 Phase 4 的信任边界稳定后再升级，避免把短期错误结构化并永久保存。
 
@@ -8,7 +8,7 @@
 
 建立可追溯、可纠正、可并发更新、可遗忘的记忆系统。记忆只保存未来确实需要复用的信息，不承担查询证据或完整聊天历史的职责。
 
-## 2. 当前实现证据
+## 2. 改造前实现证据
 
 - conversation 只有一个自由结构的 `semantic_state JSONB`。
 - 每轮完成后以 fire-and-forget 方式调用蒸馏器；只在 completed generation 后触发。
@@ -16,7 +16,7 @@
 - 模型返回完整 `{ definitions: ... }`，随后整体覆盖 semantic state：`apps/worker/src/chat/agents/semantic-distiller.service.ts`。
 - 下一轮把 definitions 直接拼入 System Prompt：`apps/worker/src/chat/prompt-builder.ts`。
 
-## 3. 对当前策略的评价
+## 3. 对改造前策略的评价
 
 “只记用户明确给出的业务口径，不自动记模型生成的数据事实”是正确的安全边界，应继续保留。否则一次错误查询可能变成长期记忆并持续污染后续回答。
 

@@ -118,6 +118,48 @@ CREATE INDEX IF NOT EXISTS idx_column_policy_lookup
   ON datasource_column_policy(datasource_id, schema_name, table_name);
 `;
 
+export const PHASE5_SCHEMA_SQL = `
+CREATE TABLE IF NOT EXISTS memory_record (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+  scope VARCHAR(20) NOT NULL CHECK(scope IN ('user','datasource','conversation')),
+  scope_id VARCHAR(100),
+  type VARCHAR(40) NOT NULL CHECK(type IN ('metric_definition','dimension_definition','analysis_preference','locale_preference')),
+  key VARCHAR(100) NOT NULL,
+  value JSONB NOT NULL,
+  source_message_id UUID NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+  source_quote VARCHAR(500),
+  status VARCHAR(20) NOT NULL CHECK(status IN ('proposed','active','superseded','deleted')),
+  version INTEGER NOT NULL CHECK(version > 0),
+  supersedes_id UUID REFERENCES memory_record(id) ON DELETE SET NULL,
+  confirmed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ,
+  CHECK((scope='user' AND scope_id IS NULL) OR (scope<>'user' AND scope_id IS NOT NULL)),
+  CHECK(jsonb_typeof(value)='object')
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_memory_active_key
+  ON memory_record(user_id, scope, COALESCE(scope_id,''), type, key)
+  WHERE status='active';
+CREATE UNIQUE INDEX IF NOT EXISTS uk_memory_source_operation
+  ON memory_record(source_message_id, scope, COALESCE(scope_id,''), type, key, version);
+CREATE INDEX IF NOT EXISTS idx_memory_resolver
+  ON memory_record(user_id, status, scope, scope_id, type, key);
+CREATE INDEX IF NOT EXISTS idx_memory_supersedes ON memory_record(supersedes_id);
+CREATE TABLE IF NOT EXISTS memory_change_audit (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  memory_id UUID NOT NULL REFERENCES memory_record(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES app_user(id) ON DELETE CASCADE,
+  action VARCHAR(20) NOT NULL CHECK(action IN ('confirm','correct','forget')),
+  previous_version INTEGER NOT NULL,
+  new_memory_id UUID REFERENCES memory_record(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_memory_audit_user ON memory_change_audit(user_id,created_at);
+ALTER TABLE conversation DROP COLUMN IF EXISTS semantic_state;
+`;
+
 export interface SchemaQueryable {
     query(sql: string): Promise<unknown>;
 }
@@ -129,6 +171,10 @@ export async function applyPhase3Schema(db: SchemaQueryable): Promise<void> {
 
 export async function applyPhase4Schema(db: SchemaQueryable): Promise<void> {
     await db.query(PHASE4_SCHEMA_SQL);
+}
+
+export async function applyPhase5Schema(db: SchemaQueryable): Promise<void> {
+    await db.query(PHASE5_SCHEMA_SQL);
 }
 
 export type QueryRow = Record<string, any>;
