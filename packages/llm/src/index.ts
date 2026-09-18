@@ -44,21 +44,19 @@ export class LlmClient {
     streamWithTools(
         messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
         tools: OpenAI.Chat.Completions.ChatCompletionTool[],
-        options: { signal?: AbortSignal; reasoningEnabled?: boolean; model?: string } = {}
+        options: { signal?: AbortSignal; reasoningEnabled?: boolean } = {}
     ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
         if (process.env.LLM_PROVIDER === 'mock') {
-            const delayMs = Math.max(0, Number(process.env.MOCK_LLM_CHUNK_DELAY_MS) || 0);
             return Promise.resolve(
                 (async function* () {
                     for (const content of ['这是', '独立 Worker', ' 的流式测试响应。']) {
-                        if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
                         yield { choices: [{ delta: { content } }] } as OpenAI.Chat.Completions.ChatCompletionChunk;
                     }
                 })()
             );
         }
         const payload = createStreamRequest({
-            model: options.model || this.model,
+            model: this.model,
             messages,
             tools,
             reasoningEnabled: options.reasoningEnabled === true,

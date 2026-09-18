@@ -15,7 +15,6 @@ import { ToolRegistry } from './tools/tool-registry';
 import { ArtifactRepository } from './artifact.repository';
 import { ReadQueryArtifactTool } from './tools/read-query-artifact.tool';
 import { MemoryModule } from '../memory/memory.module';
-import { RetentionService } from '../retention/retention.service';
 
 @Module({
     imports: [ConversationModule, MemoryModule],
@@ -32,7 +31,6 @@ import { RetentionService } from '../retention/retention.service';
         SqlQueryTool,
         GenerateChartTool,
         ReadQueryArtifactTool,
-        RetentionService,
         { provide: TOOL_INSTANCES, useFactory: (...tools: Tool[]) => tools, inject: [SqlQueryTool, GenerateChartTool, ReadQueryArtifactTool] },
         ToolRegistry,
     ],

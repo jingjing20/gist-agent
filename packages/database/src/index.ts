@@ -168,7 +168,6 @@ CREATE TABLE IF NOT EXISTS generation_metric (
   sql_call_count INTEGER NOT NULL DEFAULT 0 CHECK(sql_call_count >= 0),
   input_tokens_estimated INTEGER NOT NULL DEFAULT 0 CHECK(input_tokens_estimated >= 0),
   output_tokens_estimated INTEGER NOT NULL DEFAULT 0 CHECK(output_tokens_estimated >= 0),
-  estimated_cost_microusd BIGINT NOT NULL DEFAULT 0 CHECK(estimated_cost_microusd >= 0),
   schema_candidate_count INTEGER NOT NULL DEFAULT 0 CHECK(schema_candidate_count >= 0),
   schema_selected_count INTEGER NOT NULL DEFAULT 0 CHECK(schema_selected_count >= 0),
   schema_prompt_tokens_estimated INTEGER NOT NULL DEFAULT 0 CHECK(schema_prompt_tokens_estimated >= 0),
@@ -188,50 +187,6 @@ CREATE TABLE IF NOT EXISTS generation_trace_span (
 CREATE INDEX IF NOT EXISTS idx_generation_trace_span_generation
   ON generation_trace_span(generation_id,created_at);
 
-CREATE TABLE IF NOT EXISTS agent_evaluation_run (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  benchmark_version VARCHAR(64) NOT NULL,
-  model_provider VARCHAR(100) NOT NULL,
-  model_name VARCHAR(200) NOT NULL,
-  prompt_policy_version VARCHAR(64) NOT NULL,
-  toolset_version VARCHAR(64) NOT NULL,
-  context_policy_version VARCHAR(64) NOT NULL,
-  memory_policy_version VARCHAR(64) NOT NULL,
-  schema_context_version VARCHAR(64) NOT NULL,
-  case_count INTEGER NOT NULL CHECK(case_count >= 0),
-  overall_score NUMERIC(6,2) NOT NULL,
-  pass_rate NUMERIC(6,4) NOT NULL,
-  schema_recall NUMERIC(6,4) NOT NULL,
-  p95_total_latency_ms INTEGER NOT NULL,
-  average_cost_microusd BIGINT NOT NULL,
-  gate_passed BOOLEAN NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-CREATE INDEX IF NOT EXISTS idx_agent_evaluation_run_version
-  ON agent_evaluation_run(created_at DESC,model_name,prompt_policy_version);
-
-CREATE TABLE IF NOT EXISTS retention_policy (
-  resource_type VARCHAR(30) PRIMARY KEY CHECK(resource_type IN ('query_artifact','generation_event','memory_record')),
-  retention_days INTEGER NOT NULL CHECK(retention_days > 0),
-  enabled BOOLEAN NOT NULL DEFAULT TRUE,
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-INSERT INTO retention_policy(resource_type,retention_days,enabled) VALUES
-  ('query_artifact',30,TRUE),('generation_event',30,TRUE),('memory_record',365,TRUE)
-ON CONFLICT(resource_type) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS retention_cleanup_audit (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  resource_type VARCHAR(30) NOT NULL,
-  cutoff_at TIMESTAMPTZ NOT NULL,
-  deleted_count INTEGER NOT NULL CHECK(deleted_count >= 0),
-  status VARCHAR(20) NOT NULL CHECK(status IN ('completed','failed')),
-  error_code VARCHAR(64),
-  started_at TIMESTAMPTZ NOT NULL,
-  completed_at TIMESTAMPTZ NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_retention_cleanup_audit_time
-  ON retention_cleanup_audit(completed_at DESC);
 `;
 
 export interface SchemaQueryable {

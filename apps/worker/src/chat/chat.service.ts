@@ -148,7 +148,6 @@ export class ChatService {
                     generationId: generation.id,
                     conversationId: generation.conversationId,
                     schemaContextVersion: generation.schemaContextVersion,
-                    modelName: generation.modelName,
                 },
                 metrics
             );
@@ -213,7 +212,7 @@ export class ChatService {
         checkpoint?: () => Promise<void>,
         onFirstDelta?: () => Promise<void>,
         assertWritable?: () => Promise<void>,
-        generationContext?: { generationId: string; conversationId: string; schemaContextVersion: string; modelName: string },
+        generationContext?: { generationId: string; conversationId: string; schemaContextVersion: string },
         metrics: GenerationExecutionMetrics = { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 }
     ): Promise<AgentOutcome> {
         const tools = this.toolRegistry.getDefinitions();
@@ -228,7 +227,7 @@ export class ChatService {
             try {
                 metrics.llmCallCount += 1;
                 metrics.inputTokensEstimated += estimateMessagesTokens(messages) + estimateTokens(JSON.stringify(tools));
-                stream = await this.createModelStreamWithRetry(messages, tools, { signal, reasoningEnabled, model: generationContext?.modelName });
+                stream = await this.llm.streamWithTools(messages, tools, { signal, reasoningEnabled });
             } catch (error) {
                 this.throwAgentDependencyError(error, 'LLM_REQUEST_FAILED', 'LLM 请求失败', signal);
             }
@@ -399,23 +398,4 @@ export class ChatService {
         throw new GenerationExecutionError(code, `${prefix}: ${detail}`);
     }
 
-    private async createModelStreamWithRetry(
-        messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[],
-        tools: OpenAI.Chat.Completions.ChatCompletionTool[],
-        options: { signal?: AbortSignal; reasoningEnabled: boolean; model?: string }
-    ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
-        const attempts = Math.min(3, Math.max(1, Number(process.env.LLM_REQUEST_MAX_ATTEMPTS) || 2));
-        let lastError: unknown;
-        for (let attempt = 1; attempt <= attempts; attempt++) {
-            this.throwIfAborted(options.signal);
-            try {
-                return await this.llm.streamWithTools(messages, tools, options);
-            } catch (error) {
-                lastError = error;
-                if (attempt === attempts) break;
-                await new Promise((resolve) => setTimeout(resolve, 100 * attempt));
-            }
-        }
-        throw lastError;
-    }
 }

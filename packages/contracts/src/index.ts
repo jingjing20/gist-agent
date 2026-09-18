@@ -12,42 +12,6 @@ export const AGENT_RUNTIME_VERSIONS = {
     schemaContext: 'schema-context-v4',
 } as const;
 
-export interface GenerationMetricV1 {
-    generationId: string;
-    llmCallCount: number;
-    toolCallCount: number;
-    sqlCallCount: number;
-    inputTokensEstimated: number;
-    outputTokensEstimated: number;
-    estimatedCostMicrousd: number;
-    schemaCandidateCount: number;
-    schemaSelectedCount: number;
-    schemaPromptTokensEstimated: number;
-    schemaRetrievalMs: number;
-}
-
-export interface OperationsDashboardBucketV1 {
-    modelProvider: string;
-    modelName: string;
-    promptPolicyVersion: string;
-    toolsetVersion: string;
-    contextPolicyVersion: string;
-    memoryPolicyVersion: string;
-    schemaContextVersion: string;
-    generations: number;
-    completed: number;
-    failed: number;
-    cancelled: number;
-    successRate: number;
-    p95TotalLatencyMs: number;
-    p95FirstTokenMs: number;
-    inputTokensEstimated: number;
-    outputTokensEstimated: number;
-    estimatedCostMicrousd: number;
-    toolCalls: number;
-    sqlCalls: number;
-}
-
 export const MEMORY_TYPES = ['metric_definition', 'dimension_definition', 'analysis_preference', 'locale_preference'] as const;
 export type MemoryType = (typeof MEMORY_TYPES)[number];
 export type MemoryScope = 'user' | 'datasource' | 'conversation';

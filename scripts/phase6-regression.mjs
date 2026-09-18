@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { rankSchemaCatalog } from '../apps/worker/dist/database/schema.service.js';
-import { RetentionService } from '../apps/worker/dist/retention/retention.service.js';
 import { PHASE6_SCHEMA_SQL } from '../packages/database/dist/index.js';
 import { scoreAgentCase, summarizeReport } from './phase6-evaluation-core.mjs';
 
@@ -22,30 +21,6 @@ assert.ok(selected.length <= 12, 'retrieval must respect the configured detail l
 
 assert.match(PHASE6_SCHEMA_SQL, /generation_metric/);
 assert.match(PHASE6_SCHEMA_SQL, /generation_trace_span/);
-assert.match(PHASE6_SCHEMA_SQL, /agent_evaluation_run/);
-assert.match(PHASE6_SCHEMA_SQL, /retention_policy/);
-assert.match(PHASE6_SCHEMA_SQL, /retention_cleanup_audit/);
-
-const cleanupCalls = [];
-const fakeDatabase = {
-    async query() { return [
-        { resource_type: 'generation_event', retention_days: 30 },
-        { resource_type: 'memory_record', retention_days: 365 },
-        { resource_type: 'query_artifact', retention_days: 30 },
-    ]; },
-    async withTransaction(worker) {
-        return worker({
-            async execute(sql) {
-                cleanupCalls.push(sql);
-                return [{ rowCount: sql.startsWith('DELETE') ? 2 : 1 }];
-            },
-        });
-    },
-    async execute() { return { rowCount: 1 }; },
-};
-const cleanup = await new RetentionService(fakeDatabase).runOnce();
-assert.deepEqual(cleanup, { query_artifact: 2, generation_event: 2, memory_record: 2 });
-assert.equal(cleanupCalls.filter((sql) => sql.startsWith('INSERT INTO retention_cleanup_audit')).length, 3);
 
 const benchmark = JSON.parse(await readFile(new URL('../benchmarks/saas-growth/cases.json', import.meta.url), 'utf8'));
 const sample = benchmark.cases.find((item) => item.type === 'sql');
@@ -56,4 +31,4 @@ assert.equal(score.passed, true);
 const report = summarizeReport([score], { minimumOverallScore: 80, minimumPassRate: 0.9 });
 assert.equal(report.gate.passed, true);
 
-console.log(JSON.stringify({ schemaCandidates: tables.length, schemaSelected: selected.length, targetRank: 1, evaluatorScore: score.score, retentionContracts: 3 }, null, 2));
+console.log(JSON.stringify({ schemaCandidates: tables.length, schemaSelected: selected.length, targetRank: 1, evaluatorScore: score.score }, null, 2));
