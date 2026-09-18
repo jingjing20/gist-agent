@@ -1,0 +1,70 @@
+docs/agent-refactor/07-delivery-roadmap.md
+  068ae52ef1b030d2 16,159,198
+apps/api/src/memory/memory.module.ts
+  068ae52ef1b030d2 1-6
+apps/api/src/memory/memory.service.ts
+  068ae52ef1b030d2 1-90
+apps/web/src/types/index.ts
+  068ae52ef1b030d2 64-77
+docs/agent-refactor/14-phase-5-implementation.md
+  068ae52ef1b030d2 1-54
+apps/worker/src/chat/agents/semantic-distiller.service.ts
+  068ae52ef1b030d2 3-4,9,11-13,17-35,37-45,47-54,56-57
+apps/web/src/components/MemoryManagerModal.vue
+  068ae52ef1b030d2 1-65
+scripts/phase5-memory-regression.mjs
+  068ae52ef1b030d2 1-44
+docs/agent-refactor/README.md
+  068ae52ef1b030d2 3,25,27,29-30,61
+packages/contracts/src/index.ts
+  068ae52ef1b030d2 11,15-44
+apps/worker/src/chat/chat.service.ts
+  068ae52ef1b030d2 165-173
+apps/api/src/memory/memory.controller.ts
+  068ae52ef1b030d2 1-19
+packages/database/src/index.ts
+  068ae52ef1b030d2 121-162,176-179
+apps/web/src/views/MainLayout.vue
+  068ae52ef1b030d2 24,36-37,84,104,140-144
+docs/agent-refactor/04-memory.md
+  068ae52ef1b030d2 3,11,19
+apps/api/scripts/init-db.ts
+  068ae52ef1b030d2 4,63,142
+AI_AGENT_INTERVIEW.md
+  068ae52ef1b030d2 163,177,181,183,189-190,277,296,309
+scripts/phase4-security-quality-regression.mjs
+  068ae52ef1b030d2 77-78,82-83
+apps/worker/src/memory/memory.module.ts
+  068ae52ef1b030d2 1-5
+apps/worker/src/memory/memory.service.ts
+  068ae52ef1b030d2 1-140
+apps/worker/src/chat/prompt-builder.ts
+  068ae52ef1b030d2 7,43-44,47,54-58,70
+apps/api/src/app.module.ts
+  068ae52ef1b030d2 11,14
+package.json
+  068ae52ef1b030d2 25
+apps/worker/src/chat/chat.module.ts
+  068ae52ef1b030d2 17,20
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "8f436ad584791c9491357e4673b97b66ab686bab",
+  "prompts": {
+    "068ae52ef1b030d2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0b30d-7581-7a61-8fe4-173a6ae81d40",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 644,
+      "total_deletions": 128,
+      "accepted_lines": 633,
+      "overriden_lines": 0
+    }
+  }
+}
