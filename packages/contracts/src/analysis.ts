@@ -1,9 +1,9 @@
 /** New core is opt-in until business and interaction acceptance is complete. */
 export const ANALYSIS_RUNTIME_VERSIONS = {
     promptPolicy: 'analysis-core-v1',
-    toolset: 'analysis-tools-v1',
+    toolset: 'analysis-tools-v2',
     contextPolicy: 'analysis-context-v1',
-    memoryPolicy: 'analysis-definitions-fixture-v1',
+    memoryPolicy: 'analysis-definitions-v1',
     schemaContext: 'schema-context-v4',
 } as const;
 

@@ -410,3 +410,6 @@ export function normalizeSql(sql: string): string {
         .replace(/\b(FROM|JOIN|INTO|UPDATE|TABLE|REFERENCES)\s+(?:"user"|user)(?=\s|$|[,;)])/gi, '$1 app_user')
         .replace(/\?/g, () => `$${++parameter}`);
 }
+
+export * from './business-definition-schema';
+export * from './business-definition-repository';

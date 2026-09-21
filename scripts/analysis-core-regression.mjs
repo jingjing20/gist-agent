@@ -263,7 +263,29 @@ await check('runtime adapter persists snapshot and structured result in existing
         { isReasoningActive: () => false, streamWithTools: async () => stream([call('submit_analysis', { kind: 'clarification', question: '请提供口径' })]) },
         { name: 'execute_sql_query', definition: { type: 'function', function: { name: 'execute_sql_query', parameters: {} } } },
         { name: 'generate_chart', definition: { type: 'function', function: { name: 'generate_chart', parameters: {} } } },
-        {}
+        {},
+        {
+            withTransaction: async (fn) =>
+                fn({
+                    query: async (sql) => [
+                        sql.includes('FROM data_source d')
+                            ? [{ id: 1 }]
+                            : sql.includes('SELECT d.id')
+                              ? [
+                                    {
+                                        id: 'stored-definition',
+                                        datasource_id: 1,
+                                        version: 3,
+                                        current_status: 'active',
+                                        status: 'active',
+                                        source: 'manual',
+                                        content: { type: 'term', name: '已确认口径', description: '来自数据库' },
+                                    },
+                                ]
+                              : [],
+                    ],
+                }),
+        }
     );
     await adapter.run({
         generation: { id: 'g', datasourceId: 1, userId: 1, requestMessageId: 'r', conversationId: 'c', contextUpperBound: '2026-09-15T00:00:00Z', writerToken: 'w' },
@@ -278,6 +300,8 @@ await check('runtime adapter persists snapshot and structured result in existing
         onFirstDelta: async () => {},
     });
     assert.equal(blocks.at(-1).analysis.snapshot.datasourceId, 1);
+    assert.deepEqual(blocks.at(-1).analysis.snapshot.definitionRefs, [{ id: 'stored-definition', version: 3 }]);
+    assert.equal(blocks.at(-1).analysis.definitions[0].name, '已确认口径');
     assert.equal(blocks.at(-1).analysis.outcome.kind, 'clarification');
     assert.equal(blocks.length, 1);
     assert.ok(events.some((e) => e.type === 'log'));

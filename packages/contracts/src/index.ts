@@ -251,3 +251,4 @@ export interface GenerationStreamEvent extends ConversationEvent {
 export interface ConversationEventEmitter {
     send(event: ConversationEvent): void;
 }
+export * from './business-definition';

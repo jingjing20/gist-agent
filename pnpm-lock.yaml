@@ -129,6 +129,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@gist/contracts':
+        specifier: workspace:*
+        version: link:../../packages/contracts
       echarts:
         specifier: ^6.0.0
         version: 6.0.0
@@ -246,6 +249,9 @@ importers:
       '@gist/config':
         specifier: workspace:*
         version: link:../config
+      '@gist/contracts':
+        specifier: workspace:*
+        version: link:../contracts
       pg:
         specifier: ^8.16.3
         version: 8.23.0

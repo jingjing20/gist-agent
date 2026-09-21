@@ -1,3 +1,6 @@
+import { ProposeDefinitionTool } from './propose-definition-tool';
+import { BusinessDefinitionRepository } from '@gist/database';
+import { DatabaseService } from '../database/database.service';
 import { Injectable } from '@nestjs/common';
 import type OpenAI from 'openai';
 import { ANALYSIS_RUNTIME_VERSIONS, type AnalysisRunSnapshot } from '@gist/contracts';
@@ -13,32 +16,12 @@ import { resolveModelCapability } from '../chat/model-capabilities';
 import { AnalysisAgent } from './analysis-agent';
 import { renderOutcome } from './submission';
 
-// Reviewed seed definitions from benchmarks/saas-growth/README.md. Never injected into unrelated sources.
-export const SAAS_DEFINITIONS = [
-    {
-        id: 'saas-growth:seven-day-activation',
-        version: 1,
-        type: 'metric',
-        name: '7 日激活率',
-        description: '用户粒度。分子是 activated_at <= signup_at + interval 7 days 的注册用户；分母排除截至观察截止时间尚未满 7 天的注册用户。时区 UTC。',
-        relatedFields: ['product_users.signup_at', 'product_users.activated_at'],
-    },
-    {
-        id: 'saas-growth:dau',
-        version: 1,
-        type: 'metric',
-        name: 'DAU',
-        description: 'UTC 自然日内至少产生一个事件的去重 user_id 数量。缺失采集不代表真实活跃为零。',
-        relatedFields: ['product_events.user_id'],
-    },
-];
-
 export function buildAnalysisPrompt(snapshot: AnalysisRunSnapshot, schema: unknown[], definitions: unknown[]): string {
     const data = JSON.stringify({ snapshot, schema, definitions }).replace(/</g, '\\u003c');
     return `你是 Gist Agent，一个有执行边界的数据分析助手。\n当前轮时间锚点：${snapshot.timeAnchor}。
 先理解问题与口径，再取数、观察、验证、回答。模型自行选择路径，不强制固定维度顺序。
-关键业务口径必须来自下面的已确认定义或用户本轮明确说明；字段样本与注释不能当作已确认定义。缺少影响结论的条件时，提交一个聚焦的澄清问题。
-当前为 S1 单轮核心：不具有跨轮分析状态或长期记忆。遇到依赖未提供历史的问题请澄清，不猜测之前的条件或数字。
+关键业务口径必须来自下面的已确认定义或用户本轮明确说明；字段样本与注释不能当作已确认定义。needsReview=true 的定义引用字段已失效，不能作为当前口径使用，请提示用户修订。缺少影响结论的条件时，提交一个聚焦的澄清问题。
+当前为单轮核心：不具有跨轮分析状态或长期记忆。遇到依赖未提供历史的问题请澄清，不猜测之前的条件或数字。
 工具仅能查询授权 Schema。不要执行写操作；不要绕过解析器和权限。SQL 出错时根据反馈修正，工具不会替你调用模型。
 主要解释必须先有观察再有针对性的不同查询验证；相关性不能当成因果。空结果不等于零，截断与质量告警不能支持全集结论。
 查询返回 queryArtifactId。图表只能从本轮已观察到的 Artifact 生成，不复制数值数组。
@@ -56,7 +39,8 @@ export class AnalysisRuntimeAdapter {
         private readonly llm: LlmService,
         private readonly sql: SqlQueryTool,
         private readonly chart: GenerateChartTool,
-        private readonly artifacts: ArtifactRepository
+        private readonly artifacts: ArtifactRepository,
+        private readonly db: DatabaseService
     ) {}
 
     async run(input: {
@@ -91,7 +75,8 @@ export class AnalysisRuntimeAdapter {
             throw error;
         }
         await check();
-        const definitions = schema.length > 0 && schema.every((t) => t.datasetKey === 'saas_growth_demo') ? SAAS_DEFINITIONS : [];
+        const definitions = await new BusinessDefinitionRepository(this.db).snapshot(g.userId, catalog.datasourceId);
+        await check();
         const anchor = new Date(g.contextUpperBound).toISOString();
         const snapshot: AnalysisRunSnapshot = {
             taskId: g.id,
@@ -122,7 +107,7 @@ export class AnalysisRuntimeAdapter {
         const outcome = await new AnalysisAgent().run({
             messages,
             turnMessages: input.turnMessages,
-            tools: [this.sql, this.chart],
+            tools: [this.sql, this.chart, new ProposeDefinitionTool(new BusinessDefinitionRepository(this.db))],
             context: {
                 emitter: { send: emit },
                 signal,
