@@ -1,0 +1,93 @@
+apps/worker/src/chat/agents/sql-executor.ts
+  469bfb037e30d19b 197-198,217
+packages/contracts/src/analysis.ts
+  469bfb037e30d19b 1-3,5,7-39
+  fef8820f1c88b07c 4,6
+docs/agent-refactor/02-agent-runtime.md
+  469bfb037e30d19b 72-73,79-81,83,85,87,89,95,97,99,101,103,105-106,112-115
+apps/worker/src/analysis/submission.ts
+  469bfb037e30d19b 1-2,4-5,9-11,14-15,18-20,23-25,28-131,133-143
+apps/worker/src/chat/chat.module.ts
+  469bfb037e30d19b 1,24
+apps/api/src/chat/generation.service.ts
+  469bfb037e30d19b 6,56-58,89-93
+scripts/analysis-core-regression.mjs
+  fef8820f1c88b07c 266-288
+  469bfb037e30d19b 1-265,289-409
+benchmarks/saas-growth/agent-core-cases.json
+  469bfb037e30d19b 1-210
+apps/worker/src/chat/tools/base-tool.ts
+  469bfb037e30d19b 36-37
+README.md
+  469bfb037e30d19b 141-142
+.env.example
+  469bfb037e30d19b 53-56
+docs/agent-refactor/01-product-and-decisions.md
+  469bfb037e30d19b 27,31-32,34,36-42,44,46,80
+apps/worker/src/analysis/analysis-agent.ts
+  469bfb037e30d19b 1-217
+benchmarks/saas-growth/README.md
+  469bfb037e30d19b 76
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  469bfb037e30d19b 1-19,22-38,41-55,57-74,77-106,108-146
+  fef8820f1c88b07c 20-21,39-40,75-76,107
+package.json
+  469bfb037e30d19b 29
+docs/agent-refactor/05-delivery-and-validation.md
+  469bfb037e30d19b 1-3,5-24,26,28,30,32-35,37-39,41,43-48,50,52-57,59,61-64,66,68-71,73,75-78,80,82-88,90,92,94,96-107,109,111,113,115,117,119,121,123,125,127,129,131-139,141,143,145,147-153,156-157,159,161,163,165,167,169,171,173,175-178,180,182,184
+apps/worker/src/chat/chat.service.ts
+  469bfb037e30d19b 1-2,43-44,94,105-111,128-177,210
+scripts/phase2-agent-loop-integration.mjs
+  469bfb037e30d19b 296-297
+packages/contracts/src/index.ts
+  469bfb037e30d19b 1,52-53
+docs/agent-refactor/03-business-definitions-and-state.md
+  469bfb037e30d19b 1-124
+apps/worker/src/chat/tools/sql-query.tool.ts
+  469bfb037e30d19b 93,116,122,189-206
+apps/worker/src/chat/tools/generate-chart.tool.ts
+  469bfb037e30d19b 120,133-134
+docs/agent-refactor/README.md
+  469bfb037e30d19b 3,12,26
+docs/agent-refactor/04-context-and-evidence.md
+  469bfb037e30d19b 1,3,5,7,9,11,13,15-19,21,23,25,27,29,31,33,35-39,41,43,45,47,49,51,53,55-59,61,63,65,67-79,81,83,85,87,89,91-94,96,98
+apps/worker/src/chat/generation.service.ts
+  469bfb037e30d19b 21,59,76,86,107,150
+apps/worker/src/chat/artifact.repository.ts
+  469bfb037e30d19b 22,41,69-70,154-155,190-207
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "de269aa645b5cdbad609d50c1d49b837118a6224",
+  "prompts": {
+    "469bfb037e30d19b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c193-0ed1-7013-9f6a-13580143b920",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1866,
+      "total_deletions": 2690,
+      "accepted_lines": 1735,
+      "overriden_lines": 5
+    },
+    "fef8820f1c88b07c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c343-ab2d-7d72-a91d-311c29893334",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1247,
+      "total_deletions": 38,
+      "accepted_lines": 1235,
+      "overriden_lines": 12
+    }
+  }
+}
