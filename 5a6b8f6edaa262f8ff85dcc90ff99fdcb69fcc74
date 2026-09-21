@@ -1,0 +1,74 @@
+apps/worker/src/analysis/context-assembler.ts
+  fef8820f1c88b07c 1-31,36-37,39-69,71-73,75-76
+packages/contracts/src/index.ts
+  fef8820f1c88b07c 115
+packages/database/src/index.ts
+  fef8820f1c88b07c 416
+apps/worker/src/analysis/analysis-state.ts
+  fef8820f1c88b07c 1-44,65-170
+apps/worker/src/analysis/analysis-agent.ts
+  fef8820f1c88b07c 24-27,49,63,72-76,78,122-131,153,160,164-167,170,201-202
+apps/worker/src/database/schema.service.ts
+  fef8820f1c88b07c 85,202-204,286
+scripts/analysis-core-regression.mjs
+  fef8820f1c88b07c 262,266,268,272,288,305-307
+README.md
+  fef8820f1c88b07c 141
+docs/agent-refactor/03-business-definitions-and-state.md
+  fef8820f1c88b07c 91-92,109
+docs/agent-refactor/04-context-and-evidence.md
+  fef8820f1c88b07c 74,83
+apps/worker/src/chat/generation.service.ts
+  fef8820f1c88b07c 1,218,221,224
+packages/database/src/analysis-state-schema.ts
+  fef8820f1c88b07c 1-40
+apps/worker/src/chat/tools/sql-query.tool.ts
+  fef8820f1c88b07c 96,105-108,125
+apps/worker/src/chat/chat.service.ts
+  fef8820f1c88b07c 207-234
+scripts/analysis-state-regression.mjs
+  fef8820f1c88b07c 1-571
+scripts/migrate-analysis-state.mjs
+  fef8820f1c88b07c 1-11
+apps/api/scripts/init-db.ts
+  fef8820f1c88b07c 4,145
+apps/worker/src/chat/tools/base-tool.ts
+  fef8820f1c88b07c 37
+package.json
+  fef8820f1c88b07c 32-34
+apps/worker/src/analysis/submission.ts
+  fef8820f1c88b07c 61-65,111,117-121,146-148
+apps/worker/src/chat/artifact.repository.ts
+  fef8820f1c88b07c 22,68-69,98,103,124,137,141-151,236
+packages/contracts/src/analysis.ts
+  fef8820f1c88b07c 3-5,14,40-62
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  fef8820f1c88b07c 1,4-6,11,13,18-20,22,24-26,28-29,31-37,69-74,127-137,142,144,158,193-199,206-260,262-266,268-270,272,274,276-278,280,282-287,289,291,294-296,300-308
+apps/worker/src/analysis/analysis-tools.ts
+  fef8820f1c88b07c 1-83,187-214,224-232,234-235,237,240-263,267-287
+docs/agent-refactor/05-delivery-and-validation.md
+  fef8820f1c88b07c 4,37,202-226
+apps/worker/src/analysis/analysis-state.repository.ts
+  fef8820f1c88b07c 1-82
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "5a6b8f6edaa262f8ff85dcc90ff99fdcb69fcc74",
+  "prompts": {
+    "fef8820f1c88b07c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c343-ab2d-7d72-a91d-311c29893334",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1503,
+      "total_deletions": 432,
+      "accepted_lines": 1470,
+      "overriden_lines": 15
+    }
+  }
+}
