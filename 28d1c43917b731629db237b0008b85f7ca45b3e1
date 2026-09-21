@@ -1,0 +1,80 @@
+packages/database/src/business-definition-schema.ts
+  fef8820f1c88b07c 1-53
+packages/database/src/index.ts
+  fef8820f1c88b07c 413-415
+packages/database/package.json
+  fef8820f1c88b07c 11
+apps/web/src/router/index.ts
+  fef8820f1c88b07c 57-62
+apps/api/scripts/init-db.ts
+  fef8820f1c88b07c 4,144
+packages/contracts/src/index.ts
+  fef8820f1c88b07c 254
+docs/agent-refactor/05-delivery-and-validation.md
+  fef8820f1c88b07c 190-201
+  469bfb037e30d19b 4,36,185-189
+packages/database/src/business-definition-repository.ts
+  fef8820f1c88b07c 1-105,110-139,141-250,252-333
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  fef8820f1c88b07c 1-3,23-24,42-43,78-79,110
+apps/web/src/views/BusinessDefinitionsView.vue
+  fef8820f1c88b07c 1-273,277-281,286-358,360-398
+packages/contracts/src/analysis.ts
+  fef8820f1c88b07c 4,6
+scripts/import-business-definition-seed.mjs
+  fef8820f1c88b07c 1-10
+apps/api/src/business-definition/business-definition.module.ts
+  fef8820f1c88b07c 1-80
+apps/web/src/views/MainLayout.vue
+  fef8820f1c88b07c 14,93
+scripts/analysis-core-regression.mjs
+  fef8820f1c88b07c 266-288,303-304
+package.json
+  469bfb037e30d19b 30
+  fef8820f1c88b07c 31-32
+apps/web/package.json
+  fef8820f1c88b07c 13
+scripts/business-definition-regression.mjs
+  fef8820f1c88b07c 1-209
+apps/worker/src/analysis/propose-definition-tool.ts
+  fef8820f1c88b07c 1-76
+packages/contracts/src/business-definition.ts
+  fef8820f1c88b07c 1-33
+apps/api/src/app.module.ts
+  fef8820f1c88b07c 1,15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "28d1c43917b731629db237b0008b85f7ca45b3e1",
+  "prompts": {
+    "469bfb037e30d19b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c193-0ed1-7013-9f6a-13580143b920",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 964,
+      "total_deletions": 0,
+      "accepted_lines": 964,
+      "overriden_lines": 0
+    },
+    "fef8820f1c88b07c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c343-ab2d-7d72-a91d-311c29893334",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 2445,
+      "total_deletions": 0,
+      "accepted_lines": 2445,
+      "overriden_lines": 0
+    }
+  }
+}
