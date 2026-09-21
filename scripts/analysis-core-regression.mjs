@@ -259,16 +259,17 @@ await check('runtime adapter persists snapshot and structured result in existing
         blocks = [],
         turnMessages = [];
     const adapter = new AnalysisRuntimeAdapter(
-        { getSchemaCatalogSummary: async () => ({ datasourceId: 1, tables: [] }), getStructuredSchema: async () => [] },
+        { assertDatasourceAccess: async () => {}, getSchemaCatalogSummary: async () => ({ datasourceId: 1, tables: [] }), getStructuredSchema: async () => [] },
         { isReasoningActive: () => false, streamWithTools: async () => stream([call('submit_analysis', { kind: 'clarification', question: '请提供口径' })]) },
         { name: 'execute_sql_query', definition: { type: 'function', function: { name: 'execute_sql_query', parameters: {} } } },
         { name: 'generate_chart', definition: { type: 'function', function: { name: 'generate_chart', parameters: {} } } },
-        {},
+        { listAnalysisEvidence: async () => ({ items: [], nextOffset: null }) },
         {
+            query: async () => [],
             withTransaction: async (fn) =>
                 fn({
                     query: async (sql) => [
-                        sql.includes('FROM data_source d')
+                        sql.includes('FROM data_source d') || sql.includes('SELECT id FROM generation')
                             ? [{ id: 1 }]
                             : sql.includes('SELECT d.id')
                               ? [
@@ -284,6 +285,7 @@ await check('runtime adapter persists snapshot and structured result in existing
                                 ]
                               : [],
                     ],
+                    execute: async () => [{ rowCount: 1 }],
                 }),
         }
     );
@@ -300,8 +302,9 @@ await check('runtime adapter persists snapshot and structured result in existing
         onFirstDelta: async () => {},
     });
     assert.equal(blocks.at(-1).analysis.snapshot.datasourceId, 1);
-    assert.deepEqual(blocks.at(-1).analysis.snapshot.definitionRefs, [{ id: 'stored-definition', version: 3 }]);
-    assert.equal(blocks.at(-1).analysis.definitions[0].name, '已确认口径');
+    assert.deepEqual(blocks.at(-1).analysis.snapshot.definitionRefs, []);
+    assert.equal(blocks.at(-1).analysis.contextReports[0].snapshot.promptPolicy, 'analysis-core-v2');
+    assert.ok(blocks.at(-1).analysis.contextReports[0].selection.some((c) => c.candidateId === 'catalogs' && c.selected));
     assert.equal(blocks.at(-1).analysis.outcome.kind, 'clarification');
     assert.equal(blocks.length, 1);
     assert.ok(events.some((e) => e.type === 'log'));

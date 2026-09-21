@@ -93,7 +93,7 @@ export class SqlQueryTool implements Tool {
             const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId, ctx.signal, { allowModelRepair: !ctx.analysisCore });
             await ctx.assertWritable();
 
-            let resultRows = r.rows;
+            let resultRows = ctx.analysisContext ? r.rows.slice(0,20) : r.rows;
             let truncationNote = '';
             const serialized = JSON.stringify(resultRows);
             if (serialized.length > MAX_TOOL_RESULT_CHARS && resultRows.length > 1) {
@@ -101,6 +101,10 @@ export class SqlQueryTool implements Tool {
                 const fitCount = Math.max(1, Math.floor(MAX_TOOL_RESULT_CHARS / avgSize));
                 resultRows = r.rows.slice(0, fitCount);
                 truncationNote = `[质量约束：完整查询共 ${r.rowCount} 条，模型仅收到前 ${fitCount} 条。禁止将子集描述为全集；必须追加聚合查询。]`;
+            }
+            if (ctx.analysisContext) {
+                while (resultRows.length && JSON.stringify(resultRows).length > 16000) resultRows = resultRows.slice(0,-1);
+                if (resultRows.length !== r.rows.length) truncationNote = '[模型收到有界结果摘要；完整结果保存在 Artifact，不能把分页或省略数据当作全集。]';
             }
             const resultQuality = assessResultQuality({
                 plan: args.plan as QueryPlanV1,
@@ -118,6 +122,7 @@ export class SqlQueryTool implements Tool {
                     throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询证据缺少 generation 上下文');
                 }
                 const artifact = await this.artifacts.createQueryArtifact({
+                    analysisContext: ctx.analysisContext ? structuredClone(ctx.analysisContext) : undefined,
                     generationId: ctx.generationId,
                     writerToken: ctx.writerToken,
                     userId: ctx.userId,

@@ -138,7 +138,7 @@ pnpm dev:web      # http://localhost:5173
 
 ## 更多资源
 
-- **[Agent 核心重写方案](./docs/agent-refactor/README.md)** — 当前设计基线、业务定义与分析状态契约、实施进度及验收标准（S1 单轮核心已接入，后续阶段待实现）。
+- **[Agent 核心重写方案](./docs/agent-refactor/README.md)** — 当前设计基线、业务定义与分析状态契约、实施进度及验收标准（S1～S3 已接入并通过快速 mock，真实链路待验收，默认仍为旧核心）。
 
 - **[FAQ.md](./FAQ.md)** -- 架构设计问答（Tool vs Agent 界定、SQL 防腐层原理）及运维实践（SSH 隧道连接线上 MySQL）
 - **[DEPLOY.md](./DEPLOY.md)** -- Docker Compose 编排、Nginx 反代、GitHub Actions CI/CD

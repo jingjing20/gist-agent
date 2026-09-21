@@ -29,7 +29,9 @@
         "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\"",
         "test:analysis-core": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && pnpm --filter @gist/api build && node scripts/analysis-core-regression.mjs",
         "test:business-definitions": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/business-definition-regression.mjs",
-        "migrate:business-definitions": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/migrate-business-definitions.mjs"
+        "migrate:business-definitions": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/migrate-business-definitions.mjs",
+        "test:analysis-state": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/analysis-state-regression.mjs",
+        "migrate:analysis-state": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/migrate-analysis-state.mjs"
     },
     "devDependencies": {
         "@gist/config": "workspace:*",

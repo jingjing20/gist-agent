@@ -1,3 +1,4 @@
+import { promoteAnalysisDraft } from '@gist/database';
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import type { GenerationErrorCode, GenerationStatus } from '@gist/contracts';
 import { randomUUID } from 'crypto';
@@ -214,12 +215,13 @@ export class GenerationService implements OnModuleDestroy {
             const [updated] = await transaction.execute(
                 `UPDATE generation SET status=?,error=?,error_code=?,updated_at=NOW(),completed_at=NOW(),writer_token=NULL
                   WHERE id=? AND (
-                    (?<>'' AND writer_token=? AND status IN ('starting','running','cancel_requested'))
+                    (?<>'' AND writer_token=? AND status IN ('starting','running','cancel_requested') AND (?<>'completed' OR status<>'cancel_requested'))
                     OR (?='' AND writer_token IS NULL AND status='cancel_requested')
                   )`,
-                [status, error ?? null, errorCode ?? null, identity.id, identity.writerToken, identity.writerToken, identity.writerToken]
+                [status, error ?? null, errorCode ?? null, identity.id, identity.writerToken, identity.writerToken, status, identity.writerToken]
             );
             if (updated.rowCount !== 1) return false;
+            if (status === 'completed' && identity.promptPolicyVersion === 'analysis-core-v2') await promoteAnalysisDraft(transaction, identity.id);
             const finalAnswer = status === 'completed' && messageState ? extractFinalAnswer(messageState.blocks) : null;
             if (messageState) {
                 await transaction.execute('UPDATE message SET content=?,blocks=?::jsonb,llm_messages=?::jsonb WHERE id=?', [

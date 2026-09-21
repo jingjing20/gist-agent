@@ -34,6 +34,7 @@ export interface ToolContext {
     schemaContextVersion?: string;
     signal: AbortSignal;
     analysisCore?: boolean;
+    analysisContext?: import('@gist/contracts').AnalysisEvidenceContext;
     writerToken?: string;
     assertWritable(): Promise<void>;
 }

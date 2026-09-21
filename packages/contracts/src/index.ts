@@ -112,6 +112,7 @@ export interface ArtifactColumnV1 {
 }
 
 export interface QueryArtifactV1 {
+    analysisContext?: import('./analysis').AnalysisEvidenceContext;
     id: string;
     generationId: string;
     userId: number;

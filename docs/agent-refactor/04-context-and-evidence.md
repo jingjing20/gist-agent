@@ -71,7 +71,7 @@ type FinalAnswer = {
     id: string;
     text: string;
     kind: 'observation' | 'supported_explanation' | 'hypothesis';
-    evidence: { artifactId: string; role: 'observation' | 'verification' | 'comparison' }[];
+    evidence: { artifactId: string; role: 'observation' | 'verification' | 'comparison'; comparisonLabel?: string }[];
   }[];
   limitations: string[];
   unresolvedQuestions: string[];
@@ -80,7 +80,7 @@ type FinalAnswer = {
 
 数据相关 observation / supported_explanation 必须关联成功且可访问的证据；hypothesis 明确待验证，可以无证据，但不能混写成确定结论。主要解释至少有针对性的 verification 证据，单纯重复相同 SQL 不算验证。程序检查结构和引用，案例检查语义充分性，不建立自动因果裁判。
 
-`summary` 不引入 findings 没有的新数字或新解释，这条先由 Prompt 与人工案例检查，首期不建立逐数字解析器。混合条件比较在 findings 文本及展开信息中明确双方口径。质量阻断或状态不匹配时，引用校验返回具体错误，Agent 在剩余预算内改写或部分收尾。
+`summary` 不引入 findings 没有的新数字或新解释，这条先由 Prompt 与人工案例检查，首期不建立逐数字解析器。混合条件比较在 findings 文本及展开信息中明确双方口径。S3 对条件不匹配的证据要求先以 comparison 模式回读，最终 role=comparison 且 comparisonLabel 非空，并保留两组状态快照；标签的语义充分性仍需人工案例检查。质量阻断或状态不匹配时，引用校验返回具体错误，Agent 在剩余预算内改写或部分收尾。
 
 图表使用 Artifact 行数据与字段映射生成，校验字段类型，不接受任意数值数组。比率重新聚合优先重新查询，不能简单平均各组比例。
 

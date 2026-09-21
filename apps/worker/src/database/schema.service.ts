@@ -82,6 +82,7 @@ export class SchemaService {
     }
 
     async getDatabaseSchemaSelection(datasourceId: number | null, userId: number, query = '', generationId?: string): Promise<SchemaPromptSelection> {
+        await this.assertDatasourceAccess(datasourceId, userId);
         const startedAt = Date.now();
         const cacheKey = `${datasourceId || 'local'}_${userId}_${query.trim().toLowerCase().slice(0, 300)}`;
         const cached = this.cache.get(cacheKey);
@@ -198,8 +199,9 @@ export class SchemaService {
         return this.db.query<any[]>(sql, allowedTables);
     }
 
-    async getStructuredSchema(datasourceId: number | null, userId: number): Promise<any[]> {
-        const catalogTables = await getAgentVisibleCatalogTables(this.db, datasourceId);
+    async getStructuredSchema(datasourceId: number | null, userId: number, tableNames?: string[]): Promise<any[]> {
+        await this.assertDatasourceAccess(datasourceId,userId);
+        const catalogTables = (await getAgentVisibleCatalogTables(this.db, datasourceId)).filter(t => !tableNames || tableNames.includes(t.table_name));
         const allowedTables = catalogTables.map((table) => table.table_name);
         const catalogByName = new Map(catalogTables.map((table) => [table.table_name, table]));
         const policies = await this.getColumnPolicies(datasourceId, userId);
@@ -281,7 +283,7 @@ export class SchemaService {
     async getSchemaDetail(datasourceId: number | null, userId: number, tableName: string): Promise<SchemaDetailV1 | null> {
         const resolved = await resolveCatalogDatasourceId(this.db, datasourceId);
         if (resolved == null) return null;
-        const tables = await this.getStructuredSchema(resolved, userId);
+        const tables = await this.getStructuredSchema(resolved, userId, [tableName]);
         const table = tables.find((candidate) => candidate.tableName === tableName);
         if (!table) return null;
         return {

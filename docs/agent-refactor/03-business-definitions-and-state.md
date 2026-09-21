@@ -88,6 +88,8 @@ type AnalysisState = {
   timeRange: { start: string; endExclusive: string; timezone: string } | null;
   comparisonRange: { start: string; endExclusive: string; timezone: string } | null;
   filters: { field: string; operator: string; value: unknown }[];
+  grain: string | null;
+  freshness: 'reuse_allowed' | 'current_generation'; // 用户要求最新数据时强制本轮重查
   hypotheses: { id: string; statement: string; status: 'open' | 'supported' | 'refuted' | 'unresolved'; evidenceIds: string[] }[];
   openQuestions: string[];
 };
@@ -104,7 +106,7 @@ type AnalysisState = {
 - 业务引用、筛选、临时口径和证据引用逐项授权与校验。
 - 服务端决定 datasourceId、taskId、revision、来源用户身份；不能由模型任意更改。
 - 当前用户明确约定优先于旧默认；但系统只能验证来源消息存在，语义是否真实对应仍需要案例检验。
-- 同轮工具以当前 revision 执行，Artifact 固定记录对应状态快照。提交答案前保证引用与最终状态一致；显式跨条件比较必须列出两组条件。
+- 每轮先成功确认/更新状态再执行查询或回读；状态更新不得与其他工具混批。同轮工具以当前 revision 执行，Artifact 固定记录对应状态快照。提交答案前保证引用与最终状态一致；显式跨条件比较必须列出两组条件。
 - 状态在 generation 内保存为草稿；外壳成功 finalize 时提升会话状态，失败或取消不污染下一轮。乐观锁仍保留，避免管理操作或异常并发静默覆盖。
 - 新任务由状态工具 `start_new_task` 模式发起，清空旧条件与假设；保留旧 Artifact 历史，不维护分支树。是否新任务由当前 Agent 根据用户意图判断，不明确时澄清。
 - 更换数据源强制新任务，不能继承旧数据源定义、Schema 或证据。

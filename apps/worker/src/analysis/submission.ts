@@ -58,7 +58,11 @@ export const SUBMIT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
                                         items: {
                                             type: 'object',
                                             additionalProperties: false,
-                                            properties: { artifactId: { type: 'string' }, role: { type: 'string', enum: ['observation', 'verification', 'comparison'] } },
+                                            properties: {
+                                                artifactId: { type: 'string' },
+                                                role: { type: 'string', enum: ['observation', 'verification', 'comparison'] },
+                                                comparisonLabel: { type: 'string', description: '历史比较时明确说明该证据条件与当前条件的区别' },
+                                            },
                                             required: ['artifactId', 'role'],
                                         },
                                     },
@@ -104,13 +108,17 @@ export function validateSubmission(value: unknown, observed: Map<string, Observe
         if (!Array.isArray(f.evidence) || f.evidence.length > 20) throw new Error('证据引用无效');
         const evidence = f.evidence.map((value: unknown) => {
             const e = record(value);
-            exactKeys(e, ['artifactId', 'role']);
+            exactKeys(e, ['artifactId', 'role', 'comparisonLabel']);
             const artifactId = text(e.artifactId);
             const source = observed.get(artifactId);
             if (!source) throw new Error('只能引用本轮成功观察到的查询证据');
             if (source.blocked && f.kind !== 'hypothesis') throw new Error('质量受限证据不能支持确定结论，请追加聚合或验证');
             if (!['observation', 'verification', 'comparison'].includes(String(e.role))) throw new Error('证据角色无效');
-            return { artifactId, role: e.role as 'observation' | 'verification' | 'comparison' };
+            return {
+                artifactId,
+                role: e.role as 'observation' | 'verification' | 'comparison',
+                ...(e.comparisonLabel === undefined ? {} : { comparisonLabel: text(e.comparisonLabel) }),
+            };
         });
         if (f.kind !== 'hypothesis' && evidence.length === 0) throw new Error('数据发现需要证据');
         if (f.kind === 'supported_explanation') {
@@ -135,7 +143,9 @@ export function renderOutcome(outcome: AnalysisOutcome): string {
     if (outcome.kind === 'refusal') return outcome.explanation;
     const parts = [outcome.kind === 'partial' ? `部分分析结果：${outcome.reason}` : '', outcome.answer.summary];
     for (const f of outcome.answer.findings) {
-        parts.push(`${f.kind === 'hypothesis' ? '待验证：' : ''}${f.text}${f.evidence.length ? `\n证据：${f.evidence.map((e) => e.artifactId).join('、')}` : ''}`);
+        parts.push(
+            `${f.kind === 'hypothesis' ? '待验证：' : ''}${f.text}${f.evidence.length ? `\n证据：${f.evidence.map((e) => e.artifactId + (e.comparisonLabel ? `（${e.comparisonLabel}）` : '')).join('、')}` : ''}`
+        );
     }
     if (outcome.answer.limitations.length) parts.push(`限制：\n${outcome.answer.limitations.map((s) => `- ${s}`).join('\n')}`);
     if (outcome.answer.unresolvedQuestions.length) parts.push(`尚待确认：\n${outcome.answer.unresolvedQuestions.map((s) => `- ${s}`).join('\n')}`);

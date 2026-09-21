@@ -204,7 +204,34 @@ export class ChatService {
         } catch (drainError) {
             if (finalStatus === 'completed') throw drainError;
         }
-        const finalized = await this.generations.finalize(generation, finalStatus, errorDetail, errorCode, terminal, { blocks, llmMessages: turnMessages });
+        let finalized: boolean;
+        try {
+            finalized = await this.generations.finalize(generation, finalStatus, errorDetail, errorCode, terminal, { blocks, llmMessages: turnMessages });
+        } catch (error) {
+            if (!newCore || !(error instanceof Error) || !['ANALYSIS_STATE_CONFLICT', 'ANALYSIS_DRAFT_MISSING'].includes(error.message)) throw error;
+            finalStatus = 'failed';
+            const detail = '分析状态提交冲突，本轮草稿未提升；请重新发起分析';
+            blocks.push({ type: 'error', content: detail, errorCode: 'INTERNAL_ERROR' });
+            finalized = await this.generations.finalize(
+                generation,
+                'failed',
+                detail,
+                'INTERNAL_ERROR',
+                { type: 'done', status: 'failed', error: detail, errorCode: 'INTERNAL_ERROR' },
+                { blocks, llmMessages: turnMessages }
+            );
+        }
+        if (!finalized && finalStatus === 'completed' && (await this.generations.isCancelRequested(generation.id))) {
+            finalStatus = 'cancelled';
+            finalized = await this.generations.finalize(
+                generation,
+                'cancelled',
+                undefined,
+                'CANCELLED',
+                { type: 'done', status: 'cancelled', errorCode: 'CANCELLED' },
+                { blocks, llmMessages: turnMessages }
+            );
+        }
 
         // 记忆提取失败不影响主回答；服务端只接受有来源的结构化增量 patch。
         if (finalized && finalStatus === 'completed' && !newCore)

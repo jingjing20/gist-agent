@@ -21,7 +21,10 @@ export interface AnalysisRunOptions {
     onEvent(event: SSEEvent): void;
     checkpoint(): Promise<void>;
     onFirstDelta(): Promise<void>;
-    onContext(report: { estimatedTokens: number; budget: number; call: number; closing: boolean }): void;
+    onContext(report: { estimatedTokens: number; budget: number; call: number; closing: boolean; selection?: unknown; snapshot?: unknown }): void | Promise<void>;
+    prepareContext?(messages: Message[], tools: OpenAI.Chat.Completions.ChatCompletionTool[], budget: number): Promise<{ messages: Message[]; report: unknown; snapshot: unknown }>;
+    observeEvidence?(id: string): Promise<ObservedEvidence>;
+    validateOutcome?(outcome: AnalysisOutcome): Promise<void>;
     limits?: { modelCalls?: number; sqlCalls?: number; toolCalls?: number };
     validateEvidence?(ids: string[]): Promise<void>;
 }
@@ -43,6 +46,7 @@ export class AnalysisAgent {
         let sqlCalls = 0;
         let toolCalls = 0;
         let firstDelta = false;
+        let contextRetried = false;
         const check = async () => {
             if (context.signal.aborted) throw context.signal.reason ?? new GenerationExecutionError('CANCELLED', '已取消');
             await context.assertWritable();
@@ -56,7 +60,7 @@ export class AnalysisAgent {
             await check();
             const closing = modelCalls === maxModel - 1 || sqlCalls >= maxSql || toolCalls >= maxTools;
             const definitions = closing ? [SUBMIT_TOOL] : [...options.tools.map((t) => t.definition), SUBMIT_TOOL];
-            const input: Message[] = closing
+            let input: Message[] = closing
                 ? [
                       ...messages,
                       {
@@ -65,9 +69,13 @@ export class AnalysisAgent {
                       },
                   ]
                 : [...messages];
+            const budget = Math.floor(
+                (options.capability.contextWindow - options.capability.responseReserve - Math.ceil(options.capability.contextWindow * 0.1)) * (contextRetried ? 0.75 : 1)
+            );
+            const prepared = await options.prepareContext?.(input, definitions, budget);
+            if (prepared) input = prepared.messages;
             const estimatedTokens = estimateMessagesTokens(input) + estimateTokens(JSON.stringify(definitions));
-            const budget = options.capability.contextWindow - options.capability.responseReserve - Math.ceil(options.capability.contextWindow * 0.1);
-            options.onContext({ estimatedTokens, budget, call: modelCalls + 1, closing });
+            await options.onContext({ estimatedTokens, budget, call: modelCalls + 1, closing, ...(prepared ? { selection: prepared.report, snapshot: prepared.snapshot } : {}) });
             if (estimatedTokens > budget) throw new GenerationExecutionError('CONTEXT_BUDGET_EXCEEDED', '当前问题、Schema 与工具证据超过上下文预算，请缩小问题范围');
             modelCalls++;
             metrics.llmCallCount++;
@@ -111,6 +119,16 @@ export class AnalysisAgent {
             } catch (error) {
                 await check();
                 if (error instanceof GenerationExecutionError) throw error;
+                if (
+                    !contextRetried &&
+                    outputChars === 0 &&
+                    modelCalls < maxModel &&
+                    ['context_length_exceeded', 'max_context_length'].includes(String((error as { code?: string }).code))
+                ) {
+                    contextRetried = true;
+                    options.onEvent({ type: 'log_remove', title: progressTitle });
+                    continue;
+                }
                 throw new GenerationExecutionError('LLM_REQUEST_FAILED', '模型请求或响应流失败');
             }
             await check();
@@ -132,19 +150,24 @@ export class AnalysisAgent {
             if (reasoning) Object.assign(assistant, { reasoning_content: reasoning });
             append(assistant);
             const mixedSubmit = batch.length > 1 && batch.some((call) => call.function.name === 'submit_analysis');
+            const mixedState = batch.length > 1 && batch.some((call) => call.function.name === 'update_analysis_state');
             const previouslyObserved = new Set(observed.keys());
             let final: AnalysisOutcome | undefined;
             for (const call of batch) {
                 await check();
                 let result: string;
                 try {
+                    if (mixedState) throw new Error('状态更新必须独立调用，收到成功结果后才能执行其他工具');
                     if (mixedSubmit) throw new Error('提交结果必须独立调用，不允许与其他工具混用');
                     const args = record(JSON.parse(call.function.arguments));
                     if (call.function.name === 'submit_analysis') {
-                        final = validateSubmission(args, observed, closing);
-                        const ids = final.kind === 'answer' || final.kind === 'partial' ? final.answer.findings.flatMap((f) => f.evidence.map((e) => e.artifactId)) : [];
+                        const candidate = validateSubmission(args, observed, closing);
+                        await options.validateOutcome?.(candidate);
+                        const ids =
+                            candidate.kind === 'answer' || candidate.kind === 'partial' ? candidate.answer.findings.flatMap((f) => f.evidence.map((e) => e.artifactId)) : [];
                         await options.validateEvidence?.([...new Set(ids)]);
                         await check();
+                        final = candidate;
                         result = JSON.stringify({ accepted: true, kind: final.kind });
                     } else {
                         if (closing || toolCalls >= maxTools) throw new Error('普通工具预算已耗尽，请提交部分结果');
@@ -175,6 +198,8 @@ export class AnalysisAgent {
                         await check();
                         result = output.toolResult;
                         const data = JSON.parse(result);
+                        if (tool.name === 'read_query_artifact' && output.succeeded !== false && options.observeEvidence)
+                            observed.set(data.queryArtifactId, await options.observeEvidence(data.queryArtifactId));
                         if (tool.name === 'execute_sql_query') {
                             if (output.succeeded !== false) {
                                 if (typeof data.queryArtifactId !== 'string') throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询成功但缺少持久化证据');

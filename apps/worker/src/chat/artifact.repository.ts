@@ -19,6 +19,7 @@ import { GenerationExecutionError } from './generation-errors';
 const MAX_ARTIFACT_BYTES = 5 * 1024 * 1024;
 
 interface CreateQueryArtifactInput {
+    analysisContext?: import('@gist/contracts').AnalysisEvidenceContext;
     writerToken?: string;
     generationId: string;
     userId: number;
@@ -64,8 +65,8 @@ export class ArtifactRepository {
         }
         const id = randomUUID();
         const hash = createHash('sha256').update(canonicalRows).digest('hex');
-        const qualityColumn = input.resultQuality ? ',result_quality' : '';
-        const qualityValue = input.resultQuality ? ',?::jsonb' : '';
+        const qualityColumn = (input.resultQuality ? ',result_quality' : '') + (input.analysisContext ? ',analysis_context' : '');
+        const qualityValue = (input.resultQuality ? ',?::jsonb' : '') + (input.analysisContext ? ',?::jsonb' : '');
         const rows = await this.writeArtifact(
             input,
             `INSERT INTO query_artifact (
@@ -94,10 +95,12 @@ export class ArtifactRepository {
                 input.isLimited,
                 hash,
                 ...(input.resultQuality ? [JSON.stringify(input.resultQuality)] : []),
+                ...(input.analysisContext ? [JSON.stringify(input.analysisContext)] : []),
             ]
         );
         return {
             id,
+            ...(input.analysisContext ? { analysisContext: input.analysisContext } : {}),
             generationId: input.generationId,
             userId: input.userId,
             conversationId: input.conversationId,
@@ -118,7 +121,7 @@ export class ArtifactRepository {
         };
     }
 
-    async readQueryArtifact(id: string, userId: number, conversationId: string, rowLimit?: number): Promise<QueryArtifactResultV1> {
+    async readQueryArtifact(id: string, userId: number, conversationId: string, rowLimit?: number, offset = 0): Promise<QueryArtifactResultV1> {
         const rows = await this.db.query<QueryRow[]>('SELECT * FROM query_artifact WHERE id=?', [id]);
         if (!rows.length) throw new GenerationExecutionError('ARTIFACT_NOT_FOUND', '查询证据不存在或已删除');
         const row = rows[0];
@@ -131,8 +134,19 @@ export class ArtifactRepository {
         const resultRows = parseJson<Array<Record<string, unknown>>>(row.result_rows, []);
         return {
             artifact: this.mapQueryArtifact(row),
-            rows: rowLimit == null ? resultRows : resultRows.slice(0, Math.max(0, rowLimit)),
+            rows: rowLimit == null ? resultRows : resultRows.slice(offset, offset + Math.max(0, rowLimit)),
         };
+    }
+
+    async listAnalysisEvidence(userId: number, conversationId: string, datasourceId: number, offset = 0) {
+        if (!(await this.canAccessDatasource(datasourceId, userId))) throw new GenerationExecutionError('ARTIFACT_ACCESS_DENIED', '无权读取证据目录');
+        const rows = await this.db.query(
+            `SELECT a.id,a.title,a.created_at,a.analysis_context->'state'->>'revision' AS revision FROM query_artifact a
+         JOIN conversation_turn t ON t.generation_id=a.generation_id WHERE a.user_id=? AND a.conversation_id=? AND a.datasource_id=?
+         AND a.analysis_context IS NOT NULL AND t.status='completed' ORDER BY a.created_at DESC,a.id LIMIT 21 OFFSET ?`,
+            [userId, conversationId, datasourceId, offset]
+        );
+        return { items: rows.slice(0, 20), nextOffset: rows.length > 20 ? offset + 20 : null };
     }
 
     async assertUsableInGeneration(artifact: QueryArtifactV1, currentGenerationId: string): Promise<void> {
@@ -219,6 +233,7 @@ export class ArtifactRepository {
     private mapQueryArtifact(row: QueryRow): QueryArtifactV1 {
         return {
             id: row.id,
+            ...(row.analysis_context ? { analysisContext: parseJson(row.analysis_context, undefined) } : {}),
             generationId: row.generation_id,
             userId: Number(row.user_id),
             conversationId: row.conversation_id,
