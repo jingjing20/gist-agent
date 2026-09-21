@@ -33,6 +33,8 @@ export interface ToolContext {
     conversationId?: string;
     schemaContextVersion?: string;
     signal: AbortSignal;
+    analysisCore?: boolean;
+    writerToken?: string;
     assertWritable(): Promise<void>;
 }
 

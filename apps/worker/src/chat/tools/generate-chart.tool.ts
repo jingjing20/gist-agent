@@ -117,6 +117,7 @@ export class GenerateChartTool implements Tool {
         const chartArtifact = await this.artifacts.createChartArtifact(
             {
                 generationId: ctx.generationId,
+                writerToken: ctx.writerToken,
                 userId: ctx.userId,
                 conversationId: ctx.conversationId,
                 queryArtifactId,
@@ -129,6 +130,8 @@ export class GenerateChartTool implements Tool {
             },
             source.artifact.datasourceId
         );
+        await ctx.assertWritable();
+        if (ctx.signal.aborted) throw ctx.signal.reason ?? new Error('已取消');
         const chartEvent: SSEEvent = { type: 'chart', chartData, chartArtifactId: chartArtifact.id, queryArtifactId };
         ctx.emitter.send(chartEvent);
         return { toolResult: JSON.stringify({ chartArtifactId: chartArtifact.id, queryArtifactId, status: 'rendered' }), blocks: [chartEvent] };

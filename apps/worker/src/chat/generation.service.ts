@@ -18,6 +18,7 @@ export interface GenerationIdentity {
     parentMessageId: string | null;
     reasoningEnabled: boolean;
     schemaContextVersion: string;
+    promptPolicyVersion?: string;
     writerToken: string;
 }
 
@@ -55,7 +56,7 @@ export class GenerationService implements OnModuleDestroy {
     async candidate(id: string): Promise<(Omit<GenerationIdentity, 'writerToken'> & { status: GenerationStatus }) | null> {
         const rows = await this.db.query<QueryRow[]>(
             `SELECT id,user_id,status,conversation_id,request_message_id,response_message_id,reasoning_enabled,
-                    datasource_id,context_upper_bound,parent_message_id,schema_context_version
+                    datasource_id,context_upper_bound,parent_message_id,schema_context_version,prompt_policy_version
                FROM generation WHERE id=?`,
             [id]
         );
@@ -72,6 +73,7 @@ export class GenerationService implements OnModuleDestroy {
             parentMessageId: rows[0].parent_message_id ?? null,
             reasoningEnabled: rows[0].reasoning_enabled === true,
             schemaContextVersion: rows[0].schema_context_version,
+            promptPolicyVersion: rows[0].prompt_policy_version,
         };
     }
 
@@ -81,7 +83,7 @@ export class GenerationService implements OnModuleDestroy {
       SET status='starting',writer_token=?,writer_heartbeat_at=NOW(),started_at=COALESCE(started_at,NOW()),updated_at=NOW()
       WHERE g.id=? AND g.status='pending' AND g.writer_token IS NULL
       RETURNING g.id,g.user_id,g.conversation_id,g.request_message_id,g.response_message_id,g.reasoning_enabled,
-                g.datasource_id,g.context_upper_bound,g.parent_message_id,g.schema_context_version`,
+                g.datasource_id,g.context_upper_bound,g.parent_message_id,g.schema_context_version,g.prompt_policy_version`,
             [writerToken, id]
         );
         if (!rows.length) return null;
@@ -102,6 +104,7 @@ export class GenerationService implements OnModuleDestroy {
             parentMessageId: rows[0].parent_message_id ?? null,
             reasoningEnabled: rows[0].reasoning_enabled === true,
             schemaContextVersion: rows[0].schema_context_version,
+            promptPolicyVersion: rows[0].prompt_policy_version,
             writerToken,
         };
     }
@@ -144,14 +147,7 @@ export class GenerationService implements OnModuleDestroy {
                 input_tokens_estimated=EXCLUDED.input_tokens_estimated,
                 output_tokens_estimated=EXCLUDED.output_tokens_estimated,
                 updated_at=NOW()`,
-            [
-                identity.id,
-                metrics.llmCallCount,
-                metrics.toolCallCount,
-                metrics.sqlCallCount,
-                metrics.inputTokensEstimated,
-                metrics.outputTokensEstimated,
-            ]
+            [identity.id, metrics.llmCallCount, metrics.toolCallCount, metrics.sqlCallCount, metrics.inputTokensEstimated, metrics.outputTokensEstimated]
         );
     }
 

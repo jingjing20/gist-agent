@@ -1,3 +1,4 @@
+import { AnalysisRuntimeAdapter } from '../analysis/analysis-runtime-adapter';
 import { Module } from '@nestjs/common';
 import { ConversationModule } from '../conversation/conversation.module';
 import { ChatService } from './chat.service';
@@ -20,6 +21,7 @@ import { MemoryModule } from '../memory/memory.module';
     imports: [ConversationModule, MemoryModule],
     providers: [
         ChatService,
+        AnalysisRuntimeAdapter,
         GenerationService,
         GenerationWorkerService,
         GenerationReliabilityService,

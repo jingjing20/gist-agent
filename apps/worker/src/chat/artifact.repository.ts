@@ -19,6 +19,7 @@ import { GenerationExecutionError } from './generation-errors';
 const MAX_ARTIFACT_BYTES = 5 * 1024 * 1024;
 
 interface CreateQueryArtifactInput {
+    writerToken?: string;
     generationId: string;
     userId: number;
     conversationId: string;
@@ -37,6 +38,7 @@ interface CreateQueryArtifactInput {
 }
 
 interface CreateChartArtifactInput {
+    writerToken?: string;
     generationId: string;
     userId: number;
     conversationId: string;
@@ -64,7 +66,8 @@ export class ArtifactRepository {
         const hash = createHash('sha256').update(canonicalRows).digest('hex');
         const qualityColumn = input.resultQuality ? ',result_quality' : '';
         const qualityValue = input.resultQuality ? ',?::jsonb' : '';
-        const rows = await this.db.query<QueryRow[]>(
+        const rows = await this.writeArtifact(
+            input,
             `INSERT INTO query_artifact (
                 id,generation_id,user_id,conversation_id,datasource_id,title,purpose,expected_grain,expected_shape,
                 original_sql,executed_sql,schema_context_version,columns_json,result_rows,returned_row_count,
@@ -148,7 +151,8 @@ export class ArtifactRepository {
 
     async createChartArtifact(input: CreateChartArtifactInput, datasourceId: number): Promise<ChartArtifactV1> {
         const id = randomUUID();
-        const rows = await this.db.query<QueryRow[]>(
+        const rows = await this.writeArtifact(
+            input,
             `INSERT INTO chart_artifact (
                 id,generation_id,query_artifact_id,user_id,conversation_id,datasource_id,
                 chart_type,title,x_field,y_fields,filters,sort
@@ -181,6 +185,24 @@ export class ArtifactRepository {
             ...(input.sort ? { sort: input.sort } : {}),
             createdAt: toIso(rows[0].created_at),
         };
+    }
+
+    /** Serialize new-core evidence writes with cancellation/finalization on the generation row. */
+    private async writeArtifact(
+        input: { generationId: string; userId: number; conversationId: string; writerToken?: string },
+        sql: string,
+        params: unknown[]
+    ): Promise<QueryRow[]> {
+        if (!input.writerToken) return this.db.query<QueryRow[]>(sql, params);
+        return this.db.withTransaction(async (tx) => {
+            const [owned] = await tx.query<QueryRow[]>(
+                "SELECT 1 FROM generation WHERE id=? AND user_id=? AND conversation_id=? AND writer_token=? AND status IN ('starting','running') FOR UPDATE",
+                [input.generationId, input.userId, input.conversationId, input.writerToken]
+            );
+            if (!owned.length) throw new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '任务已停止，不能保存证据');
+            const [rows] = await tx.query<QueryRow[]>(sql, params);
+            return rows;
+        });
     }
 
     private async canAccessDatasource(datasourceId: number, userId: number): Promise<boolean> {

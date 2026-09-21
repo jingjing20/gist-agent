@@ -1,3 +1,5 @@
+import { AnalysisRuntimeAdapter } from '../analysis/analysis-runtime-adapter';
+import { ANALYSIS_RUNTIME_VERSIONS } from '@gist/contracts';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConversationService } from '../conversation/conversation.service';
 import { LlmService } from '../llm/llm.service';
@@ -38,7 +40,8 @@ export class ChatService {
         private readonly promptBuilder: PromptBuilder,
         private readonly distiller: SemanticDistillerService,
         private readonly generations: GenerationService,
-        private readonly reliability: GenerationReliabilityService
+        private readonly reliability: GenerationReliabilityService,
+        private readonly analysisRuntime: AnalysisRuntimeAdapter
     ) {}
 
     async executeGeneration(generationId: string): Promise<void> {
@@ -88,6 +91,7 @@ export class ChatService {
 
     private async runGeneration(generation: GenerationIdentity, message: string, datasourceId: number | null, ownershipLost: () => boolean): Promise<void> {
         const { conversationId, userId, messageId, reasoningEnabled } = generation;
+        const newCore = generation.promptPolicyVersion === ANALYSIS_RUNTIME_VERSIONS.promptPolicy;
         const controller = new AbortController();
         const signal = controller.signal;
         const emitter = this.generations.emitter(generation);
@@ -98,10 +102,13 @@ export class ChatService {
             if (ownershipLost()) controller.abort(new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '生成任务写入权已丢失'));
             else void this.generations.isCancelRequested(generation.id).then((cancelled) => cancelled && controller.abort(new GenerationExecutionError('CANCELLED', '已取消')));
         }, 500);
-        const timeout = setTimeout(() => {
-            timedOut = true;
-            controller.abort(new GenerationExecutionError('ANALYSIS_TIMEOUT', '分析超时，请尝试简化问题后重试'));
-        }, CHAT_TIMEOUT_MS);
+        const timeout = setTimeout(
+            () => {
+                timedOut = true;
+                controller.abort(new GenerationExecutionError('ANALYSIS_TIMEOUT', '分析超时，请尝试简化问题后重试'));
+            },
+            newCore ? Math.min(CHAT_TIMEOUT_MS, 120_000) : CHAT_TIMEOUT_MS
+        );
         timeout.unref();
         let terminal: SSEEvent = { type: 'done' };
         let finalStatus: GenerationStatus = 'completed';
@@ -118,40 +125,56 @@ export class ChatService {
         // 全局定时器与用户取消共用同一 AbortController。
         // 超时时先 abort LLM/工具/SQL，等执行栈退出后再写终态。
         try {
-            const reasoningActive = this.llm.isReasoningActive(reasoningEnabled);
-            const contextStartedAt = Date.now();
-            const systemPrompt = await this.promptBuilder.buildSystemPrompt(datasourceId, userId, conversationId, message, generation.id);
-            const messages = await this.promptBuilder.buildMessages(conversationId, userId, systemPrompt, {
-                reasoningEnabled: reasoningActive,
-                excludeMessageIds: [messageId],
-                toolDefinitions: this.toolRegistry.getDefinitions(),
-                generationSnapshot: {
-                    contextUpperBound: generation.contextUpperBound,
-                    requestMessageId: generation.requestMessageId,
-                },
-            });
-            await this.generations.recordSpan(generation, 'context.select', contextStartedAt, 'ok', { messageCount: messages.length });
-            const agentStartedAt = Date.now();
-            await this.runAgentLoop(
-                emitter,
-                messages,
-                turnMessages,
-                blocks,
-                datasourceId,
-                userId,
-                reasoningActive,
-                signal,
-                () => this.generations.checkpointMessage(generation, blocks, turnMessages),
-                () => this.generations.markFirstDelta(generation),
-                () => this.generations.assertWritable(generation),
-                {
-                    generationId: generation.id,
-                    conversationId: generation.conversationId,
-                    schemaContextVersion: generation.schemaContextVersion,
-                },
-                metrics
-            );
-            await this.generations.recordSpan(generation, 'agent.loop', agentStartedAt, 'ok', { llmCalls: metrics.llmCallCount, toolCalls: metrics.toolCallCount });
+            if (generation.promptPolicyVersion?.startsWith('analysis-') && !newCore) throw new GenerationExecutionError('ANALYSIS_PROTOCOL_ERROR', '不支持的分析核心版本');
+            if (newCore) {
+                await this.analysisRuntime.run({
+                    generation,
+                    message,
+                    signal,
+                    emitter,
+                    blocks,
+                    turnMessages,
+                    metrics,
+                    assertWritable: () => this.generations.assertWritable(generation),
+                    checkpoint: () => this.generations.checkpointMessage(generation, blocks, turnMessages),
+                    onFirstDelta: () => this.generations.markFirstDelta(generation),
+                });
+            } else {
+                const reasoningActive = this.llm.isReasoningActive(reasoningEnabled);
+                const contextStartedAt = Date.now();
+                const systemPrompt = await this.promptBuilder.buildSystemPrompt(datasourceId, userId, conversationId, message, generation.id);
+                const messages = await this.promptBuilder.buildMessages(conversationId, userId, systemPrompt, {
+                    reasoningEnabled: reasoningActive,
+                    excludeMessageIds: [messageId],
+                    toolDefinitions: this.toolRegistry.getDefinitions(),
+                    generationSnapshot: {
+                        contextUpperBound: generation.contextUpperBound,
+                        requestMessageId: generation.requestMessageId,
+                    },
+                });
+                await this.generations.recordSpan(generation, 'context.select', contextStartedAt, 'ok', { messageCount: messages.length });
+                const agentStartedAt = Date.now();
+                await this.runAgentLoop(
+                    emitter,
+                    messages,
+                    turnMessages,
+                    blocks,
+                    datasourceId,
+                    userId,
+                    reasoningActive,
+                    signal,
+                    () => this.generations.checkpointMessage(generation, blocks, turnMessages),
+                    () => this.generations.markFirstDelta(generation),
+                    () => this.generations.assertWritable(generation),
+                    {
+                        generationId: generation.id,
+                        conversationId: generation.conversationId,
+                        schemaContextVersion: generation.schemaContextVersion,
+                    },
+                    metrics
+                );
+                await this.generations.recordSpan(generation, 'agent.loop', agentStartedAt, 'ok', { llmCalls: metrics.llmCallCount, toolCalls: metrics.toolCallCount });
+            }
             if (signal.aborted) throw new GenerationExecutionError('CANCELLED', '已取消');
         } catch (err: unknown) {
             const cause = signal.aborted && signal.reason instanceof Error ? signal.reason : err;
@@ -184,7 +207,7 @@ export class ChatService {
         const finalized = await this.generations.finalize(generation, finalStatus, errorDetail, errorCode, terminal, { blocks, llmMessages: turnMessages });
 
         // 记忆提取失败不影响主回答；服务端只接受有来源的结构化增量 patch。
-        if (finalized && finalStatus === 'completed')
+        if (finalized && finalStatus === 'completed' && !newCore)
             this.distiller.updateStateAsync({
                 conversationId,
                 userId,
@@ -397,5 +420,4 @@ export class ChatService {
         const detail = error instanceof Error ? error.message : String(error);
         throw new GenerationExecutionError(code, `${prefix}: ${detail}`);
     }
-
 }

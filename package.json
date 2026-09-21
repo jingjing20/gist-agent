@@ -26,7 +26,8 @@
         "test:phase6": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/phase6-regression.mjs",
         "smoke:phase3": "pnpm test:phase3 && pnpm smoke:conversation",
         "init-db": "pnpm --filter @gist/api init-db",
-        "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\""
+        "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\"",
+        "test:analysis-core": "pnpm --filter @gist/contracts build && pnpm --filter @gist/worker build && pnpm --filter @gist/api build && node scripts/analysis-core-regression.mjs"
     },
     "devDependencies": {
         "@gist/config": "workspace:*",

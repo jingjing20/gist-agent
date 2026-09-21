@@ -1,3 +1,4 @@
+export * from './analysis';
 export const GENERATION_QUEUE_NAME = 'conversation-generations';
 
 /**
@@ -48,6 +49,8 @@ export const GENERATION_ERROR_CODES = [
     'WRITER_OWNERSHIP_LOST',
     'GENERATION_CAPACITY_UNAVAILABLE',
     'EMPTY_LLM_RESPONSE',
+    'CONTEXT_BUDGET_EXCEEDED',
+    'ANALYSIS_PROTOCOL_ERROR',
     'MAX_AGENT_ITERATIONS_EXCEEDED',
     'LLM_REQUEST_FAILED',
     'TOOL_EXECUTION_FAILED',

@@ -194,8 +194,8 @@ export class SqlExecutorAgent {
      *   若语法错误 -> attemptFixSql() -> 重试 (max 2 次)
      *   若语义错误 -> 直接向上层暴露
      */
-    async execute(sql: string, datasourceId?: number | null, userId?: number, signal?: AbortSignal): Promise<QueryResult> {
-        const maxRetries = 2;
+    async execute(sql: string, datasourceId?: number | null, userId?: number, signal?: AbortSignal, options: { allowModelRepair?: boolean } = {}): Promise<QueryResult> {
+        const maxRetries = options.allowModelRepair === false ? 0 : 2;
         let currentSql = sql;
         let attempt = 0;
 
@@ -214,6 +214,7 @@ export class SqlExecutorAgent {
         }
 
         while (attempt <= maxRetries) {
+            if (signal?.aborted) throw signal.reason ?? new GenerationExecutionError('CANCELLED', '已取消');
             try {
                 const { astResult, parser } = this.validate(currentSql, allowedTables, columnPolicies);
                 const safeSql = this.ensureLimit(astResult, parser);

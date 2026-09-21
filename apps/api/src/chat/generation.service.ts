@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import Redis from 'ioredis';
 import { randomUUID } from 'crypto';
 import { DatabaseService, QueryRow } from '../database/database.service';
-import { AGENT_RUNTIME_VERSIONS } from '@gist/contracts';
+import { AGENT_RUNTIME_VERSIONS, ANALYSIS_RUNTIME_VERSIONS } from '@gist/contracts';
 
 @Injectable()
 export class GenerationService implements OnModuleDestroy {
@@ -53,6 +53,9 @@ export class GenerationService implements OnModuleDestroy {
                   LIMIT 1`,
                 [conversationId]
             );
+            const selection = process.env.ANALYSIS_CORE || 'legacy';
+            if (!['legacy', 'new'].includes(selection)) throw new Error('ANALYSIS_CORE must be legacy or new');
+            const runtimeVersions = selection === 'new' ? ANALYSIS_RUNTIME_VERSIONS : AGENT_RUNTIME_VERSIONS;
             const effectiveDatasourceId = datasourceId ?? conversation[0].datasource_id ?? null;
             await tx.execute("INSERT INTO message (id,conversation_id,role,content,blocks,llm_messages) VALUES (?,?,?,?,'[]'::jsonb,'[]'::jsonb)", [
                 requestMessageId,
@@ -83,11 +86,11 @@ export class GenerationService implements OnModuleDestroy {
                     reasoningEnabled,
                     process.env.LLM_PROVIDER || 'openai-compatible',
                     process.env.OPENAI_MODEL || 'gpt-4o',
-                    AGENT_RUNTIME_VERSIONS.promptPolicy,
-                    AGENT_RUNTIME_VERSIONS.toolset,
-                    AGENT_RUNTIME_VERSIONS.contextPolicy,
-                    AGENT_RUNTIME_VERSIONS.memoryPolicy,
-                    AGENT_RUNTIME_VERSIONS.schemaContext,
+                    runtimeVersions.promptPolicy,
+                    runtimeVersions.toolset,
+                    runtimeVersions.contextPolicy,
+                    runtimeVersions.memoryPolicy,
+                    runtimeVersions.schemaContext,
                     effectiveDatasourceId,
                     snapshot[0].context_upper_bound,
                     parent[0]?.response_message_id ?? null,

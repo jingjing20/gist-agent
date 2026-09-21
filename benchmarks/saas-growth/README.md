@@ -73,6 +73,7 @@ daily_business_metrics ──(UTC date)── product_events / subscriptions / s
 
 ## 评测资产
 
+- [`agent-core-cases.json`](./agent-core-cases.json)：新核心 C01～C10 行为案例与阶段范围；真实模型尚未验收，数值仍引用下列标准答案。
 - [`cases.json`](./cases.json)：机器可读问题、标准 SQL、标准结果和评分提示。
 - [`answers.md`](./answers.md)：适合人工查阅的常见问题与标准答案，由更新命令生成。
 - [`reference.sql`](./reference.sql)：全部标准 SQL，由更新命令生成。

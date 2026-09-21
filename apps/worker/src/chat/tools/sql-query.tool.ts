@@ -90,7 +90,7 @@ export class SqlQueryTool implements Tool {
         blocks.push(sqlBlock);
 
         try {
-            const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId, ctx.signal);
+            const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId, ctx.signal, { allowModelRepair: !ctx.analysisCore });
             await ctx.assertWritable();
 
             let resultRows = r.rows;
@@ -113,12 +113,13 @@ export class SqlQueryTool implements Tool {
 
             let queryArtifactId: string | undefined;
             let resultContentHash: string | undefined;
-            if (process.env.ARTIFACT_DUAL_WRITE_ENABLED !== '0') {
+            if (ctx.analysisCore || process.env.ARTIFACT_DUAL_WRITE_ENABLED !== '0') {
                 if (!ctx.generationId || !ctx.conversationId || !ctx.userId || !ctx.schemaContextVersion) {
                     throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询证据缺少 generation 上下文');
                 }
                 const artifact = await this.artifacts.createQueryArtifact({
                     generationId: ctx.generationId,
+                    writerToken: ctx.writerToken,
                     userId: ctx.userId,
                     conversationId: ctx.conversationId,
                     datasourceId: ctx.datasourceId ?? null,
@@ -185,6 +186,24 @@ export class SqlQueryTool implements Tool {
             return { toolResult, blocks, succeeded: true };
         } catch (e: any) {
             if (ctx.signal.aborted) throw ctx.signal.reason ?? e;
+            if (ctx.analysisCore) {
+                await ctx.assertWritable();
+                if (e instanceof GenerationExecutionError && ['SQL_SECURITY_REJECTED', 'DATASOURCE_ACCESS_CHANGED', 'WRITER_OWNERSHIP_LOST'].includes(e.code)) throw e;
+                const code = String(e.code ?? '');
+                const recoverable: Record<string, string> = {
+                    '42601': 'SQL 语法错误，请根据已加载 Schema 修正查询。',
+                    '42703': '字段不存在，请核对已加载的字段名。',
+                    '42P01': '表不存在，请核对已加载的表名。',
+                    '42803': '聚合与 GROUP BY 不匹配，请修正查询。',
+                    '42702': '字段引用有歧义，请添加表限定。',
+                    '57014': '单次查询超时，请缩小查询范围。',
+                    ER_PARSE_ERROR: 'SQL 语法错误，请修正查询。',
+                };
+                if (!recoverable[code]) throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询执行失败，未生成有效证据');
+                execLog.content = recoverable[code];
+                ctx.emitter.send({ ...execLog, type: 'log_update' });
+                return { toolResult: JSON.stringify({ errorCode: code, message: recoverable[code], retryable: true }), blocks, succeeded: false };
+            }
             execLog.content = `查询失败: ${e.message}`;
             ctx.emitter.send({ ...execLog, type: 'log_update' } as any);
             return {
