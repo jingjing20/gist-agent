@@ -1,0 +1,48 @@
+apps/api/src/analysis-artifact/analysis-artifact.module.ts
+  9bf65784ad5f4a8b 10-15,29-30,32-34,37-40,42-50,55-70,72-83,86
+scripts/analysis-presentation-regression.mjs
+  9bf65784ad5f4a8b 1-95
+docs/agent-refactor/05-delivery-and-validation.md
+  9bf65784ad5f4a8b 4,38,227-241
+RESUME_HIGHLIGHTS.md
+  9bf65784ad5f4a8b 3-4,19,27
+apps/web/src/components/DefinitionContent.vue
+  9bf65784ad5f4a8b 1-52
+benchmarks/saas-growth/s4-acceptance.json
+  9bf65784ad5f4a8b 1-291
+apps/web/src/components/ChatMessageItem.vue
+  9bf65784ad5f4a8b 16,18,31,46-51,65-68,74
+README.md
+  9bf65784ad5f4a8b 20-23
+apps/web/src/components/blocks/AnalysisBlock.vue
+  9bf65784ad5f4a8b 1-279
+apps/web/src/types/index.ts
+  9bf65784ad5f4a8b 2-6
+package.json
+  9bf65784ad5f4a8b 34-35
+docs/agent-refactor/README.md
+  9bf65784ad5f4a8b 3
+benchmarks/saas-growth/S4-WALKTHROUGH.md
+  9bf65784ad5f4a8b 1-34
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "468033775750487de0f76982a5c747a6859a1dfe",
+  "prompts": {
+    "9bf65784ad5f4a8b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3e9-02d5-7bb0-8a36-30ffce8d11ce",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 974,
+      "total_deletions": 149,
+      "accepted_lines": 852,
+      "overriden_lines": 0
+    }
+  }
+}
