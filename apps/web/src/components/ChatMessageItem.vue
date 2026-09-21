@@ -13,8 +13,9 @@
             <template v-else>
                 <div class="assistant-content">
                     <template v-for="(block, i) in visibleBlocks" :key="i">
-                        <component :is="blockComponent(block.type)" v-bind="blockProps(block)" />
+                        <component :is="hasAnalysis(block) ? AnalysisBlock : blockComponent(block.type)" v-bind="blockProps(block)" />
                     </template>
+                    <p v-if="terminalStatus" role="status">{{ terminalStatus }}</p>
                     <div v-if="isStreaming" class="streaming-indicator">
                         <span class="dot"></span>
                         <span class="dot"></span>
@@ -27,7 +28,9 @@
 </template>
 
 <script setup lang="ts">
+import { useChatStore } from '../stores/chat';
 import { computed, type Component } from 'vue';
+import AnalysisBlock from './blocks/AnalysisBlock.vue';
 import SqlBlock from './blocks/SqlBlock.vue';
 import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
@@ -39,6 +42,12 @@ const props = defineProps<{
     msg: ChatMessage;
     isStreaming: boolean;
 }>();
+
+const chat = useChatStore();
+const terminalStatus = computed(() => {
+    const status = Object.values(chat.generations).find((g) => g.messageId === props.msg.id)?.status;
+    return status === 'cancelled' ? '分析已取消；已有内容不代表完整结论。' : status === 'failed' ? '分析未完成，请查看错误说明后重试。' : '';
+});
 
 // Raw model reasoning is not a product-facing protocol. Ignore legacy persisted
 // blocks as well as preventing new ones from being rendered.
@@ -53,11 +62,16 @@ const blockMap: Record<string, Component> = {
     chart: ChartBlock,
 };
 
+function hasAnalysis(block: MessageBlock): boolean {
+    return !!(block.analysis?.state?.conversationId && block.analysis?.snapshot?.requestMessageId && block.analysis?.outcome);
+}
+
 function blockComponent(type: string): Component {
     return blockMap[type] || MarkdownBlock;
 }
 
 function blockProps(block: MessageBlock): Record<string, unknown> {
+    if (hasAnalysis(block)) return { analysis: block.analysis, messageId: props.msg.id, isStreaming: props.isStreaming };
     if (block.type === 'log') {
         return {
             title: block.title,

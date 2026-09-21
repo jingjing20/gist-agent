@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "status": "not_run",
+  "runtime_version": "analysis-core-v2",
+  "case_file": "agent-core-cases.json",
+  "reference_file": "cases.json",
+  "dataset_key": "saas_growth_demo",
+  "dataset_version": 1,
+  "time_anchor": "2026-09-15T00:00:00Z",
+  "execution": {
+    "model": null,
+    "model_parameters": null,
+    "commit": null,
+    "executed_at": null,
+    "reviewer": null,
+    "definition_versions": null,
+    "permission_scope": null
+  },
+  "comparison_protocol": "同模型、同数据、同已确认定义和权限，每次仅改变验证策略或证据复用；不把旧核心不同口径配置当作受控基线。",
+  "cases": [
+    {
+      "id": "C01",
+      "input_ref": "agent-core-cases.json#C01",
+      "reference_case_ids": [],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C02",
+      "input_ref": "agent-core-cases.json#C02",
+      "reference_case_ids": [
+        "FUNNEL-002"
+      ],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C03",
+      "input_ref": "agent-core-cases.json#C03",
+      "reference_case_ids": [
+        "FUNNEL-003"
+      ],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C04",
+      "input_ref": "agent-core-cases.json#C04",
+      "reference_case_ids": [
+        "FUNNEL-002"
+      ],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C05",
+      "input_ref": "agent-core-cases.json#C05",
+      "reference_case_ids": [],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C06",
+      "input_ref": "agent-core-cases.json#C06",
+      "reference_case_ids": [
+        "QUALITY-004",
+        "QUALITY-005"
+      ],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C07",
+      "input_ref": "agent-core-cases.json#C07",
+      "reference_case_ids": [],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C08",
+      "input_ref": "agent-core-cases.json#C08",
+      "reference_case_ids": [],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C09",
+      "input_ref": "agent-core-cases.json#C09",
+      "reference_case_ids": [],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    },
+    {
+      "id": "C10",
+      "input_ref": "agent-core-cases.json#C10",
+      "reference_case_ids": [],
+      "baseline": {
+        "status": "not_run",
+        "result": null
+      },
+      "new_core": {
+        "status": "not_run",
+        "result": null
+      },
+      "checks": {
+        "key_values": null,
+        "definition_and_window": null,
+        "evidence_support": null,
+        "explanation_verified": null,
+        "uncertainty": null,
+        "tool_count": null,
+        "budget_exit": null
+      },
+      "artifact_ids": [],
+      "failure_type": null,
+      "limitations": [],
+      "review_notes": null
+    }
+  ]
+}

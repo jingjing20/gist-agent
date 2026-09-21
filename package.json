@@ -31,7 +31,8 @@
         "test:business-definitions": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/business-definition-regression.mjs",
         "migrate:business-definitions": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/migrate-business-definitions.mjs",
         "test:analysis-state": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/analysis-state-regression.mjs",
-        "migrate:analysis-state": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/migrate-analysis-state.mjs"
+        "migrate:analysis-state": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/migrate-analysis-state.mjs",
+        "test:analysis-presentation": "pnpm --filter @gist/api build && node scripts/analysis-presentation-regression.mjs"
     },
     "devDependencies": {
         "@gist/config": "workspace:*",

@@ -17,6 +17,10 @@
   </p>
 </div>
 
+> 2026-09-21 实施状态：新核心 S1～S4 的代码与快速 mock/构建验证已完成，真实模型、数据库及业务交互待验收，默认入口仍为 legacy。新核心采用显式 SQL 修正、业务定义版本和证据展开；下文旧记忆/静默修复描述属于旧核心，不能作为新核心能力或准确率证明。详见 [阶段记录](docs/agent-refactor/05-delivery-and-validation.md) 与 [S4 验收步骤](benchmarks/saas-growth/S4-WALKTHROUGH.md)。
+
+
+
 <h2 align="center">项目演示</h2>
 
 <div align="center">

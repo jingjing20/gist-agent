@@ -1,3 +1,9 @@
+import type { AnalysisOutcome, AnalysisState } from '@gist/contracts';
+export interface AnalysisPresentation {
+    outcome: AnalysisOutcome;
+    state: AnalysisState;
+    snapshot: { requestMessageId: string };
+}
 export interface ChartSeries {
     name: string;
     data: number[];
@@ -16,6 +22,7 @@ export interface ArtifactColumn {
 }
 
 export interface SSEEvent {
+    analysis?: AnalysisPresentation;
     type: 'sql' | 'table' | 'text' | 'text_chunk' | 'reasoning_chunk' | 'thinking' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading' | 'log_update' | 'log_remove';
     content?: string;
     columns?: string[];
@@ -31,6 +38,7 @@ export interface SSEEvent {
 }
 
 export interface MessageBlock {
+    analysis?: AnalysisPresentation;
     type: SSEEvent['type'];
     content?: string;
     columns?: string[];
