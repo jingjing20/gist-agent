@@ -189,27 +189,20 @@ await check('tool dependency failures are not exposed as model argument errors',
     await assert.rejects(h.run(), (e) => e.code === 'TOOL_EXECUTION_FAILED' && !e.message.includes('private'));
 });
 await check('new SQL execution disables nested model repair', async () => {
-    let repairCalls = 0,
-        dbCalls = 0;
+    let dbCalls = 0;
     const executor = new SqlExecutorAgent(
         {
             queryReadOnlyWithFields: async () => {
                 dbCalls++;
-                throw Object.assign(new Error('syntax'), { code: 'ER_PARSE_ERROR' });
-            },
-        },
-        {
-            chat: async () => {
-                repairCalls++;
-                return 'SELECT 1';
+                throw Object.assign(new Error('syntax'), { code: '42601' });
             },
         },
         { getAllowedTableNames: async () => ['t'], getColumnPolicies: async () => [] }
     );
     executor.logger = { error() {}, warn() {}, log() {} };
-    await assert.rejects(executor.execute('SELECT 1', 1, 1, new AbortController().signal, { allowModelRepair: false }));
+    await assert.rejects(executor.execute('SELECT 1', 1, 1, new AbortController().signal));
     assert.equal(dbCalls, 1);
-    assert.equal(repairCalls, 0);
+    assert.equal(typeof executor.attemptFixSql, 'undefined');
 });
 await check('SQL adapter sanitizes recoverable errors and propagates security', async () => {
     const ctx = { analysisCore: true, assertWritable: async () => {}, signal: new AbortController().signal, emitter: { send() {} } };
@@ -332,10 +325,6 @@ await check('generation selects persisted core and does not call legacy prompt o
     };
     const service = new ChatService(
         {},
-        { isReasoningActive: unexpected },
-        {},
-        { buildSystemPrompt: unexpected },
-        { updateStateAsync: unexpected },
         generations,
         {},
         {
@@ -392,13 +381,13 @@ await check('new SQL tool persists evidence even when legacy dual-write is disab
         );
         assert.equal(JSON.parse(result.toolResult).queryArtifactId, 'persisted');
         assert.equal(persisted.writerToken, 'writer');
-        assert.equal(executionOptions.allowModelRepair, false);
+        assert.equal(executionOptions, undefined);
     } finally {
         if (saved === undefined) delete process.env.ARTIFACT_DUAL_WRITE_ENABLED;
         else process.env.ARTIFACT_DUAL_WRITE_ENABLED = saved;
     }
 });
-await check('generation creation stamps all new versions before enqueue, legacy remains default', async () => {
+await check('generation creation always stamps the sole runtime before enqueue', async () => {
     const { GenerationService } = require('../apps/api/dist/chat/generation.service.js');
     const service = Object.create(GenerationService.prototype); // No Redis connection in this test.
     const writes = [];
@@ -427,7 +416,7 @@ await check('generation creation stamps all new versions before enqueue, legacy 
         writes.length = 0;
         delete process.env.ANALYSIS_CORE;
         await service.createTurn(1, 'c', 'question', 1, 'key2', 'hash', false);
-        assert.ok(!writes.find((w) => w.sql.includes('INSERT INTO generation')).params.includes(ANALYSIS_RUNTIME_VERSIONS.promptPolicy));
+        assert.ok(writes.find((w) => w.sql.includes('INSERT INTO generation')).params.includes(ANALYSIS_RUNTIME_VERSIONS.promptPolicy));
     } finally {
         if (saved === undefined) delete process.env.ANALYSIS_CORE;
         else process.env.ANALYSIS_CORE = saved;

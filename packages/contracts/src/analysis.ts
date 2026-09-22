@@ -1,4 +1,4 @@
-/** New core is opt-in until business and interaction acceptance is complete. */
+/** Sole active analysis runtime. Persist these versions on each generation. */
 export const ANALYSIS_RUNTIME_VERSIONS = {
     promptPolicy: 'analysis-core-v2',
     toolset: 'analysis-tools-v3',

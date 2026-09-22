@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseClient } from '../packages/database/dist/index.js';
 import { ConversationService } from '../apps/worker/dist/conversation/conversation.service.js';
 import { GenerationService } from '../apps/worker/dist/chat/generation.service.js';
+import { ANALYSIS_RUNTIME_VERSIONS } from '../packages/contracts/dist/index.js';
 import { ChatService } from '../apps/worker/dist/chat/chat.service.js';
 import { loadWorkspaceEnv } from '@gist/config';
 
@@ -133,11 +134,8 @@ try {
         upperBound,
     });
     const conversations = new ConversationService(database);
-    const context = await conversations.getGenerationContextMessages(contextConversation.id, userId, upperBound, currentRequest);
-    assert.deepEqual(
-        context.map((message) => message.content),
-        ['completed-user', 'completed-assistant', 'current-user']
-    );
+    assert.equal((await conversations.getMessage(currentRequest, contextConversation.id, userId)).content, 'current-user');
+    assert.equal(await conversations.getMessage(currentRequest, contextConversation.id, -1), null);
 
     // Writer fence: after terminal transition, neither events nor message checkpoints are accepted.
     const repository = new GenerationService(database);
@@ -219,19 +217,12 @@ try {
                 else options.signal?.addEventListener('abort', rejectAbort, { once: true });
             }),
     };
-    const toolRegistry = { getDefinitions: () => [], get: () => undefined };
-    const promptBuilder = {
-        buildSystemPrompt: async () => 'system',
-        buildMessages: async (_conversationId, _userId, systemPrompt) => [{ role: 'system', content: systemPrompt }],
-    };
-    let distillCalls = 0;
-    const distiller = { updateStateAsync: () => distillCalls++ };
     const reliability = {
         acquire: async (input) => ({ token: input.token, keys: [] }),
         renew: async () => true,
         release: async () => undefined,
     };
-    const chat = new ChatService(conversations, stuckLlm, toolRegistry, promptBuilder, distiller, repository, reliability);
+    const chat = new ChatService(conversations, repository, reliability, { run: ({ signal }) => stuckLlm.streamWithTools([], [], { signal }) });
 
     async function createPendingGeneration(title, content) {
         const conversation = await request('/conversations', {
@@ -245,6 +236,7 @@ try {
         await insertMessage(requestId, conversation.id, 'user', content);
         await insertMessage(responseId, conversation.id, 'assistant', '');
         await insertGeneration({ id: generationId, userId, conversationId: conversation.id, requestId, responseId, status: 'pending' });
+        await database.execute('UPDATE generation SET prompt_policy_version=? WHERE id=?', [ANALYSIS_RUNTIME_VERSIONS.promptPolicy, generationId]);
         return { conversation, requestId, responseId, generationId };
     }
 
@@ -262,7 +254,6 @@ try {
     await cancellation;
     const cancelled = (await database.query('SELECT status,error_code FROM generation WHERE id=?', [cancelledGeneration.generationId]))[0];
     assert.deepEqual(cancelled, { status: 'cancelled', error_code: 'CANCELLED' });
-    assert.equal(distillCalls, 0, 'failed or cancelled generations must not update semantic memory');
 
     await new Promise((resolve) => setTimeout(resolve, 400));
     for (const generationId of [timeoutGeneration.generationId, cancelledGeneration.generationId]) {

@@ -54,7 +54,7 @@ function autoResize() {
     el.style.height = Math.min(el.scrollHeight, 150) + 'px';
 }
 
-function handleSubmit(e?: Event) {
+async function handleSubmit(e?: Event) {
     e?.preventDefault();
     const text = inputText.value.trim();
     if (!text || chatStore.isLoading) return;
@@ -62,7 +62,13 @@ function handleSubmit(e?: Event) {
     nextTick(() => {
         if (textareaRef.value) textareaRef.value.style.height = 'auto';
     });
-    chatStore.sendMessage(text);
+    const conversationId = chatStore.activeConversationId;
+    const sent = await chatStore.sendMessage(text);
+    if (!sent && !inputText.value && (conversationId === chatStore.activeConversationId || conversationId === null)) {
+        inputText.value = text;
+        await nextTick();
+        autoResize();
+    }
 }
 </script>
 

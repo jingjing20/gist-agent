@@ -1,3 +1,4 @@
+import { quoteIdentifier } from '@gist/database';
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { SchemaService } from '../database/schema.service';
@@ -68,7 +69,7 @@ export class DataSourceService {
         const rows = await this.db.query<RowDataPacket[]>(
             `SELECT d.id, d.name, d.is_local, d.created_by, u.name as creator_name, d.description, d.created_at
        FROM data_source d
-       LEFT JOIN user u ON d.created_by = u.id
+       LEFT JOIN app_user u ON d.created_by = u.id
        LEFT JOIN datasource_permission p ON d.id = p.datasource_id AND p.user_id = ?
        WHERE d.created_by IS NULL OR d.created_by = ? OR p.user_id IS NOT NULL
        ORDER BY d.id ASC`,
@@ -92,7 +93,11 @@ export class DataSourceService {
             description?: string;
         }
     ): Promise<DataSource> {
-        const result = await this.db.execute(`INSERT INTO data_source (name, created_by, description) VALUES (?, ?, ?) RETURNING id`, [body.name, userId, body.description ?? null]);
+        const result = await this.db.execute(`INSERT INTO data_source (name, created_by, description) VALUES (?, ?, ?) RETURNING id`, [
+            body.name,
+            userId,
+            body.description ?? null,
+        ]);
         await this.db.execute('INSERT INTO datasource_permission (datasource_id, user_id, granted_by) VALUES (?, ?, ?)', [result.insertId, userId, null]);
         return this.findOne(result.insertId, userId);
     }
@@ -136,7 +141,7 @@ export class DataSourceService {
 
         const tableRows = await this.db.query<RowDataPacket[]>("SELECT table_name FROM datasource_table_catalog WHERE datasource_id = ? AND source_type = 'uploaded'", [id]);
         for (const t of tableRows) {
-            await this.db.execute(`DROP TABLE IF EXISTS \`${(t as any).table_name}\``);
+            await this.db.execute(`DROP TABLE IF EXISTS ${quoteIdentifier((t as any).table_name)}`);
         }
 
         await this.db.execute('DELETE FROM data_source WHERE id = ?', [id]);
@@ -146,8 +151,8 @@ export class DataSourceService {
     /**
      * 文件上传建表核心流程：
      * 1. CREATE TABLE (动态列定义)
-     * 2. LOAD DATA LOCAL INFILE (极速写入) -- 失败则降级为批量 INSERT
-     * 3. ALTER TABLE 写入列注释 (原始列名 -> COMMENT)
+     * 2. PostgreSQL 参数化批量 INSERT
+     * 3. COMMENT ON 写入表和列注释
      * 4. 注册到统一表目录
      * 5. 异步触发: Schema 增强 (LLM 推断业务语义) + 推荐问题重新生成
      *
@@ -182,45 +187,23 @@ export class DataSourceService {
             if (value.includes('BOOL')) return 'BOOLEAN';
             return 'TEXT';
         };
-        const colDefs = columns.map((c) => `\`${c.name}\` ${pgType(c.type)}`).join(', ');
-        await this.db.execute(`CREATE TABLE \`${tableName}\` (${colDefs})`);
+        const colDefs = columns.map((c) => `${quoteIdentifier(c.name)} ${pgType(c.type)}`).join(', ');
+        await this.db.execute(`CREATE TABLE ${quoteIdentifier(tableName)} (${colDefs})`);
 
         try {
-            try {
-                // 将全量数据序列化为内存中的 TSV 流，大幅度减少网络 IO 耗时
-                const { Readable } = require('stream');
-                const tsvData =
-                    rows
-                        .map((r) => {
-                            return columns
-                                .map((c) => {
-                                    const v = r[c.name];
-                                    if (v === null || v === undefined) return '\\N'; // MySQL LOAD DATA 中 \N 表示 NULL
-                                    return String(v).replace(/\\/g, '\\\\').replace(/\t/g, ' ').replace(/\n/g, ' ');
-                                })
-                                .join('\t');
-                        })
-                        .join('\n') + '\n';
-
-                const loadSql = `LOAD DATA LOCAL INFILE 'stream' INTO TABLE \`${tableName}\` FIELDS TERMINATED BY '\\t' LINES TERMINATED BY '\\n' (${columns.map((c) => `\`${c.name}\``).join(', ')})`;
-                await this.db.executeLoad(loadSql, () => Readable.from([tsvData]));
-            } catch (err: any) {
-                // 部分云服务可能屏蔽了 local_infile 权限，遇到异常平滑降级为批量插入
-                const BATCH = Math.max(1, Math.floor(60000 / columns.length));
-                for (let i = 0; i < rows.length; i += BATCH) {
-                    const batch = rows.slice(i, i + BATCH);
-                    if (!batch.length) continue;
-                    const placeholders = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
-                    const values = batch.flatMap((row) => columns.map((c) => row[c.name] ?? null));
-                    await this.db.execute(`INSERT INTO \`${tableName}\` (${columns.map((c) => `\`${c.name}\``).join(', ')}) VALUES ${placeholders}`, values);
-                }
+            const batchSize = Math.max(1, Math.floor(60000 / columns.length));
+            for (let i = 0; i < rows.length; i += batchSize) {
+                const batch = rows.slice(i, i + batchSize);
+                const placeholders = batch.map(() => `(${columns.map(() => '?').join(', ')})`).join(', ');
+                const values = batch.flatMap((row) => columns.map((c) => row[c.name] ?? null));
+                await this.db.execute(`INSERT INTO ${quoteIdentifier(tableName)} (${columns.map((c) => quoteIdentifier(c.name)).join(', ')}) VALUES ${placeholders}`, values);
             }
 
             const esc = (s: string) => s.replace(/'/g, "''");
-            await this.db.execute(`COMMENT ON TABLE \`${tableName}\` IS '${esc(displayName)}'`);
+            await this.db.execute(`COMMENT ON TABLE ${quoteIdentifier(tableName)} IS '${esc(displayName)}'`);
             for (const col of columns) {
                 const comment = col.originalName ?? col.name;
-                await this.db.execute(`COMMENT ON COLUMN \`${tableName}\`.\`${col.name}\` IS '${esc(comment)}'`);
+                await this.db.execute(`COMMENT ON COLUMN ${quoteIdentifier(tableName)}.${quoteIdentifier(col.name)} IS '${esc(comment)}'`);
             }
 
             const result = await this.db.execute(
@@ -248,7 +231,7 @@ export class DataSourceService {
                 created_at: new Date().toISOString(),
             };
         } catch (error) {
-            await this.db.execute(`DROP TABLE IF EXISTS \`${tableName}\``);
+            await this.db.execute(`DROP TABLE IF EXISTS ${quoteIdentifier(tableName)}`);
             throw error;
         }
     }
@@ -259,7 +242,7 @@ export class DataSourceService {
         if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(role) || !/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(tableName)) {
             throw new Error('只读角色或数据表名称不合法');
         }
-        await this.db.execute(`GRANT SELECT ON TABLE public.\`${tableName}\` TO \`${role}\``);
+        await this.db.execute(`GRANT SELECT ON TABLE public.${quoteIdentifier(tableName)} TO ${quoteIdentifier(role)}`);
     }
 
     async listTables(datasourceId: number, userId: number): Promise<DataSourceTable[]> {
@@ -269,7 +252,7 @@ export class DataSourceService {
             `SELECT t.id, t.datasource_id, t.schema_name, t.table_name, t.display_name, t.description,
                     t.dataset_key, t.source_type, t.is_agent_visible, t.created_by, u.name as creator_name, t.created_at
        FROM datasource_table_catalog t
-       LEFT JOIN user u ON t.created_by = u.id
+       LEFT JOIN app_user u ON t.created_by = u.id
        WHERE t.datasource_id = ?
        ORDER BY t.dataset_key NULLS LAST, t.id`,
             [datasourceId]
@@ -292,7 +275,7 @@ export class DataSourceService {
             throw new ForbiddenException('仅数据源创建者或表上传人可删除');
         }
 
-        await this.db.execute(`DROP TABLE IF EXISTS \`${row.table_name}\``);
+        await this.db.execute(`DROP TABLE IF EXISTS ${quoteIdentifier(row.table_name)}`);
         await this.db.execute('DELETE FROM datasource_table_catalog WHERE id = ?', [tableId]);
         this.schemaService.clearDatasourceCache(row.datasource_id ?? null);
         return row.datasource_id;
@@ -304,7 +287,11 @@ export class DataSourceService {
         if ((rows[0] as any).created_by !== grantorId) {
             throw new ForbiddenException('仅创建人可授权');
         }
-        await this.db.execute('INSERT INTO datasource_permission (datasource_id, user_id, granted_by) VALUES (?, ?, ?) ON CONFLICT (datasource_id, user_id) DO NOTHING', [datasourceId, targetUserId, grantorId]);
+        await this.db.execute('INSERT INTO datasource_permission (datasource_id, user_id, granted_by) VALUES (?, ?, ?) ON CONFLICT (datasource_id, user_id) DO NOTHING', [
+            datasourceId,
+            targetUserId,
+            grantorId,
+        ]);
     }
 
     async revoke(datasourceId: number, targetUserId: number, grantorId: number): Promise<void> {
@@ -323,7 +310,7 @@ export class DataSourceService {
             throw new ForbiddenException('仅创建人可查看授权列表');
         }
         const users = await this.db.query<RowDataPacket[]>(
-            `SELECT u.id, u.email, u.name FROM user u
+            `SELECT u.id, u.email, u.name FROM app_user u
        INNER JOIN datasource_permission p ON u.id = p.user_id AND p.datasource_id = ?
        ORDER BY u.email`,
             [datasourceId]

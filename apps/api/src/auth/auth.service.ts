@@ -24,13 +24,13 @@ export class AuthService {
     ) {}
 
     async register(email: string, password: string, name: string): Promise<{ user: User; token: string }> {
-        const existing = await this.db.query<QueryRow[]>('SELECT id FROM user WHERE email = ?', [email.toLowerCase().trim()]);
+        const existing = await this.db.query<QueryRow[]>('SELECT id FROM app_user WHERE email = ?', [email.toLowerCase().trim()]);
         if (existing.length) {
             throw new ConflictException('该邮箱已注册');
         }
 
         const hash = await bcrypt.hash(password, SALT_ROUNDS);
-        const result = await this.db.execute('INSERT INTO user (email, password_hash, name) VALUES (?, ?, ?) RETURNING id', [
+        const result = await this.db.execute('INSERT INTO app_user (email, password_hash, name) VALUES (?, ?, ?) RETURNING id', [
             email.toLowerCase().trim(),
             hash,
             (name || email.split('@')[0]).trim(),
@@ -42,7 +42,7 @@ export class AuthService {
     }
 
     async login(email: string, password: string): Promise<{ user: User; token: string }> {
-        const rows = await this.db.query<QueryRow[]>('SELECT id, email, name, password_hash FROM user WHERE email = ?', [email.toLowerCase().trim()]);
+        const rows = await this.db.query<QueryRow[]>('SELECT id, email, name, password_hash FROM app_user WHERE email = ?', [email.toLowerCase().trim()]);
         if (!rows.length) {
             throw new UnauthorizedException('邮箱或密码错误');
         }
@@ -64,7 +64,7 @@ export class AuthService {
     }
 
     async requestReset(email: string, origin?: string): Promise<void> {
-        const rows = await this.db.query<QueryRow[]>('SELECT id, email FROM user WHERE email = ?', [email.toLowerCase().trim()]);
+        const rows = await this.db.query<QueryRow[]>('SELECT id, email FROM app_user WHERE email = ?', [email.toLowerCase().trim()]);
         if (!rows.length) return; // 不暴露邮箱是否存在
 
         const userId = (rows[0] as any).id;
@@ -92,13 +92,13 @@ export class AuthService {
             const { id: tokenId, user_id: userId } = rows[0] as any;
             const hash = await bcrypt.hash(newPassword, SALT_ROUNDS);
 
-            await conn.execute('UPDATE user SET password_hash = ? WHERE id = ?', [hash, userId]);
+            await conn.execute('UPDATE app_user SET password_hash = ? WHERE id = ?', [hash, userId]);
             await conn.execute('UPDATE password_reset_token SET used_at = NOW() WHERE id = ?', [tokenId]);
         });
     }
 
     async findById(id: number): Promise<User> {
-        const rows = await this.db.query<QueryRow[]>('SELECT id, email, name, created_at FROM user WHERE id = ?', [id]);
+        const rows = await this.db.query<QueryRow[]>('SELECT id, email, name, created_at FROM app_user WHERE id = ?', [id]);
         if (!rows.length) {
             throw new UnauthorizedException('用户不存在');
         }

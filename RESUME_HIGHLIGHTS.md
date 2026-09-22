@@ -1,6 +1,6 @@
 # 项目：AI 智能数据分析与可视化中台 (AI Data Analysis Platform)
 
-> 2026-09-21 实施状态：新核心 S1～S4 的代码与快速 mock/构建验证已完成，真实模型、数据库及业务交互待验收，默认入口仍为 legacy。新核心采用显式 SQL 修正、业务定义版本和证据展开；下文旧记忆/静默修复描述属于旧核心，不能作为新核心能力或准确率证明。详见 [阶段记录](docs/agent-refactor/05-delivery-and-validation.md) 与 [S4 验收步骤](benchmarks/saas-growth/S4-WALKTHROUGH.md)。
+> 2026-09-21 实施状态：S1～S5 代码与快速验证已落地；按用户明确要求直接切换为唯一新核心，真实模型、数据库及业务交互仍待验收。新核心采用显式 SQL 修正、业务定义版本和证据展开；下文旧记忆/静默修复描述仅为历史设计，相关运行时代码与入口已退役，不能作为当前能力或准确率证明。详见 [阶段记录](docs/agent-refactor/05-delivery-and-validation.md) 与 [S4 验收步骤](benchmarks/saas-growth/S4-WALKTHROUGH.md)。
 
 ## 🎯 项目简介
 基于大语言模型（LLM）驱动的智能化数据分析平台，旨在将传统的 BI（商业智能）和数据查询流程彻底平民化。系统支持多数据源接入与灵活管理，核心通过 **智能 Agent (ReAct 架构)** 将用户自然语言意图动态转化为安全的 SQL 执行流，并自动推导渲染数据图表，从而提供无缝的「问答即洞察」体验。

@@ -1,8 +1,18 @@
 # Docker 部署指南
 
-按顺序执行以下步骤，可在服务器上完成部署并对外访问。
 
----
+## 开发数据库初始化与重建
+
+项目尚未上线，不提供旧对话、旧记忆或旧数据库结构的兼容迁移。当前版本只使用 `applyCurrentSchema` 创建当前结构。
+
+- 全新数据库：配置 `.env` 后执行 `pnpm init-db`，创建当前应用表和业务样例数据。
+- 当前开发库迁移：`pnpm migrate:database --reset-analysis`。这会在事务中删除并重建对话、消息、任务、证据、分析状态及业务定义表，同时删除旧记忆、message_block 和废弃 retention 表。账号、数据源、权限与业务样例表保留。存在活动任务时命令拒绝重建。
+- 已是当前结构时：`pnpm migrate:database` 只补齐缺失表，不回填历史数据；检测到旧结构需使用上述重建命令。
+- 构建运行匹配的 API、Worker、Web。旧的 `ANALYSIS_CORE` 及 Artifact 临时开关已删除，无需配置。任务协议、权限、取消和多会话隔离检查仍保留，这些是当前运行正确性约束。
+
+2026-09-22 已按用户授权在本机 `localhost:5432/gist_agent` 执行分析数据重建并提交，旧测试会话已清除。后续重跑 `--reset-analysis` 也会清空新增分析数据，勿将它作为日常启动命令。
+
+快速验证：`pnpm test:analysis-cutover`、`pnpm test:analysis-core`、`pnpm test:analysis-state`、`pnpm --filter @gist/web build`。业务和交互验收仍按 [S4 walkthrough](benchmarks/saas-growth/S4-WALKTHROUGH.md) 单独进行。
 
 ## 一、服务器环境要求
 

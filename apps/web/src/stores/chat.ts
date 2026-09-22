@@ -104,10 +104,10 @@ export const useChatStore = defineStore('chat', () => {
         void router.replace('/chat');
     }
 
-    async function sendMessage(content: string) {
+    async function sendMessage(content: string): Promise<boolean> {
         if (!activeConversationId.value) await createConversation();
         const conv = activeConversation.value;
-        if (!conv) return;
+        if (!conv) return false;
         const localUserId = crypto.randomUUID();
         conv.messages.push({ id: localUserId, role: 'user', content, blocks: [], timestamp: Date.now() });
         if (conv.messages.length === 1) {
@@ -134,9 +134,11 @@ export const useChatStore = defineStore('chat', () => {
             if (!conv.messages.some((m) => m.id === data.responseMessageId))
                 conv.messages.push({ id: data.responseMessageId, role: 'assistant', content: '', blocks: [], timestamp: Date.now() });
             generations.value[data.generationId] = { id: data.generationId, conversationId: conv.id, messageId: data.responseMessageId, status: 'pending', sequence: 0 };
+            return true;
         } catch (error) {
             conv.messages = conv.messages.filter((m) => m.id !== localUserId);
             toast.error('发送失败: ' + (error instanceof Error ? error.message : '未知错误'));
+            return false;
         }
     }
 

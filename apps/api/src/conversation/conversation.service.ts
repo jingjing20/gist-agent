@@ -49,8 +49,6 @@ export class ConversationService {
         const conv = await this.findOne(id, userId);
         if (!conv) throw new NotFoundException('对话不存在或无权删除');
 
-        // message_block -> message -> conversation 均有 ON DELETE CASCADE，
-        // 删除 conversation 会自动级联清理关联的 message 和 message_block
         await this.db.execute('DELETE FROM conversation WHERE id = ?', [id]);
     }
 
@@ -62,90 +60,6 @@ export class ConversationService {
             conversationId,
         ]);
 
-        if (rows.length === 0) return [];
-
-        const messageIds = rows.map((r) => r.id);
-        const placeholders = messageIds.map(() => '?').join(', ');
-        const blockRows = await this.db.query<QueryRow[]>(`SELECT * FROM message_block WHERE message_id IN (${placeholders}) ORDER BY message_id, sort_order`, messageIds);
-
-        const blocksByMessageId = new Map<string, any[]>();
-        for (const row of blockRows) {
-            if (!blocksByMessageId.has(row.message_id)) {
-                blocksByMessageId.set(row.message_id, []);
-            }
-            const metadata = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata || {};
-            blocksByMessageId.get(row.message_id)!.push({
-                type: row.type,
-                ...(row.content != null ? { content: row.content } : {}),
-                ...metadata,
-            });
-        }
-
-        return rows.map((row) => {
-            const blocksFromTable = blocksByMessageId.get(row.id);
-            const blocksFromJson = typeof row.blocks === 'string' ? JSON.parse(row.blocks) : row.blocks || [];
-            const blocks = blocksFromTable && blocksFromTable.length > 0 ? blocksFromTable : blocksFromJson;
-
-            return {
-                ...row,
-                blocks,
-                llm_messages: typeof row.llm_messages === 'string' ? JSON.parse(row.llm_messages) : row.llm_messages || [],
-            };
-        }) as unknown as Message[];
-    }
-
-    async addMessage(conversationId: string, role: 'user' | 'assistant', content: string, blocks: unknown[], llmMessages: unknown[] = [], messageId?: string): Promise<Message> {
-        const id = messageId ?? uuidv4();
-
-        await this.db.withTransaction(async (conn) => {
-            await conn.execute('INSERT INTO message (id, conversation_id, role, content, blocks, llm_messages) VALUES (?, ?, ?, ?, ?::jsonb, ?::jsonb)', [
-                id,
-                conversationId,
-                role,
-                content,
-                JSON.stringify(blocks),
-                JSON.stringify(llmMessages),
-            ]);
-
-            const blockValues: unknown[] = [];
-            const blockPlaceholders: string[] = [];
-
-            for (let i = 0; i < blocks.length; i++) {
-                const block = blocks[i] as any;
-                const blockId = uuidv4();
-                const { type, content: blockContent, ...rest } = block;
-                const hasMetadata = Object.keys(rest).length > 0;
-
-                const metadataStr = hasMetadata ? JSON.stringify(rest) : null;
-                blockValues.push(blockId, id, i, type, blockContent ?? null, metadataStr);
-                blockPlaceholders.push('(?, ?, ?, ?, ?, ?)');
-            }
-
-            if (blockPlaceholders.length > 0) {
-                const sql = `INSERT INTO message_block (id, message_id, sort_order, type, content, metadata) VALUES ${blockPlaceholders.join(', ')}`;
-                await conn.execute(sql, blockValues as any);
-            }
-
-            await conn.execute('UPDATE conversation SET updated_at = NOW() WHERE id = ?', [conversationId]);
-        });
-
-        return {
-            id,
-            conversation_id: conversationId,
-            role,
-            content,
-            blocks,
-            llm_messages: llmMessages,
-            created_at: new Date().toISOString(),
-        };
-    }
-
-    async updateMessage(id: string, content: string, blocks: unknown[], llmMessages: unknown[] = []): Promise<void> {
-        await this.db.execute('UPDATE message SET content = ?, blocks = ?::jsonb, llm_messages = ?::jsonb WHERE id = ?', [
-            content,
-            JSON.stringify(blocks),
-            JSON.stringify(llmMessages),
-            id,
-        ]);
+        return rows as unknown as Message[];
     }
 }

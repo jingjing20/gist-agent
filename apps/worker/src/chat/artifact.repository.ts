@@ -65,15 +65,13 @@ export class ArtifactRepository {
         }
         const id = randomUUID();
         const hash = createHash('sha256').update(canonicalRows).digest('hex');
-        const qualityColumn = (input.resultQuality ? ',result_quality' : '') + (input.analysisContext ? ',analysis_context' : '');
-        const qualityValue = (input.resultQuality ? ',?::jsonb' : '') + (input.analysisContext ? ',?::jsonb' : '');
         const rows = await this.writeArtifact(
             input,
             `INSERT INTO query_artifact (
                 id,generation_id,user_id,conversation_id,datasource_id,title,purpose,expected_grain,expected_shape,
                 original_sql,executed_sql,schema_context_version,columns_json,result_rows,returned_row_count,
-                total_row_count,is_limited,result_content_hash${qualityColumn}
-             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?,?,?,?${qualityValue})
+                total_row_count,is_limited,result_content_hash,result_quality,analysis_context
+             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?,?,?,?,?::jsonb,?::jsonb)
              RETURNING created_at,expires_at`,
             [
                 id,
@@ -94,8 +92,8 @@ export class ArtifactRepository {
                 input.totalRowCount ?? null,
                 input.isLimited,
                 hash,
-                ...(input.resultQuality ? [JSON.stringify(input.resultQuality)] : []),
-                ...(input.analysisContext ? [JSON.stringify(input.analysisContext)] : []),
+                JSON.stringify(input.resultQuality ?? null),
+                JSON.stringify(input.analysisContext ?? null),
             ]
         );
         return {
@@ -131,7 +129,7 @@ export class ArtifactRepository {
         if (row.expires_at && new Date(row.expires_at).getTime() <= Date.now()) {
             throw new GenerationExecutionError('ARTIFACT_NOT_FOUND', '查询证据已过期');
         }
-        const resultRows = parseJson<Array<Record<string, unknown>>>(row.result_rows, []);
+        const resultRows = row.result_rows as Array<Record<string, unknown>>;
         return {
             artifact: this.mapQueryArtifact(row),
             rows: rowLimit == null ? resultRows : resultRows.slice(offset, offset + Math.max(0, rowLimit)),
@@ -233,7 +231,7 @@ export class ArtifactRepository {
     private mapQueryArtifact(row: QueryRow): QueryArtifactV1 {
         return {
             id: row.id,
-            ...(row.analysis_context ? { analysisContext: parseJson(row.analysis_context, undefined) } : {}),
+            ...(row.analysis_context ? { analysisContext: row.analysis_context } : {}),
             generationId: row.generation_id,
             userId: Number(row.user_id),
             conversationId: row.conversation_id,
@@ -243,11 +241,11 @@ export class ArtifactRepository {
             originalSql: row.original_sql,
             executedSql: row.executed_sql,
             schemaContextVersion: row.schema_context_version,
-            columns: parseJson<ArtifactColumnV1[]>(row.columns_json, []),
+            columns: row.columns_json as ArtifactColumnV1[],
             returnedRowCount: Number(row.returned_row_count),
             ...(row.total_row_count == null ? {} : { totalRowCount: Number(row.total_row_count) }),
             isLimited: row.is_limited === true,
-            ...(row.result_quality ? { resultQuality: parseJson<ResultQualityV1>(row.result_quality, {} as ResultQualityV1) } : {}),
+            ...(row.result_quality ? { resultQuality: row.result_quality as ResultQualityV1 } : {}),
             resultContentHash: row.result_content_hash,
             createdAt: toIso(row.created_at),
             ...(row.expires_at ? { expiresAt: toIso(row.expires_at) } : {}),
@@ -270,18 +268,6 @@ function sortValue(value: unknown): unknown {
     }
     if (value instanceof Date) return value.toISOString();
     return value;
-}
-
-function parseJson<T>(value: unknown, fallback: T): T {
-    if (value == null) return fallback;
-    if (typeof value === 'string') {
-        try {
-            return JSON.parse(value) as T;
-        } catch {
-            return fallback;
-        }
-    }
-    return value as T;
 }
 
 function toIso(value: unknown): string {

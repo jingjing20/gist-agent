@@ -518,12 +518,11 @@ await check('failed final evidence validation cannot accidentally return an acce
     assert.equal(outcome.kind, 'clarification');
     assert.deepEqual(outcomes, ['answer', 'clarification']);
 });
-await check('schema and definition pages remain discoverable; permission revocation blocks cached schema and tools', async () => {
+await check('schema and definition pages remain discoverable; permission revocation blocks schema catalog and tools', async () => {
     const { analysisTools } = require('../apps/worker/dist/analysis/analysis-tools.js');
     const { SchemaService } = require('../apps/worker/dist/database/schema.service.js');
     const cached = new SchemaService({ query: async () => [] });
-    cached.cache.set('1_1_q', { prompt: 'must not leak', timestamp: Date.now(), candidateCount: 1, selectedCount: 1, promptTokensEstimated: 10 });
-    await assert.rejects(() => cached.getDatabaseSchemaSelection(1, 1, 'q'), /DATASOURCE_ACCESS_CHANGED/);
+    await assert.rejects(() => cached.getSchemaCatalogSummary(1, 1), /DATASOURCE_ACCESS_CHANGED/);
     let revoked = false;
     const session = {
         state: newAnalysisState('c', 1, 'q'),

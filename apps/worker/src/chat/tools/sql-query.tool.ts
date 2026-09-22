@@ -90,10 +90,10 @@ export class SqlQueryTool implements Tool {
         blocks.push(sqlBlock);
 
         try {
-            const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId, ctx.signal, { allowModelRepair: !ctx.analysisCore });
+            const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId, ctx.signal);
             await ctx.assertWritable();
 
-            let resultRows = ctx.analysisContext ? r.rows.slice(0,20) : r.rows;
+            let resultRows = ctx.analysisContext ? r.rows.slice(0, 20) : r.rows;
             let truncationNote = '';
             const serialized = JSON.stringify(resultRows);
             if (serialized.length > MAX_TOOL_RESULT_CHARS && resultRows.length > 1) {
@@ -103,7 +103,7 @@ export class SqlQueryTool implements Tool {
                 truncationNote = `[质量约束：完整查询共 ${r.rowCount} 条，模型仅收到前 ${fitCount} 条。禁止将子集描述为全集；必须追加聚合查询。]`;
             }
             if (ctx.analysisContext) {
-                while (resultRows.length && JSON.stringify(resultRows).length > 16000) resultRows = resultRows.slice(0,-1);
+                while (resultRows.length && JSON.stringify(resultRows).length > 16000) resultRows = resultRows.slice(0, -1);
                 if (resultRows.length !== r.rows.length) truncationNote = '[模型收到有界结果摘要；完整结果保存在 Artifact，不能把分页或省略数据当作全集。]';
             }
             const resultQuality = assessResultQuality({
@@ -117,7 +117,7 @@ export class SqlQueryTool implements Tool {
 
             let queryArtifactId: string | undefined;
             let resultContentHash: string | undefined;
-            if (ctx.analysisCore || process.env.ARTIFACT_DUAL_WRITE_ENABLED !== '0') {
+            {
                 if (!ctx.generationId || !ctx.conversationId || !ctx.userId || !ctx.schemaContextVersion) {
                     throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询证据缺少 generation 上下文');
                 }
@@ -145,16 +145,6 @@ export class SqlQueryTool implements Tool {
                 await ctx.assertWritable();
             }
 
-            if (r.wasFixed) {
-                const fixLog: SSEEvent = {
-                    type: 'log',
-                    title: `${queryTitle} · SQL 自动修复`,
-                    content: `检测到语法错误已由内部子模型修复。\n修复前：${sql}\n\n修复后：${r.finalSql}`,
-                };
-                ctx.emitter.send(fixLog);
-                blocks.push(fixLog);
-            }
-
             ctx.emitter.send({ type: 'log_remove', title: queryTitle });
             const execLogIndex = blocks.indexOf(execLog);
             if (execLogIndex >= 0) blocks.splice(execLogIndex, 1);
@@ -180,18 +170,14 @@ export class SqlQueryTool implements Tool {
                 returnedRowCount: r.rowCount,
                 isLimited: r.isLimited,
                 resultQuality,
-                ...(r.wasFixed
-                    ? { systemMessage: `原始 SQL 存在语法错误，最终执行 SQL 为: ${r.finalSql}。请以最终 SQL 为准。${truncationNote}` }
-                    : truncationNote
-                      ? { systemMessage: truncationNote.trim() }
-                      : {}),
+                ...(truncationNote ? { systemMessage: truncationNote.trim() } : {}),
                 data: resultRows,
             });
 
             return { toolResult, blocks, succeeded: true };
         } catch (e: any) {
             if (ctx.signal.aborted) throw ctx.signal.reason ?? e;
-            if (ctx.analysisCore) {
+            {
                 await ctx.assertWritable();
                 if (e instanceof GenerationExecutionError && ['SQL_SECURITY_REJECTED', 'DATASOURCE_ACCESS_CHANGED', 'WRITER_OWNERSHIP_LOST'].includes(e.code)) throw e;
                 const code = String(e.code ?? '');
@@ -202,23 +188,12 @@ export class SqlQueryTool implements Tool {
                     '42803': '聚合与 GROUP BY 不匹配，请修正查询。',
                     '42702': '字段引用有歧义，请添加表限定。',
                     '57014': '单次查询超时，请缩小查询范围。',
-                    ER_PARSE_ERROR: 'SQL 语法错误，请修正查询。',
                 };
                 if (!recoverable[code]) throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询执行失败，未生成有效证据');
                 execLog.content = recoverable[code];
                 ctx.emitter.send({ ...execLog, type: 'log_update' });
                 return { toolResult: JSON.stringify({ errorCode: code, message: recoverable[code], retryable: true }), blocks, succeeded: false };
             }
-            execLog.content = `查询失败: ${e.message}`;
-            ctx.emitter.send({ ...execLog, type: 'log_update' } as any);
-            return {
-                toolResult: JSON.stringify({
-                    errorCode: e instanceof GenerationExecutionError ? e.code : 'TOOL_EXECUTION_FAILED',
-                    message: e.message,
-                }),
-                blocks,
-                succeeded: false,
-            };
         }
     }
 }

@@ -69,17 +69,3 @@ export interface Conversation {
     createdAt: number;
     updatedAt: number;
 }
-
-export interface MemoryRecord {
-    id: string;
-    scope: 'user' | 'datasource' | 'conversation';
-    scopeId?: string;
-    type: 'metric_definition' | 'dimension_definition' | 'analysis_preference' | 'locale_preference';
-    key: string;
-    value: Record<string, unknown>;
-    sourceMessageId: string;
-    sourceQuote?: string;
-    status: 'proposed' | 'active';
-    version: number;
-    updatedAt: string;
-}

@@ -1,19 +1,18 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
-import { applyPhase4Schema, DatabaseClient } from '@gist/database';
+import { applyCurrentSchema, DatabaseClient } from '@gist/database';
 import { loadWorkspaceEnv } from '@gist/config';
 
 loadWorkspaceEnv();
 const require = createRequire(import.meta.url);
 const { ArtifactRepository, stableStringify } = require('../apps/worker/dist/chat/artifact.repository.js');
 const { GenerateChartTool } = require('../apps/worker/dist/chat/tools/generate-chart.tool.js');
-const { ReadQueryArtifactTool } = require('../apps/worker/dist/chat/tools/read-query-artifact.tool.js');
 const { SqlQueryTool } = require('../apps/worker/dist/chat/tools/sql-query.tool.js');
 const { SqlExecutorAgent } = require('../apps/worker/dist/chat/agents/sql-executor.js');
 
 const database = new DatabaseClient();
-await applyPhase4Schema(database);
+await applyCurrentSchema(database);
 const email = `phase3-artifacts-${randomUUID()}@example.test`;
 const ownerEmail = `phase3-owner-${randomUUID()}@example.test`;
 let privateDatasourceId;
@@ -115,20 +114,8 @@ try {
     await assert.rejects(() => repository.readQueryArtifact(artifact.id, Number(other.id), conversationId), expectCode('ARTIFACT_ACCESS_DENIED'));
     await assert.rejects(() => repository.readQueryArtifact(randomUUID(), Number(user.id), conversationId), expectCode('ARTIFACT_NOT_FOUND'));
 
-    const readTool = new ReadQueryArtifactTool(repository);
-    const readResult = await readTool.execute(
-        { queryArtifactId: artifact.id },
-        toolContext({ userId: Number(user.id), conversationId, generationId, datasourceId: Number(localDatasource.id) })
-    );
-    assert.equal(JSON.parse(readResult.toolResult).rows.length, 100);
-    assert.deepEqual(readResult.blocks, []);
-
     const laterGenerationId = await createGeneration(user.id, conversationId, localDatasource.id, 'completed');
-    const historicalRead = await readTool.execute(
-        { queryArtifactId: artifact.id },
-        toolContext({ userId: Number(user.id), conversationId, generationId: laterGenerationId, datasourceId: Number(localDatasource.id) })
-    );
-    assert.equal(JSON.parse(historicalRead.toolResult).queryArtifactId, artifact.id, 'completed historical Turn evidence should remain reusable');
+    await repository.assertUsableInGeneration(artifact, laterGenerationId);
 
     const failedGenerationId = await createGeneration(user.id, conversationId, localDatasource.id, 'failed');
     const failedArtifact = await repository.createQueryArtifact({
@@ -146,14 +133,7 @@ try {
         returnedRowCount: 1,
         isLimited: false,
     });
-    await assert.rejects(
-        () =>
-            readTool.execute(
-                { queryArtifactId: failedArtifact.id },
-                toolContext({ userId: Number(user.id), conversationId, generationId: laterGenerationId, datasourceId: Number(localDatasource.id) })
-            ),
-        expectCode('ARTIFACT_ACCESS_DENIED')
-    );
+    await assert.rejects(() => repository.assertUsableInGeneration(failedArtifact, laterGenerationId), expectCode('ARTIFACT_ACCESS_DENIED'));
 
     // Chart data is derived server-side from Artifact rows and persisted as a reference.
     const chartEvents = [];
@@ -272,7 +252,6 @@ try {
                 ],
             }),
         },
-        { chat: async () => '' },
         { getAllowedTableNames: async () => [], getColumnPolicies: async () => [] }
     );
     const normalized = await executor.execute('SELECT 1', null, 1);
@@ -320,11 +299,15 @@ try {
             },
         }
     );
-    const failedWrite = await failingSqlTool.execute(
-        { title: '失败查询', sql: 'SELECT 1', plan },
-        toolContext({ userId: Number(user.id), conversationId, generationId, datasourceId: Number(localDatasource.id), events: failureEvents })
+    await assert.rejects(
+        () =>
+            failingSqlTool.execute(
+                { title: '失败查询', sql: 'SELECT 1', plan },
+                toolContext({ userId: Number(user.id), conversationId, generationId, datasourceId: Number(localDatasource.id), events: failureEvents })
+            ),
+        expectCode('TOOL_EXECUTION_FAILED')
     );
-    assert.equal(failedWrite.succeeded, false);
+
     assert.equal(
         failureEvents.some((event) => event.type === 'table'),
         false
@@ -336,44 +319,29 @@ try {
         { execute: async () => ({ finalSql: 'SELECT 1', wasFixed: false, columns: [], rows: [], rowCount: 0, isLimited: false }) },
         { createQueryArtifact: async () => ({ id: randomUUID(), resultContentHash: 'hash' }) }
     );
-    const cancelledWrite = await cancellationRace.execute(
-        { title: '取消竞争', sql: 'SELECT 1', plan },
-        toolContext({
-            userId: Number(user.id),
-            conversationId,
-            generationId,
-            datasourceId: Number(localDatasource.id),
-            events: cancelledEvents,
-            assertWritable: async () => {
-                fenceChecks += 1;
-                if (fenceChecks >= 3) throw new Error('writer cancelled during artifact write');
-            },
-        })
+    await assert.rejects(
+        () =>
+            cancellationRace.execute(
+                { title: '取消竞争', sql: 'SELECT 1', plan },
+                toolContext({
+                    userId: Number(user.id),
+                    conversationId,
+                    generationId,
+                    datasourceId: Number(localDatasource.id),
+                    events: cancelledEvents,
+                    assertWritable: async () => {
+                        fenceChecks += 1;
+                        if (fenceChecks >= 3) throw new Error('writer cancelled during artifact write');
+                    },
+                })
+            ),
+        /writer cancelled/
     );
-    assert.equal(cancelledWrite.succeeded, false);
+
     assert.equal(
         cancelledEvents.some((event) => event.type === 'table'),
         false
     );
-
-    // Rollback switches are independent and preserve the legacy table block path.
-    process.env.ARTIFACT_DUAL_WRITE_ENABLED = '0';
-    const rollbackEvents = [];
-    const rollback = await sqlTool.execute(
-        { title: '回滚查询', sql: 'SELECT day,value FROM metric', plan },
-        toolContext({ userId: Number(user.id), conversationId, generationId, datasourceId: Number(localDatasource.id), events: rollbackEvents })
-    );
-    assert.equal(rollback.succeeded, true);
-    assert.equal(rollbackEvents.find((event) => event.type === 'table').queryArtifactId, undefined);
-    process.env.ARTIFACT_DUAL_WRITE_ENABLED = '1';
-
-    process.env.ARTIFACT_CHART_READ_ENABLED = '0';
-    await assert.rejects(
-        () => readTool.execute({ queryArtifactId: artifact.id }, toolContext({ userId: Number(user.id), conversationId, generationId })),
-        expectCode('TOOL_EXECUTION_FAILED')
-    );
-    await assert.rejects(() => chartTool.execute(chartArgs, toolContext({ userId: Number(user.id), conversationId, generationId })), expectCode('TOOL_EXECUTION_FAILED'));
-    process.env.ARTIFACT_CHART_READ_ENABLED = '1';
 
     console.log(
         JSON.stringify(
@@ -395,8 +363,6 @@ try {
         )
     );
 } finally {
-    delete process.env.ARTIFACT_DUAL_WRITE_ENABLED;
-    delete process.env.ARTIFACT_CHART_READ_ENABLED;
     await database.execute('DELETE FROM app_user WHERE email=?', [email]).catch(() => undefined);
     if (privateDatasourceId) await database.execute('DELETE FROM data_source WHERE id=?', [privateDatasourceId]).catch(() => undefined);
     await database.execute('DELETE FROM app_user WHERE email=?', [ownerEmail]).catch(() => undefined);

@@ -1,7 +1,5 @@
 import type OpenAI from 'openai';
 
-export const TOOL_INSTANCES = 'TOOL_INSTANCES';
-
 export interface SSEEvent {
     type:
         | 'sql'
@@ -33,7 +31,6 @@ export interface ToolContext {
     conversationId?: string;
     schemaContextVersion?: string;
     signal: AbortSignal;
-    analysisCore?: boolean;
     analysisContext?: import('@gist/contracts').AnalysisEvidenceContext;
     writerToken?: string;
     assertWritable(): Promise<void>;

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
-import { applyPhase4Schema, DatabaseClient } from '@gist/database';
+import { applyCurrentSchema, DatabaseClient } from '@gist/database';
 import { databaseConfig, loadWorkspaceEnv } from '@gist/config';
 
 loadWorkspaceEnv();
@@ -16,8 +16,8 @@ let reader;
 
 try {
     await admin.connect();
-    await applyPhase4Schema(admin);
-    await applyPhase4Schema(admin);
+    await applyCurrentSchema(admin);
+    await applyCurrentSchema(admin);
     const columns = await admin.query(
         `SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='query_artifact' AND column_name='result_quality'`
     );

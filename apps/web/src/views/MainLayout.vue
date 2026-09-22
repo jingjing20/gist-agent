@@ -22,7 +22,6 @@
                     <div v-show="showDropdown" class="dropdown-menu">
                         <div class="dropdown-item" @click="openProfileModal">个人信息</div>
                         <div class="dropdown-item" @click="openPasswordModal">修改密码</div>
-                        <div class="dropdown-item" @click="openMemoryModal">记忆管理</div>
                         <a href="https://github.com/jingjing20/gist-agent" target="_blank" class="dropdown-item link-item">github 地址</a>
                         <div class="dropdown-divider"></div>
                         <div class="dropdown-item text-danger" @click="handleLogout">退出登录</div>
@@ -33,8 +32,6 @@
         <div class="app-body">
             <router-view />
         </div>
-
-        <MemoryManagerModal v-if="memoryModalVisible" @close="memoryModalVisible = false" />
 
         <!-- 个人信息弹框 -->
         <div v-if="profileModalVisible" class="modal-overlay" @click.self="profileModalVisible = false">
@@ -82,7 +79,6 @@ import { useRouter, useRoute } from 'vue-router';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
-import MemoryManagerModal from '../components/MemoryManagerModal.vue';
 
 const router = useRouter();
 const route = useRoute();
@@ -90,7 +86,7 @@ const dsStore = useDataSourceStore();
 const authStore = useAuthStore();
 const toast = useToastStore();
 
-const activeTab = computed(() => route.name === 'business-definitions' ? 'business-definitions' : route.name === 'datasource' ? 'datasource' : 'chat');
+const activeTab = computed(() => (route.name === 'business-definitions' ? 'business-definitions' : route.name === 'datasource' ? 'datasource' : 'chat'));
 
 function goToDataSource() {
     router.push('/datasource');
@@ -102,7 +98,6 @@ const dropdownRef = ref<HTMLElement | null>(null);
 
 const profileModalVisible = ref(false);
 const passwordModalVisible = ref(false);
-const memoryModalVisible = ref(false);
 
 function toggleDropdown() {
     showDropdown.value = !showDropdown.value;
@@ -136,11 +131,6 @@ function openPasswordModal() {
     passwordForm.password = '';
     passwordForm.confirmPassword = '';
     passwordModalVisible.value = true;
-}
-
-function openMemoryModal() {
-    showDropdown.value = false;
-    memoryModalVisible.value = true;
 }
 
 async function submitProfile() {

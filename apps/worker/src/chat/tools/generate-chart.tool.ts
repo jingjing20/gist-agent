@@ -85,9 +85,6 @@ export class GenerateChartTool implements Tool {
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
         await ctx.assertWritable();
         if (ctx.signal.aborted) throw ctx.signal.reason ?? new Error('已取消');
-        if (process.env.ARTIFACT_CHART_READ_ENABLED === '0') {
-            throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', 'Chart Artifact 读取路径已关闭');
-        }
         if (!ctx.userId || !ctx.conversationId || !ctx.generationId) {
             throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '图表证据缺少 generation 上下文');
         }

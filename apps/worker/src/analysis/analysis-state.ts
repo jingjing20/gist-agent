@@ -36,7 +36,7 @@ export function conditionSignature(state: AnalysisState): string {
 }
 export function evidenceMismatch(artifact: QueryArtifactV1, state: AnalysisState, generationId: string): string | null {
     if (artifact.datasourceId !== state.datasourceId) return '证据属于其他数据源';
-    if (!artifact.analysisContext) return '旧证据缺少分析条件，不能用于新核心推导';
+    if (!artifact.analysisContext) return '证据缺少必要分析条件，无法验证适用性';
     if (artifact.analysisContext.state.taskId !== state.taskId) return '证据属于其他分析任务';
     if (state.freshness === 'current_generation' && artifact.generationId !== generationId) return '本轮要求最新数据，请重新查询';
     if (conditionSignature(artifact.analysisContext.state) !== conditionSignature(state)) return '定义、时间、筛选或粒度已变化，请重新查询或显式比较历史条件';

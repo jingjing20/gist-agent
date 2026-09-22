@@ -48,7 +48,7 @@ export class AnalysisArtifactController {
         const fingerprint = createHash('sha256')
             .update(JSON.stringify(stable({ tables, policies })))
             .digest('hex');
-        if (row.analysis_context?.accessFingerprint !== fingerprint) throw new ConflictException('历史证据缺少权限快照或字段权限已变化，请重新查询');
+        if (row.analysis_context?.accessFingerprint !== fingerprint) throw new ConflictException('证据权限快照无效或字段权限已变化，请重新查询');
         return row;
     }
     @Get(':id') async metadata(@CurrentUser() user: User, @Param('id') id: string, @Query('conversationId') conversation: string) {

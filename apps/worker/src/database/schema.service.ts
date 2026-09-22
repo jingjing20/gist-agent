@@ -4,33 +4,12 @@ import { getAgentVisibleCatalogTables, type DataSourceTableCatalogEntry } from '
 import { resolveCatalogDatasourceId } from '@gist/database';
 import type { SchemaCatalogSummaryV1, SchemaDetailV1 } from '@gist/contracts';
 
-interface SchemaCacheEntry {
-    prompt: string;
-    timestamp: number;
-    candidateCount: number;
-    selectedCount: number;
-    promptTokensEstimated: number;
-}
-
-export interface SchemaPromptSelection {
-    prompt: string;
-    candidateCount: number;
-    selectedCount: number;
-    promptTokensEstimated: number;
-    retrievalMs: number;
-    selectedTables: string[];
-}
-
 export interface AgentColumnPolicy {
     tableName: string;
     columnName: string;
     access: 'allow' | 'mask' | 'deny';
     maskType: 'redact' | 'last4' | 'hash' | null;
 }
-
-const CACHE_TTL_MS = 60 * 1000; // 1 分钟缓存
-const FULL_SCHEMA_TABLE_LIMIT = 20;
-const DEFAULT_RETRIEVAL_LIMIT = Math.max(1, Number(process.env.SCHEMA_RETRIEVAL_LIMIT) || 12);
 
 function searchTerms(value: string): Set<string> {
     const normalized = value.toLowerCase();
@@ -69,82 +48,7 @@ export function rankSchemaCatalog(query: string, tables: DataSourceTableCatalogE
  */
 @Injectable()
 export class SchemaService {
-    private readonly cache = new Map<string, SchemaCacheEntry>();
-
     constructor(private readonly db: DatabaseService) {}
-
-    /**
-     * 获取用于 AI 会话的数据库结构 Prompt。
-     * 包含权限控制：仅列出目录中明确对 Agent 开放的表。
-     */
-    async getDatabaseSchemaPrompt(datasourceId: number | null, userId: number, query = '', generationId?: string): Promise<string> {
-        return (await this.getDatabaseSchemaSelection(datasourceId, userId, query, generationId)).prompt;
-    }
-
-    async getDatabaseSchemaSelection(datasourceId: number | null, userId: number, query = '', generationId?: string): Promise<SchemaPromptSelection> {
-        await this.assertDatasourceAccess(datasourceId, userId);
-        const startedAt = Date.now();
-        const cacheKey = `${datasourceId || 'local'}_${userId}_${query.trim().toLowerCase().slice(0, 300)}`;
-        const cached = this.cache.get(cacheKey);
-        if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
-            const selection = {
-                prompt: cached.prompt,
-                candidateCount: cached.candidateCount,
-                selectedCount: cached.selectedCount,
-                promptTokensEstimated: cached.promptTokensEstimated,
-                retrievalMs: Date.now() - startedAt,
-                selectedTables: [],
-            };
-            await this.recordSelectionMetric(generationId, selection);
-            return selection;
-        }
-
-        await this.assertDatasourceAccess(datasourceId, userId);
-        const catalogTables = await getAgentVisibleCatalogTables(this.db, datasourceId);
-        const selectedCatalog =
-            catalogTables.length <= FULL_SCHEMA_TABLE_LIMIT
-                ? catalogTables
-                : rankSchemaCatalog(query, catalogTables).slice(0, DEFAULT_RETRIEVAL_LIMIT);
-        const allowedTables = selectedCatalog.map((table) => table.table_name);
-
-        if (allowedTables.length === 0) {
-            const selection = { prompt: '当前数据源中没有对 Agent 开放的业务表。', candidateCount: 0, selectedCount: 0, promptTokensEstimated: 0, retrievalMs: Date.now() - startedAt, selectedTables: [] };
-            await this.recordSelectionMetric(generationId, selection);
-            return selection;
-        }
-
-        const rows = await this.fetchRawSchemaRows(allowedTables);
-        const policies = await this.getColumnPolicies(datasourceId, userId);
-        const prompt = rows.length > 0 ? this.formatSchemaRows(rows, selectedCatalog, policies) : '当前数据源中没有可用的业务表。';
-        const selection: SchemaPromptSelection = {
-            prompt,
-            candidateCount: catalogTables.length,
-            selectedCount: selectedCatalog.length,
-            promptTokensEstimated: Math.ceil(prompt.length / 3),
-            retrievalMs: Date.now() - startedAt,
-            selectedTables: allowedTables,
-        };
-
-        if (prompt) {
-            this.cache.set(cacheKey, { ...selection, timestamp: Date.now() });
-        }
-        await this.recordSelectionMetric(generationId, selection);
-        return selection;
-    }
-
-    clearUserCache(datasourceId: number | null, userId: number): void {
-        const prefix = `${datasourceId || 'local'}_${userId}_`;
-        for (const key of this.cache.keys()) {
-            if (key.startsWith(prefix)) this.cache.delete(key);
-        }
-    }
-
-    clearDatasourceCache(datasourceId: number | null): void {
-        const prefix = `${datasourceId || 'local'}_`;
-        for (const key of this.cache.keys()) {
-            if (key.startsWith(prefix)) this.cache.delete(key);
-        }
-    }
 
     async getAllowedTableNames(datasourceId: number | null, userId: number): Promise<string[]> {
         await this.assertDatasourceAccess(datasourceId, userId);
@@ -200,8 +104,8 @@ export class SchemaService {
     }
 
     async getStructuredSchema(datasourceId: number | null, userId: number, tableNames?: string[]): Promise<any[]> {
-        await this.assertDatasourceAccess(datasourceId,userId);
-        const catalogTables = (await getAgentVisibleCatalogTables(this.db, datasourceId)).filter(t => !tableNames || tableNames.includes(t.table_name));
+        await this.assertDatasourceAccess(datasourceId, userId);
+        const catalogTables = (await getAgentVisibleCatalogTables(this.db, datasourceId)).filter((t) => !tableNames || tableNames.includes(t.table_name));
         const allowedTables = catalogTables.map((table) => table.table_name);
         const catalogByName = new Map(catalogTables.map((table) => [table.table_name, table]));
         const policies = await this.getColumnPolicies(datasourceId, userId);
@@ -264,22 +168,6 @@ export class SchemaService {
         };
     }
 
-    private async recordSelectionMetric(generationId: string | undefined, selection: SchemaPromptSelection): Promise<void> {
-        if (!generationId) return;
-        await this.db.execute(
-            `INSERT INTO generation_metric (
-                generation_id,schema_candidate_count,schema_selected_count,schema_prompt_tokens_estimated,schema_retrieval_ms
-             ) VALUES (?,?,?,?,?)
-             ON CONFLICT(generation_id) DO UPDATE SET
-                schema_candidate_count=EXCLUDED.schema_candidate_count,
-                schema_selected_count=EXCLUDED.schema_selected_count,
-                schema_prompt_tokens_estimated=EXCLUDED.schema_prompt_tokens_estimated,
-                schema_retrieval_ms=EXCLUDED.schema_retrieval_ms,
-                updated_at=NOW()`,
-            [generationId, selection.candidateCount, selection.selectedCount, selection.promptTokensEstimated, selection.retrievalMs]
-        );
-    }
-
     async getSchemaDetail(datasourceId: number | null, userId: number, tableName: string): Promise<SchemaDetailV1 | null> {
         const resolved = await resolveCatalogDatasourceId(this.db, datasourceId);
         if (resolved == null) return null;
@@ -292,46 +180,5 @@ export class SchemaService {
             table: table.tableName,
             columns: table.fields.map((field: any) => ({ name: field.name, type: field.type, ...(field.comment ? { description: field.comment } : {}) })),
         };
-    }
-
-    /**
-     * 将数据库行数据转换为 AI 友好的文本格式。
-     */
-    private formatSchemaRows(rows: any[], catalogTables: DataSourceTableCatalogEntry[], policies: AgentColumnPolicy[] = []): string {
-        if (!rows || rows.length === 0) {
-            return '当前数据库中没有可用的业务表。';
-        }
-
-        const catalogByName = new Map(catalogTables.map((table) => [table.table_name, table]));
-        const policyByColumn = new Map(policies.map((policy) => [`${policy.tableName}.${policy.columnName}`.toLowerCase(), policy]));
-        const tablesMap = new Map<string, { comment: string; columns: string[]; catalog?: DataSourceTableCatalogEntry }>();
-
-        for (const row of rows) {
-            const tableName = row.TABLE_NAME;
-            const policy = policyByColumn.get(`${tableName}.${row.COLUMN_NAME}`.toLowerCase());
-            if (policy?.access === 'deny') continue;
-            if (!tablesMap.has(tableName)) {
-                tablesMap.set(tableName, {
-                    comment: row.TABLE_COMMENT || '',
-                    columns: [],
-                    catalog: catalogByName.get(tableName),
-                });
-            }
-            const tableInfo = tablesMap.get(tableName)!;
-            const colDef = `  ${row.COLUMN_NAME} ${row.COLUMN_TYPE}${policy?.access === 'mask' ? ' [输出脱敏]' : ''} -- ${row.COLUMN_COMMENT || ''}`;
-            tableInfo.columns.push(colDef);
-        }
-
-        const promptLines: string[] = [];
-        for (const [tableName, info] of tablesMap.entries()) {
-            const label = info.catalog?.source_type === 'uploaded' ? ' [用户上传]' : '';
-            promptLines.push(`表名: ${tableName}${label}`);
-            if (info.catalog?.dataset_key) promptLines.push(`数据集: ${info.catalog.dataset_key}`);
-            promptLines.push(`说明: ${info.catalog?.description || info.comment}`);
-            promptLines.push(`字段:\n${info.columns.join('\n')}`);
-            promptLines.push('');
-        }
-
-        return promptLines.join('\n').trim();
     }
 }

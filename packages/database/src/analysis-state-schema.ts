@@ -18,7 +18,6 @@ CREATE TABLE IF NOT EXISTS analysis_state_draft (
  context_reports JSONB NOT NULL DEFAULT '[]'::jsonb,
  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-ALTER TABLE query_artifact ADD COLUMN IF NOT EXISTS analysis_context JSONB;
 `;
 export async function applyAnalysisStateSchema(db: { query(sql: string): Promise<unknown> }): Promise<void> {
     await db.query(ANALYSIS_STATE_SCHEMA_SQL);

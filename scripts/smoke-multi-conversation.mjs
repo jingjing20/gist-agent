@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { DatabaseClient } from '@gist/database';
 import { loadWorkspaceEnv } from '@gist/config';
-import { AGENT_RUNTIME_VERSIONS } from '../packages/contracts/dist/index.js';
+import { ANALYSIS_RUNTIME_VERSIONS } from '../packages/contracts/dist/index.js';
 
 loadWorkspaceEnv();
 const api = process.env.API_BASE_URL || 'http://127.0.0.1:3000/api';
@@ -88,9 +88,9 @@ try {
         conversations[0].id,
     ]);
     await database.execute(
-        `INSERT INTO generation (id,user_id,conversation_id,request_message_id,response_message_id,status,context_upper_bound,completed_at,error_code)
-         VALUES (?,?,?,?,?,'failed',NOW(),NOW(),'TOOL_EXECUTION_FAILED')`,
-        [failedGenerationId, registration.user.id, conversations[0].id, failedRequestId, failedResponseId]
+        `INSERT INTO generation (id,user_id,conversation_id,request_message_id,response_message_id,status,context_upper_bound,completed_at,error_code,prompt_policy_version)
+         VALUES (?,?,?,?,?,'failed',NOW(),NOW(),'TOOL_EXECUTION_FAILED',?)`,
+        [failedGenerationId, registration.user.id, conversations[0].id, failedRequestId, failedResponseId, ANALYSIS_RUNTIME_VERSIONS.promptPolicy]
     );
     await database.execute(
         `INSERT INTO conversation_turn (id,conversation_id,sequence,generation_id,user_message_id,assistant_message_id,status,completed_at)
@@ -132,11 +132,11 @@ try {
         assert.ok(row.first_token_at, `missing first_token_at for ${row.id}`);
         assert.ok(row.model_provider);
         assert.ok(row.model_name);
-        assert.equal(row.prompt_policy_version, AGENT_RUNTIME_VERSIONS.promptPolicy);
-        assert.equal(row.toolset_version, AGENT_RUNTIME_VERSIONS.toolset);
-        assert.equal(row.context_policy_version, AGENT_RUNTIME_VERSIONS.contextPolicy);
-        assert.equal(row.memory_policy_version, AGENT_RUNTIME_VERSIONS.memoryPolicy);
-        assert.equal(row.schema_context_version, AGENT_RUNTIME_VERSIONS.schemaContext);
+        assert.equal(row.prompt_policy_version, ANALYSIS_RUNTIME_VERSIONS.promptPolicy);
+        assert.equal(row.toolset_version, ANALYSIS_RUNTIME_VERSIONS.toolset);
+        assert.equal(row.context_policy_version, ANALYSIS_RUNTIME_VERSIONS.contextPolicy);
+        assert.equal(row.memory_policy_version, ANALYSIS_RUNTIME_VERSIONS.memoryPolicy);
+        assert.equal(row.schema_context_version, ANALYSIS_RUNTIME_VERSIONS.schemaContext);
     }
     const attempts = await database.query(`SELECT generation_id,received_first_delta FROM generation_attempt WHERE generation_id IN (${placeholders})`, generationIds);
     assert.equal(attempts.length, generationIds.length);

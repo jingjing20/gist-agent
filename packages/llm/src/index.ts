@@ -47,6 +47,35 @@ export class LlmClient {
         options: { signal?: AbortSignal; reasoningEnabled?: boolean } = {}
     ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
         if (process.env.LLM_PROVIDER === 'mock') {
+            // Exercise the structured protocol without inventing data or evidence.
+            if (tools.some((tool) => tool.function.name === 'submit_analysis')) {
+                return Promise.resolve(
+                    (async function* () {
+                        yield {
+                            choices: [
+                                {
+                                    delta: {
+                                        tool_calls: [
+                                            {
+                                                index: 0,
+                                                id: 'mock-submit',
+                                                type: 'function',
+                                                function: {
+                                                    name: 'submit_analysis',
+                                                    arguments: JSON.stringify({
+                                                        kind: 'clarification',
+                                                        question: '这是独立 Worker 的协议测试响应。请提供要分析的指标与时间范围。',
+                                                    }),
+                                                },
+                                            },
+                                        ],
+                                    },
+                                },
+                            ],
+                        } as OpenAI.Chat.Completions.ChatCompletionChunk;
+                    })()
+                );
+            }
             return Promise.resolve(
                 (async function* () {
                     for (const content of ['这是', '独立 Worker', ' 的流式测试响应。']) {

@@ -3,7 +3,7 @@ import type { Request, Response } from 'express';
 import Redis from 'ioredis';
 import { randomUUID } from 'crypto';
 import { DatabaseService, QueryRow } from '../database/database.service';
-import { AGENT_RUNTIME_VERSIONS, ANALYSIS_RUNTIME_VERSIONS } from '@gist/contracts';
+import { ANALYSIS_RUNTIME_VERSIONS } from '@gist/contracts';
 
 @Injectable()
 export class GenerationService implements OnModuleDestroy {
@@ -44,6 +44,7 @@ export class GenerationService implements OnModuleDestroy {
                 [userId]
             );
             if (Number(counts[0].count) >= limit) throw new HttpException(`同时最多运行 ${limit} 个生成任务`, HttpStatus.TOO_MANY_REQUESTS);
+            const runtimeVersions = ANALYSIS_RUNTIME_VERSIONS;
             const [snapshot] = await tx.query<QueryRow[]>('SELECT clock_timestamp() AS context_upper_bound');
             const [parent] = await tx.query<QueryRow[]>(
                 `SELECT response_message_id
@@ -53,9 +54,6 @@ export class GenerationService implements OnModuleDestroy {
                   LIMIT 1`,
                 [conversationId]
             );
-            const selection = process.env.ANALYSIS_CORE || 'legacy';
-            if (!['legacy', 'new'].includes(selection)) throw new Error('ANALYSIS_CORE must be legacy or new');
-            const runtimeVersions = selection === 'new' ? ANALYSIS_RUNTIME_VERSIONS : AGENT_RUNTIME_VERSIONS;
             const effectiveDatasourceId = datasourceId ?? conversation[0].datasource_id ?? null;
             await tx.execute("INSERT INTO message (id,conversation_id,role,content,blocks,llm_messages) VALUES (?,?,?,?,'[]'::jsonb,'[]'::jsonb)", [
                 requestMessageId,

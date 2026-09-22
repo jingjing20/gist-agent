@@ -1,3 +1,4 @@
+import { quoteIdentifier } from '@gist/database';
 import { Injectable, Logger } from '@nestjs/common';
 import { DatabaseService } from '../database/database.service';
 import { LlmService } from '../llm/llm.service';
@@ -32,7 +33,7 @@ export class SchemaEnrichmentService {
             if (!cols.length) return;
 
             // 2. 抽取少许样本数据
-            const samples = await this.db.query<any[]>(`SELECT * FROM \`${tableName}\` LIMIT 5`);
+            const samples = await this.db.query<any[]>(`SELECT * FROM ${quoteIdentifier(tableName)} LIMIT 5`);
 
             // 如果没数据，没法做样例级增强
             if (!samples.length) return;
@@ -64,7 +65,7 @@ ${JSON.stringify(samples, null, 2)}`;
                 // 长度限制
                 const newComment = String(e.comment).slice(0, 1000);
                 const esc = (s: string) => s.replace(/'/g, "''");
-                await this.db.execute(`COMMENT ON COLUMN \`${tableName}\`.\`${col.COLUMN_NAME}\` IS '${esc(newComment)}'`);
+                await this.db.execute(`COMMENT ON COLUMN ${quoteIdentifier(tableName)}.${quoteIdentifier(col.COLUMN_NAME)} IS '${esc(newComment)}'`);
             }
 
             this.logger.log(`Table [${tableName}] schema enrichment completed successfully.`);
