@@ -1,6 +1,6 @@
 # 业务定义与会话分析状态
 
-> 归属、独立模块、轻量结构化、显式更新为已确认决策；下列字段、接口和事务方式为实施约定。
+归属、独立模块、轻量结构化、显式更新为产品边界。当前类型以[业务定义契约](../../packages/contracts/src/business-definition.ts)和[分析契约](../../packages/contracts/src/analysis.ts)为准；HTTP 实现见[定义模块](../../apps/api/src/business-definition/business-definition.module.ts)。
 
 ## 1. 三类对象必须分开
 
@@ -14,7 +14,7 @@
 
 ## 2. 独立业务定义模块
 
-建议位置：`apps/api/src/business-definition/`；前端新增独立 `/business-definitions` 页面（带数据源选择器），类型放共享 contracts。可以从现有数据源页面增加跳转入口，但不得替换 `DataSourceView` 或改变上传、表管理等职责。
+后端位于 `apps/api/src/business-definition/`，前端提供独立 `/business-definitions` 页面及数据源选择器，类型位于共享 contracts。该模块不替代数据源管理、上传和表管理。
 
 Worker 经共享 repository/领域接口读定义，不经自己的 HTTP 回调 API，不直接调用旧 MemoryService。数据库仍用现有基础设施。
 
@@ -52,7 +52,7 @@ term 不要求填分子分母；metric 不是比率时 denominator 可空。必�
 
 ### 2.3 HTTP 契约
 
-路径为本项目拟新增接口，不是外部 YApi 契约。统一 JSON 请求/响应；所有 ID 均先授权，身份来自登录态。
+以下为本项目已实现接口，不是外部 YApi 契约。请求体采用 JSON；删除成功无响应体。所有 ID 均先授权，身份来自登录态。
 
 | 方法与路径 | 参数位置 | 行为 |
 | --- | --- | --- |
@@ -87,7 +87,7 @@ type AnalysisState = {
   temporaryDefinitions: { name: string; description: string; sourceMessageId: string }[];
   timeRange: { start: string; endExclusive: string; timezone: string } | null;
   comparisonRange: { start: string; endExclusive: string; timezone: string } | null;
-  filters: { field: string; operator: string; value: unknown }[];
+  filters: { field: string; operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in'; value: string | number | boolean | null | (string | number | boolean)[] }[];
   grain: string | null;
   freshness: 'reuse_allowed' | 'current_generation'; // 用户要求最新数据时强制本轮重查
   hypotheses: { id: string; statement: string; status: 'open' | 'supported' | 'refuted' | 'unresolved'; evidenceIds: string[] }[];
@@ -119,8 +119,10 @@ type AnalysisState = {
 
 读取历史 Artifact 不代表数据实时刷新；用户要求最新数据时必须重新查询。没有数据快照版本时显示 queriedAt，不承诺历史查询代表当前数据库。
 
-## 6. 旧记忆的退出
+## 6. 当前存储与旧记忆退出
 
-新核心不注册旧 SemanticDistiller，不调用旧 MemoryService 注入，不同时维护旧 MemoryRecord 和业务定义。旧记录不自动全部迁移；仅明确有数据源、用户确认来源、符合新类型的条目可通过显式一次性导入审核进入新定义，其余留在旧数据中，不影响新核心。
+旧 SemanticDistiller、MemoryService 和前端记忆管理入口已退役。业务定义是唯一长期业务语义来源，查询事实保存在 Artifact 中，临时约定保存在会话分析状态中。
 
-退役时移除旧写入口和前端记忆管理入口，替换为独立业务定义入口。移除旧表或历史数据是另一个明确的数据清理任务，本次文档替换和核心开发不授权直接清库。
+当前结构由 applyCurrentSchema 创建，不提供旧记忆或旧对话自动迁移。开发重建会清空定义、候选和分析数据，范围与命令见[部署指南](../../DEPLOY.md)；不能把历史阶段迁移命令用于当前版本。
+
+SaaS 演示定义不是运行时自动 fixture。需要预置时，构建共享包后显式运行 `node scripts/import-business-definition-seed.mjs <ownerUserId> <datasourceId>`；目标必须具有真实所有者并满足脚本的数据目录检查。导入带一次性回执，不覆盖用户修改，也不恢复已删除定义。缺少定义时应按实际条件澄清。

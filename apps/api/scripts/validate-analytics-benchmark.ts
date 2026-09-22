@@ -61,6 +61,8 @@ function renderAnswers(benchmark: Benchmark): string {
     const lines = [
         '# SaaS Growth Demo 常见问题与标准答案',
         '',
+        '> 自动生成：来源为 [cases.json](./cases.json)，请勿直接修改结果。维护方式见 [README](./README.md)。',
+        '',
         `- 数据集：\`${benchmark.dataset_key}\``,
         `- 固定数据日期：\`${benchmark.anchor_date}\``,
         `- 用例版本：\`${benchmark.version}\``,

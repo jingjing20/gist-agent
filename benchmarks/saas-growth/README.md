@@ -73,12 +73,16 @@ daily_business_metrics ──(UTC date)── product_events / subscriptions / s
 
 ## 评测资产
 
+- [交付与验证状态](../../docs/agent-refactor/05-delivery-and-validation.md)：实现、快速检查与真实验收的边界。
+- [acceptance-walkthrough.md](./acceptance-walkthrough.md)：C01～C10 操作步骤及语义审核依据。
+- [s4-acceptance.json](./s4-acceptance.json)：逐例实际结果；未执行保持 not_run。
+
 - [`agent-core-cases.json`](./agent-core-cases.json)：新核心 C01～C10 行为案例与阶段范围；真实模型尚未验收，数值仍引用下列标准答案。
 - [`cases.json`](./cases.json)：机器可读问题、标准 SQL、标准结果和评分提示。
 - [`answers.md`](./answers.md)：适合人工查阅的常见问题与标准答案，由更新命令生成。
 - [`reference.sql`](./reference.sql)：全部标准 SQL，由更新命令生成。
 
-评测时应以 `cases.json` 为事实来源。`answers.md` 和 `reference.sql` 是便于阅读的派生产物。
+评测时应以 `cases.json` 为事实来源。`answers.md` 和 `reference.sql` 是便于阅读的派生产物，不直接手改其中的结果。数据变更审核后通过下方更新命令统一生成。
 
 ## 使用命令
 

@@ -1,5 +1,7 @@
 # SaaS Growth Demo 常见问题与标准答案
 
+> 自动生成：来源为 [cases.json](./cases.json)，请勿直接修改结果。维护方式见 [README](./README.md)。
+
 - 数据集：`saas_growth_demo`
 - 固定数据日期：`2026-09-15`
 - 用例版本：`1`
@@ -1236,4 +1238,3 @@ WITH user_metrics AS (SELECT acquisition_channel,COUNT(*) AS users,COUNT(*) FILT
 评分提示：
 
 - 正确拒答是评测能力的一部分
-

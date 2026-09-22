@@ -1,152 +1,114 @@
-<div align="center">
-  <img src="./apps/web/public/gist-agent-banner.png" width="600" />
-
 # Gist Agent
 
-基于大语言模型（LLM）的智能数据分析平台。上传 CSV / Excel 文件，
-用自然语言提问，Agent 自动生成 SQL、执行查询、实时渲染图表。
+<img src="./apps/web/public/gist-agent-banner.png" width="600" alt="Gist Agent" />
 
-  <p>
-    <img src="https://img.shields.io/badge/Node.js-%3E%3D18-green" alt="Node version" />
-    <img src="https://img.shields.io/badge/license-MIT-blue" alt="License" />
-    <img src="https://img.shields.io/badge/MySQL-%3E%3D5.7-orange" alt="MySQL" />
-  </p>
+用自然语言分析 CSV / Excel 数据，查看 SQL、查询结果和结论依据。
 
-  <p>
-    <a href="./README.en.md">English</a> · <b>简体中文</b>
-  </p>
-</div>
+[English](README.en.md) · 简体中文
 
-> 2026-09-21 实施状态：S1～S5 代码与快速验证已落地；按用户明确要求直接切换为唯一新核心，本机数据库已于 2026-09-22 重建为当前结构，真实模型与业务交互仍待验收。不支持旧对话或旧数据结构兼容。新核心采用显式 SQL 修正、业务定义版本和证据展开；下文旧记忆/静默修复描述仅为历史设计，相关运行时代码与入口已退役，不能作为当前能力或准确率证明。详见 [阶段记录](docs/agent-refactor/05-delivery-and-validation.md) 与 [S4 验收步骤](benchmarks/saas-growth/S4-WALKTHROUGH.md)。
+## 项目定位
 
+Gist Agent 是用于学习和验证 Agent 工程的数据分析项目。模型在权限和执行预算内选择工具，围绕同一问题连续查询、验证解释，并通过证据引用回答。
 
+当前仅使用新分析核心，不提供旧对话、旧记忆或旧数据库结构兼容。代码实现、快速验证与真实业务验收分别记录，见[交付与验收状态](docs/agent-refactor/05-delivery-and-validation.md)。
 
-<h2 align="center">项目演示</h2>
+## 当前能力
 
-<div align="center">
-  <video src="https://github.com/user-attachments/assets/47fd3e74-0748-4505-822a-447fb07f992d" width="100%" autoplay loop muted playsinline>
-    Your browser does not support video playback.
-  </video>
-  <video src="https://github.com/user-attachments/assets/c6252c3d-237f-4809-92f0-3e850702a8b5" width="100%" autoplay loop muted playsinline>
-    Your browser does not support video playback.
-  </video>
-  <video src="https://github.com/user-attachments/assets/04861aa2-b6cb-4767-a96d-6f4a49a4cfe6" width="100%" autoplay loop muted playsinline>
-    Your browser does not support video playback.
-  </video>
-</div>
+| 能力 | 实现方式 |
+| --- | --- |
+| 数据接入 | CSV / Excel、多 Sheet 选择、字段推断及 PostgreSQL 参数化批量 INSERT |
+| 单 Agent 分析 | 显式更新状态，按需读取 Schema 与业务定义，查询、验证并结构化提交结果 |
+| 业务定义 | 数据源级指标、术语和关系定义；用户确认、版本及候选确认 |
+| 多轮状态 | 保存问题、时间、筛选、粒度、临时口径和假设；条件变化后检查证据适用性 |
+| 查询安全 | 单条 SELECT、AST 校验、表字段权限、行数限制、只读连接和查询超时 |
+| 显式 SQL 纠错 | 可修正错误返回主循环，修正后重新校验；执行器内部不调用模型 |
+| 可追溯结果 | 结论关联证据，可展开口径、SQL、条件、结果和质量限制；图表引用 Artifact |
+| 上下文管理 | 按固定优先级选择状态、定义、完整工具交互和历史，记录选择与省略原因 |
+| 后台执行与 SSE | API 接收请求，Worker 执行任务；支持事件恢复和显式取消 |
+| 外围功能 | JWT 登录、SMTP 密码找回、数据源管理、授权、推荐问题及 Schema 注释增强 |
 
-<h2 align="center">架构图（具体见功能特性）</h2>
-
-<p align="center">
-  <img src="./apps/web/public/project-design.png" width="800" />
-</p>
-
-## 功能特性
-
-| 特性                 | 说明                                                                                                                                                            |
-| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **零配置数据接入**   | 上传 `.csv` / `.xlsx`（支持多 Sheet 选择），服务端自动推断 Schema、去重列名、建表。首选 `LOAD DATA LOCAL INFILE` 极速写入，云环境自动降级为批量 INSERT。        |
-| **ReAct Agent 循环** | 基于 OpenAI Function Calling 的多步 Agent：意图解析 -> SQL 生成 -> 错误重试 -> 结果分析 -> 图表输出。最大 15 轮迭代，120 秒全局超时。                           |
-| **AST SQL 防腐层**   | 每条 SQL 经 `node-sql-parser` 解析为 AST，白名单仅允许 `SELECT`/`SHOW`/`DESC`/`EXPLAIN`，自动注入 `LIMIT 1000`，表名范围校验防越权。                            |
-| **SQL 自愈执行器**   | 纯语法错误（GROUP BY 冲突、保留字等）触发内部 LLM 静默修复（最多 2 次重试）；语义错误（列不存在等）直接暴露给主 Agent，不掩盖。15 秒单次查询超时熔断。          |
-| **Schema 自动增强**  | 建表后异步采样 5 行真实数据，LLM 推断字段业务语义（枚举值、单位、日期格式），反写 `COLUMN_COMMENT`。                                                            |
-| **三层记忆引擎**     | 近距（2 轮）保留完整 tool chain（脱水后），中距（3~6 轮）仅保留 SQL + 行数 + 结论，远距（>6 轮）压缩为纯文字摘要。CJK 感知的 Token 估算器自适应分配上下文预算。 |
-| **语义蒸馏**         | 每轮对话结束后异步提取业务定义和数据事实，持久化为 State JSON，下轮自动注入 System Prompt，实现跨轮次"长期记忆"。                                               |
-| **智能推荐问题**     | 基于数据源 Schema 自动生成 3 个业务导向的推荐提问，上传新表后自动刷新，带缓存。                                                                                 |
-| **SSE 流式推送**     | Agent 每一步动作（推理、SQL、取数、图表配置）实时通过 Server-Sent Events 推送，无轮询，无 WebSocket。                                                           |
-| **多租户隔离**       | JWT 认证 + SMTP 密码找回。数据源支持精细权限管理（grant/revoke），不同用户的表空间、会话历史完全隔离。                                                          |
-| **LangSmith 追踪**   | 配置 `LANGSMITH_API_KEY` 即开启全链路追踪：Tool 调用链、Token 用量、SQL 执行耗时。                                                                              |
-
-## 项目结构
-
-```
-gist-agent/                  # pnpm workspaces Monorepo
-├── apps/
-│   ├── api/                 # HTTP、鉴权、SSE 与 Outbox（不执行对话生成）
-│   ├── worker/              # 队列消费、Agent Loop、工具执行和故障恢复
-│   └── web/                 # Vue 3 页面与多对话流状态
-├── packages/
-│   ├── contracts/           # 队列、SSE 与 generation 共享协议
-│   ├── config/              # 各进程配置加载与校验
-│   ├── database/            # 框架无关 PostgreSQL 客户端
-│   └── llm/                 # 框架无关 OpenAI-compatible 适配器
-├── docker-compose.yml
-├── DEPLOY.md                # 生产部署指南
-└── FAQ.md                   # 架构设计 FAQ & 运维实践
-```
-
-## 技术栈
-
-| 层级     | 技术                                                                                       |
-| -------- | ------------------------------------------------------------------------------------------ |
-| 前端     | Vue 3（Composition API）、Vite、Pinia、ECharts、marked + highlight.js                      |
-| 后端     | NestJS、OpenAI Node SDK、mysql2（Raw SQL）、Passport JWT                                   |
-| 关键依赖 | `node-sql-parser`（AST）、`xlsx`（Excel 解析）、`nodemailer`（邮件）、`bcrypt`（密码哈希） |
-| 可观测性 | LangSmith（可选）                                                                          |
-| 运行环境 | Node.js >= 18、pnpm >= 8、MySQL >= 5.7                                                     |
+Schema 自动注释是模型推断的线索，不等于用户确认的业务事实。证据可追溯也不等于结论已经被证明正确。
 
 ## 快速启动
 
-### 1. 克隆并安装依赖
+推荐与 Docker / CI 对齐使用 Node.js 22、pnpm 9.15.9；容器数据库和队列版本为 PostgreSQL 17、Redis 7。
+
+### 1. 安装与配置
 
 ```bash
-git clone <your-repo-url>
-cd gist-agent
 pnpm install
-```
-
-### 2. 配置环境变量
-
-```bash
 cp .env.example .env
 ```
 
-编辑 `.env`，变量说明如下：
+已有 .env 时保留原文件。填写模型 Key、Base URL、可用模型名、数据库凭据、JWT_SECRET 及独立查询账号 AGENT_DB_USER / AGENT_DB_PASSWORD。示例模型名需要按供应商实际支持情况调整。
 
-| 变量名                 | 是否必填 | 说明                                                   |
-| ---------------------- | -------- | ------------------------------------------------------ |
-| `OPENAI_API_KEY`       | 必填     | LLM API Key                                            |
-| `OPENAI_BASE_URL`      | 可选     | 自定义 Base URL（如 DeepSeek、Qwen 等兼容服务）        |
-| `OPENAI_MODEL`         | 可选     | 模型名称，默认 `gpt-4o`                                |
-| `LLM_THINKING_CONTROL` | 可选     | 思考参数兼容策略：`auto`（默认）、`deepseek` 或 `none` |
-| `LLM_REASONING_EFFORT` | 可选     | DeepSeek 深度思考强度，如 `low`、`high`、`max`         |
-| `DB_HOST`              | 必填     | MySQL 地址                                             |
-| `DB_PORT`              | 必填     | MySQL 端口，默认 `3306`                                |
-| `DB_USER`              | 必填     | MySQL 用户名                                           |
-| `DB_PASSWORD`          | 必填     | MySQL 密码                                             |
-| `DB_NAME`              | 必填     | 数据库名                                               |
-| `JWT_SECRET`           | 必填     | JWT 签名密钥                                           |
-| `MAX_CONTEXT_TOKENS`   | 可选     | LLM 上下文窗口大小，默认 `32000`                       |
-| `SMTP_HOST`            | 可选     | SMTP 服务地址（用于密码找回邮件）                      |
-| `SMTP_USER`            | 可选     | SMTP 发件人地址                                        |
-| `SMTP_PASS`            | 可选     | SMTP 密码或授权码                                      |
-| `LANGSMITH_API_KEY`    | 可选     | 开启 LangSmith 全链路追踪                              |
+### 2. 准备数据库和 Redis
 
-### 3. 初始化数据库与表结构
+已有本地服务时使用实际地址；也可以仅通过 Compose 启动依赖：
 
 ```bash
-# 执行此命令，服务端将自动创建目标数据库并初始化所有元数据表
-pnpm run init-db
+docker compose up -d postgres redis
 ```
 
-### 4. 启动项目（开发环境）
+使用此方式时，本机开发进程的 .env 需要设置：
+
+```dotenv
+DB_HOST=127.0.0.1
+DB_PORT=15432
+REDIS_URL=redis://127.0.0.1:16379
+```
+
+Compose 内部使用 postgres:5432 和 redis:6379，不要与宿主机映射端口混淆。
+
+### 3. 构建依赖并初始化
 
 ```bash
-# 同时启动服务端与前端
+pnpm --filter @gist/api... build
+pnpm init-db
+```
+
+初始化创建当前应用表、合成业务样例及已配置的只读查询账号，会写入数据库。旧开发库的处理方式见[部署指南](DEPLOY.md)。
+
+### 4. 启动
+
+```bash
 pnpm dev
-
-# 或分别启动
-pnpm dev:server   # http://localhost:3000
-pnpm dev:web      # http://localhost:5173
 ```
 
-## 更多资源
+Web 默认 http://localhost:5173，API 默认 http://localhost:3000。也可分别运行 pnpm dev:api、pnpm dev:worker 和 pnpm dev:web。仅启动 API 不会执行分析任务。
 
-- **[Agent 核心重写方案](./docs/agent-refactor/README.md)** — 当前设计基线、业务定义与分析状态契约、实施进度及验收标准（S1～S3 已接入并通过快速 mock，真实链路待验收，默认仍为旧核心）。
+## 架构与代码入口
 
-- **[FAQ.md](./FAQ.md)** -- 架构设计问答（Tool vs Agent 界定、SQL 防腐层原理）及运维实践（SSH 隧道连接线上 MySQL）
-- **[DEPLOY.md](./DEPLOY.md)** -- Docker Compose 编排、Nginx 反代、GitHub Actions CI/CD
+```text
+apps/api            HTTP、鉴权、任务创建、Outbox 和 SSE
+apps/worker         队列消费、Agent、工具、状态与证据
+apps/web            Vue 3、Pinia、ECharts、多会话和证据展示
+packages/contracts  共享协议与领域类型
+packages/config     环境配置
+packages/database   PostgreSQL 客户端、表结构与业务定义仓库
+packages/llm        OpenAI-compatible 模型适配
+```
+
+后端使用 NestJS，队列使用 BullMQ / Redis。详见[运行时设计](docs/agent-refactor/02-agent-runtime.md)。
+
+## 演示与验证
+
+以下视频可能包含历史界面，当前能力以代码及设计文档为准：
+
+- [演示一](https://github.com/user-attachments/assets/47fd3e74-0748-4505-822a-447fb07f992d)
+- [演示二](https://github.com/user-attachments/assets/c6252c3d-237f-4809-92f0-3e850702a8b5)
+- [演示三](https://github.com/user-attachments/assets/04861aa2-b6cb-4767-a96d-6f4a49a4cfe6)
+
+快速检查与真实服务验收的边界见[验证说明](docs/agent-refactor/05-delivery-and-validation.md)。[固定合成数据与标准答案](benchmarks/saas-growth/README.md)不代表真实公司数据或通用准确率。
+
+## 文档导航
+
+- [部署与运维](DEPLOY.md)
+- [设计入口](docs/agent-refactor/README.md)
+- [业务验收步骤](benchmarks/saas-growth/acceptance-walkthrough.md)
+- [项目亮点](docs/career/resume-highlights.md)
+- [面试参考](docs/career/agent-interview.md)
 
 ## 许可证
 
-[MIT](./LICENSE)
+[MIT](LICENSE)

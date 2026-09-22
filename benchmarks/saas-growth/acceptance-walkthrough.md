@@ -1,10 +1,10 @@
-# S4 业务验收与展示 walkthrough
+# 业务验收与展示 walkthrough
 
-当前状态：实现与快速结构验证已完成，真实模型、数据库和界面操作均未执行。以下是用户安排验收时的操作步骤，不是运行报告。
+本文件是用户安排验收时的操作步骤，不是运行报告。当前进度统一见[交付状态](../../docs/agent-refactor/05-delivery-and-validation.md)，逐例结果记录在 [s4-acceptance.json](s4-acceptance.json)；文件名保留 S4 以兼容现有检查脚本。
 
 ## 执行前记录
 
-在 `s4-acceptance.json` 填写 Git commit、实际模型版本和参数、执行时间、数据集版本、数据源权限、正式定义 id/version 和审核人。`agent-core-cases.json` 的 fixture 版本是历史设计锚点；实际运行以数据库确认版本为准，必须记录。使用已有 SaaS 数据集与 `cases.json` 标准答案，不复制另一份数值。按部署说明准备当前数据库结构和匹配 API/Worker，使用新会话；S5 已固定新核心入口，无需配置开关。2026-09-22 已完成本机分析数据重建；真实模型与交互验收仍未执行。
+在 `s4-acceptance.json` 填写 Git commit、实际模型版本和参数、执行时间、数据集版本、数据源权限、正式定义 id/version 和审核人。`agent-core-cases.json` 的 fixture 版本是历史设计锚点；实际运行以数据库确认版本为准，必须记录。使用已有 SaaS 数据集与 `cases.json` 标准答案，不复制另一份数值。按[部署说明](../../DEPLOY.md)准备当前数据库结构和匹配 API/Worker，使用新会话；当前入口无需核心切换开关。
 
 每例使用案例文件的原始消息序列；记录可见查询、证据 ID、关键数值、工具次数、预算退出、限制与失败。对照使用同一模型、数据、定义、权限，每次只改变验证策略或复用策略；如无法建立等价基线，标记 needs-review 并解释，不能把它判为收益。
 
