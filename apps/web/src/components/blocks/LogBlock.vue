@@ -3,6 +3,7 @@
         <div class="log-header" @click="collapsed = !collapsed">
             <div class="status-indicator">
                 <i v-if="isLoading" class="fas fa-circle-notch fa-spin spinner"></i>
+                <i v-else-if="isIncomplete" class="fas fa-exclamation-circle warning"></i>
                 <i v-else class="fas fa-check-circle success"></i>
             </div>
             <span class="title">{{ title }}</span>
@@ -19,13 +20,14 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 
-defineProps<{
+const props = defineProps<{
     title?: string;
     content?: string;
     isLoading?: boolean;
+    isIncomplete?: boolean;
 }>();
 
-const collapsed = ref(true);
+const collapsed = ref(!/^分析步骤 \d+$/.test(props.title || ''));
 </script>
 
 <style scoped>
@@ -64,6 +66,10 @@ const collapsed = ref(true);
 .spinner {
     color: var(--da-primary);
     font-size: 14px;
+}
+
+.warning {
+    color: #f59e0b;
 }
 
 .success {

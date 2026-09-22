@@ -47,6 +47,7 @@ export class AnalysisAgent {
         let toolCalls = 0;
         let firstDelta = false;
         let contextRetried = false;
+        let submissionRejected = false;
         const check = async () => {
             if (context.signal.aborted) throw context.signal.reason ?? new GenerationExecutionError('CANCELLED', '已取消');
             await context.assertWritable();
@@ -126,16 +127,16 @@ export class AnalysisAgent {
                     ['context_length_exceeded', 'max_context_length'].includes(String((error as { code?: string }).code))
                 ) {
                     contextRetried = true;
-                    options.onEvent({ type: 'log_remove', title: progressTitle });
+                    options.onEvent({ type: 'log_update', title: progressTitle, content: '需要调整：上下文过长，将缩减后重试。' });
                     continue;
                 }
                 throw new GenerationExecutionError('LLM_REQUEST_FAILED', '模型请求或响应流失败');
             }
             await check();
-            options.onEvent({ type: 'log_remove', title: progressTitle });
             const batch = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call);
             if (!batch.length) {
                 if (!content.trim()) throw new GenerationExecutionError('EMPTY_LLM_RESPONSE', '模型未返回正式结果或工具调用');
+                options.onEvent({ type: 'log_update', title: progressTitle, content: '需要调整：已收到模型回复，继续整理为正式结果。' });
                 // Unstructured text is not a final answer; do not publish unsupported conclusions.
                 append({ role: 'assistant', content });
                 messages.push({ role: 'system', content: '请通过 submit_analysis 提交正式结果，不能只输出自由文本。' });
@@ -153,9 +154,25 @@ export class AnalysisAgent {
             const mixedState = batch.length > 1 && batch.some((call) => call.function.name === 'update_analysis_state');
             const previouslyObserved = new Set(observed.keys());
             let final: AnalysisOutcome | undefined;
+            let needsCorrection = false;
+            const actionLabels: Record<string, string> = {
+                update_analysis_state: '确认分析条件',
+                get_analysis_state: '读取分析状态',
+                list_schema: '查看数据目录',
+                get_schema: '读取表结构',
+                list_business_definitions: '查看业务定义',
+                read_business_definitions: '读取业务定义',
+                execute_sql_query: '查询数据',
+                read_query_artifact: '读取查询证据',
+                generate_chart: '生成图表',
+                submit_analysis: '提交分析结果',
+                propose_business_definition: '提出业务定义',
+            };
+            const actions = [...new Set(batch.map((c) => actionLabels[c.function.name] ?? '执行分析工具'))].join('、');
             for (const call of batch) {
                 await check();
                 let result: string;
+                if (call.function.name === 'submit_analysis') submissionRejected = true;
                 try {
                     if (mixedState) throw new Error('状态更新必须独立调用，收到成功结果后才能执行其他工具');
                     if (mixedSubmit) throw new Error('提交结果必须独立调用，不允许与其他工具混用');
@@ -197,6 +214,7 @@ export class AnalysisAgent {
                         }
                         await check();
                         result = output.toolResult;
+                        if (output.succeeded === false) needsCorrection = true;
                         const data = JSON.parse(result);
                         if (tool.name === 'read_query_artifact' && output.succeeded !== false && options.observeEvidence)
                             observed.set(data.queryArtifactId, await options.observeEvidence(data.queryArtifactId));
@@ -224,19 +242,38 @@ export class AnalysisAgent {
                             for (const skipped of batch.slice(batch.indexOf(call) + 1)) {
                                 append({ role: 'tool', tool_call_id: skipped.id, content: JSON.stringify({ skipped: true, reason: 'SECURITY_STOP' }) });
                             }
-                            return { kind: 'refusal', explanation: '当前请求无法在授权的数据与安全查询范围内完成。' };
+                            options.onEvent({ type: 'log_update', title: progressTitle, content: `未完成：${actions}；查询被访问或安全规则阻止。` });
+                            return {
+                                kind: 'refusal',
+                                explanation:
+                                    error.code === 'DATASOURCE_ACCESS_CHANGED'
+                                        ? '当前数据源访问权限已变化，分析已停止。请确认数据源权限后重试。'
+                                        : '本次生成的 SQL 未通过安全校验，查询已停止。请重试；若持续出现，请检查查询语法与允许访问的表或字段。',
+                            };
                         }
                         throw error;
                     }
+                    needsCorrection = true;
                     final = undefined;
-                    result = JSON.stringify({ errorCode: 'INVALID_TOOL_ARGUMENTS', message: error instanceof Error ? error.message : '工具参数不合法', retryable: true });
+                    result = JSON.stringify({
+                        errorCode: 'INVALID_TOOL_ARGUMENTS',
+                        message: error instanceof Error ? error.message : '工具参数不合法',
+                        retryable: true,
+                        ...(call.function.name === 'submit_analysis' ? { submissionGuide: SUBMIT_TOOL.function.description, ...(closing ? { requiredKind: 'partial' } : {}) } : {}),
+                    });
                 }
                 append({ role: 'tool', tool_call_id: call.id, content: result });
             }
+            options.onEvent({
+                type: 'log_update',
+                title: progressTitle,
+                content: `${needsCorrection ? '需要调整' : '已完成'}：${actions}${needsCorrection ? '；已将错误反馈给模型修正。' : '。'}`,
+            });
             await options.checkpoint();
             await check();
             if (final) return final;
         }
-        throw new GenerationExecutionError('MAX_AGENT_ITERATIONS_EXCEEDED', '分析预算已耗尽，模型未能提交有效的部分结果');
+        if (submissionRejected) throw new GenerationExecutionError('ANALYSIS_PROTOCOL_ERROR', '模型未能按要求提交有效的分析结果，请重试。');
+        throw new GenerationExecutionError('MAX_AGENT_ITERATIONS_EXCEEDED', '本轮分析已达到模型或工具调用次数上限，尚未提交有效结果；请缩小问题范围后重试。');
     }
 }

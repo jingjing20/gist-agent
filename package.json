@@ -28,7 +28,8 @@
         "test:analysis-state": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/analysis-state-regression.mjs",
         "test:analysis-presentation": "pnpm --filter @gist/api build && node scripts/analysis-presentation-regression.mjs",
         "test:analysis-cutover": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/llm build && pnpm --filter @gist/worker build && pnpm --filter @gist/api build && node scripts/analysis-cutover-regression.mjs",
-        "migrate:database": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/migrate-database.mjs"
+        "migrate:database": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/migrate-database.mjs",
+        "test:analysis-failures": "pnpm --filter @gist/worker build && node scripts/analysis-failure-regression.mjs"
     },
     "devDependencies": {
         "@gist/config": "workspace:*",

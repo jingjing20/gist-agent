@@ -299,7 +299,10 @@ await check('runtime adapter persists snapshot and structured result in existing
     assert.equal(blocks.at(-1).analysis.contextReports[0].snapshot.promptPolicy, 'analysis-core-v2');
     assert.ok(blocks.at(-1).analysis.contextReports[0].selection.some((c) => c.candidateId === 'catalogs' && c.selected));
     assert.equal(blocks.at(-1).analysis.outcome.kind, 'clarification');
-    assert.equal(blocks.length, 1);
+    assert.equal(blocks.length, 2);
+    assert.equal(blocks[0].type, 'log');
+    assert.equal(blocks[0].title, '分析步骤 1');
+    assert.match(blocks[0].content, /^已完成/);
     assert.ok(events.some((e) => e.type === 'log'));
     assert.equal(events.at(-1).content, blocks.at(-1).content);
 });

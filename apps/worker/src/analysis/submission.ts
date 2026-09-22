@@ -12,7 +12,8 @@ export function record(value: unknown): Record<string, unknown> {
 }
 
 export function exactKeys(value: Record<string, unknown>, allowed: string[]): void {
-    if (Object.keys(value).some((key) => !allowed.includes(key))) throw new Error('存在不允许的字段');
+    const unexpected = Object.keys(value).filter((key) => !allowed.includes(key));
+    if (unexpected.length) throw new Error(`存在不允许的字段：${unexpected.join('、')}；只允许字段：${allowed.join('、')}。请删除多余字段后重试。`);
 }
 
 function text(value: unknown): string {
@@ -29,15 +30,16 @@ export const SUBMIT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
     type: 'function',
     function: {
         name: 'submit_analysis',
-        description: '提交本轮正式结果并停止。answer 为完整回答，partial 为部分结果，clarification 为澄清，refusal 为拒绝。',
+        description:
+            '提交本轮正式结果并停止。按 kind 严格选择字段，禁止混用：clarification 仅 {kind,question}（解释与待确认问题都写在 question）；refusal 仅 {kind,explanation}；answer 使用 {kind,answer}；partial 使用 {kind,reason,answer}。answer 内必须有 summary、findings、limitations、unresolvedQuestions；无数据发现时 findings=[]，不得编造无证据 observation。',
         parameters: {
             type: 'object',
             additionalProperties: false,
             properties: {
                 kind: { type: 'string', enum: ['answer', 'partial', 'clarification', 'refusal'] },
-                question: { type: 'string' },
-                explanation: { type: 'string' },
-                reason: { type: 'string' },
+                question: { type: 'string', description: '仅 clarification 必填：解释上下文并提出具体待确认问题；此时不要传 answer、explanation 或 reason。' },
+                explanation: { type: 'string', description: '仅 refusal 必填：拒绝原因。其他 kind 不传。' },
+                reason: { type: 'string', description: 'partial 必填：分析未完成的原因。' },
                 answer: {
                     type: 'object',
                     additionalProperties: false,

@@ -50,7 +50,12 @@ export class SqlExecutorAgent {
         try {
             astResult = parser.parse(sql, { database: 'Postgresql' });
         } catch (error: any) {
-            throw new GenerationExecutionError('SQL_SECURITY_REJECTED', `SQL 安全校验无法确认语法范围: ${error.message}`);
+            const line = error.location?.start?.line;
+            const column = error.location?.start?.column;
+            throw new GenerationExecutionError(
+                'SQL_VALIDATION_FAILED',
+                `SQL 解析器无法识别${line ? `第 ${line} 行、第 ${column} 列附近的` : ''}语法。请使用双引号包裹列别名（如 AS \"nulls\"），或改写为更简单的 PostgreSQL SELECT；未执行此查询。`
+            );
         }
 
         // parser.ast 在单条查询时是对象，多条拼接（分号隔开等情况）时是数组
@@ -68,7 +73,7 @@ export class SqlExecutorAgent {
         if (allowedTables !== 'ALL') {
             let tables: string[];
             try {
-                tables = parser.tableList(sql);
+                tables = astResult.tableList;
             } catch (error: any) {
                 throw new GenerationExecutionError('SQL_SECURITY_REJECTED', `无法确认查询访问的表范围: ${error.message}`);
             }
@@ -94,7 +99,7 @@ export class SqlExecutorAgent {
             }
             let columns: string[];
             try {
-                columns = parser.columnList(sql);
+                columns = astResult.columnList;
             } catch (error: any) {
                 throw new GenerationExecutionError('SQL_SECURITY_REJECTED', `无法确认查询访问的字段范围: ${error.message}`);
             }
@@ -119,7 +124,7 @@ export class SqlExecutorAgent {
 
         for (const node of astList) {
             if (node.type?.toLowerCase() === 'select') {
-                if (!node.limit) {
+                if (!node.limit || !node.limit.value?.length) {
                     // 注入 limit
                     node.limit = {
                         seperator: '',
@@ -157,7 +162,12 @@ export class SqlExecutorAgent {
 
         if (signal?.aborted) throw signal.reason ?? new GenerationExecutionError('CANCELLED', '已取消');
         const { astResult, parser } = this.validate(sql, allowedTables, columnPolicies);
-        const safeSql = this.ensureLimit(astResult, parser);
+        let safeSql: string;
+        try {
+            safeSql = this.ensureLimit(astResult, parser);
+        } catch {
+            throw new GenerationExecutionError('SQL_VALIDATION_FAILED', 'SQL 无法规范化为安全的只读查询，请简化 PostgreSQL 表达式后重试；未执行此查询。');
+        }
         const detailed = await this.queryWithTimeout(safeSql, datasourceId, 15000, signal);
         const normalized = this.normalizeRows(detailed.rows as Record<string, unknown>[], detailed.fields);
         this.applyColumnMasks(normalized.rows, columnPolicies);

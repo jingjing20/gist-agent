@@ -72,6 +72,7 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
             title: block.title,
             content: block.content,
             isLoading: props.isStreaming && String(block.content || '').startsWith('正在'),
+            isIncomplete: /^(需要调整|未完成|已取消)/.test(block.content || '') || (!props.isStreaming && String(block.content || '').startsWith('正在')),
         };
     }
     if (block.type === 'chart') {

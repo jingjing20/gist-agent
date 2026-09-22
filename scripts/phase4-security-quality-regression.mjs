@@ -50,7 +50,7 @@ rejected('SELECT * FROM missing_table', '允许范围');
 rejected("SELECT pg_read_file('/etc/passwd')", '禁止');
 rejected('SELECT * FROM sales', 'SELECT *');
 rejected('SELECT secret FROM sales', '字段');
-rejected('SELECT FROM', '无法确认');
+assert.throws(() => executor.validate('SELECT FROM', ['sales']), { code: 'SQL_VALIDATION_FAILED' });
 assert.doesNotThrow(() => executor.validate('WITH daily AS (SELECT day, amount FROM sales) SELECT day, amount FROM daily', ['sales', 'users'], policies));
 
 const executed = await executor.execute('SELECT email, day, amount FROM sales', 1, 7, new AbortController().signal);

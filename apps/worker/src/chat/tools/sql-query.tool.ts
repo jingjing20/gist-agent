@@ -25,7 +25,10 @@ export class SqlQueryTool implements Tool {
                         type: 'string',
                         description: '本次查询的简短动作标题，使用明确的中文动宾短语（建议 6-15 个字），例如“查询所有平台类型”；不要包含“SQL”“查询结果”等后缀',
                     },
-                    sql: { type: 'string', description: '安全的只读 PostgreSQL 查询语句' },
+                    sql: {
+                        type: 'string',
+                        description: '只读 PostgreSQL SELECT。列别名使用双引号，避免 nulls 等关键字被解析器误解。SQL_VALIDATION_FAILED 表示未执行查询，按反馈改写后重试。',
+                    },
                     plan: {
                         type: 'object',
                         description: '本次查询的目标、预期粒度和结果形态，用于证据追踪与后续质量检查',
@@ -145,7 +148,7 @@ export class SqlQueryTool implements Tool {
                 await ctx.assertWritable();
             }
 
-            ctx.emitter.send({ type: 'log_remove', title: queryTitle });
+            ctx.emitter.send({ type: 'log_update', title: queryTitle, content: `已完成查询，返回 ${r.rowCount} 行。` });
             const execLogIndex = blocks.indexOf(execLog);
             if (execLogIndex >= 0) blocks.splice(execLogIndex, 1);
 
@@ -179,9 +182,13 @@ export class SqlQueryTool implements Tool {
             if (ctx.signal.aborted) throw ctx.signal.reason ?? e;
             {
                 await ctx.assertWritable();
-                if (e instanceof GenerationExecutionError && ['SQL_SECURITY_REJECTED', 'DATASOURCE_ACCESS_CHANGED', 'WRITER_OWNERSHIP_LOST'].includes(e.code)) throw e;
+                if (e instanceof GenerationExecutionError && ['SQL_SECURITY_REJECTED', 'DATASOURCE_ACCESS_CHANGED', 'WRITER_OWNERSHIP_LOST'].includes(e.code)) {
+                    ctx.emitter.send({ type: 'log_update', title: queryTitle, content: '未完成：查询被访问或安全规则阻止。' });
+                    throw e;
+                }
                 const code = String(e.code ?? '');
                 const recoverable: Record<string, string> = {
+                    SQL_VALIDATION_FAILED: e.message,
                     '42601': 'SQL 语法错误，请根据已加载 Schema 修正查询。',
                     '42703': '字段不存在，请核对已加载的字段名。',
                     '42P01': '表不存在，请核对已加载的表名。',
@@ -190,7 +197,7 @@ export class SqlQueryTool implements Tool {
                     '57014': '单次查询超时，请缩小查询范围。',
                 };
                 if (!recoverable[code]) throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询执行失败，未生成有效证据');
-                execLog.content = recoverable[code];
+                execLog.content = `需要调整：${recoverable[code]}`;
                 ctx.emitter.send({ ...execLog, type: 'log_update' });
                 return { toolResult: JSON.stringify({ errorCode: code, message: recoverable[code], retryable: true }), blocks, succeeded: false };
             }
