@@ -1,0 +1,98 @@
+README.md
+  9bf65784ad5f4a8b 20
+apps/api/nest-cli.json
+  9bf65784ad5f4a8b 4-7
+apps/api/src/conversation/conversation.service.ts
+  9bf65784ad5f4a8b 63
+benchmarks/saas-growth/S4-WALKTHROUGH.md
+  9bf65784ad5f4a8b 7
+apps/api/src/analysis-artifact/analysis-artifact.module.ts
+  9bf65784ad5f4a8b 51
+apps/worker/src/chat/tools/sql-query.tool.ts
+  9bf65784ad5f4a8b 96,106
+apps/worker/nest-cli.json
+  9bf65784ad5f4a8b 2-7
+scripts/reasoning-context-regression.mjs
+  9bf65784ad5f4a8b 5-8
+apps/web/src/components/ChatMessageItem.vue
+  9bf65784ad5f4a8b 16,52,69
+apps/api/scripts/init-db.ts
+  9bf65784ad5f4a8b 4,25
+apps/worker/tsconfig.json
+  9bf65784ad5f4a8b 24-25
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  9bf65784ad5f4a8b 33
+packages/database/src/schema.ts
+  9bf65784ad5f4a8b 1-205
+docs/agent-refactor/README.md
+  9bf65784ad5f4a8b 3
+apps/worker/src/database/schema.service.ts
+  9bf65784ad5f4a8b 107-108
+package.json
+  9bf65784ad5f4a8b 20,30-31
+scripts/generation-baseline-regression.mjs
+  9bf65784ad5f4a8b 9,13
+scripts/analysis-cutover-regression.mjs
+  9bf65784ad5f4a8b 2-13,15-37,39-84,86,88-94,96-139
+scripts/phase4-security-quality-regression.mjs
+  9bf65784ad5f4a8b 25-30,32-35,40-43,50,64-67,79-82,88-91,95-98,111-116
+DEPLOY.md
+  9bf65784ad5f4a8b 4-15
+apps/worker/src/chat/agents/sql-executor.ts
+  9bf65784ad5f4a8b 165-171
+apps/worker/src/chat/chat.service.ts
+  9bf65784ad5f4a8b 114-122
+docs/agent-refactor/05-delivery-and-validation.md
+  9bf65784ad5f4a8b 261-279
+scripts/analysis-core-regression.mjs
+  9bf65784ad5f4a8b 197
+scripts/phase4-database-integration.mjs
+  9bf65784ad5f4a8b 3,19-20
+apps/api/src/auth/auth.service.ts
+  9bf65784ad5f4a8b 27,33,45,67,95,101
+apps/api/src/datasource/datasource.service.ts
+  9bf65784ad5f4a8b 72,255,313
+scripts/smoke-multi-conversation.mjs
+  9bf65784ad5f4a8b 91-93
+scripts/phase1-reliability-regression.mjs
+  9bf65784ad5f4a8b 6,137-138,225,239
+apps/web/src/views/MainLayout.vue
+  9bf65784ad5f4a8b 89
+scripts/migrate-database.mjs
+  9bf65784ad5f4a8b 1-3,5-29,31-33,35-68,70-71,73-76
+packages/database/src/index.ts
+  9bf65784ad5f4a8b 201-203
+scripts/phase6-regression.mjs
+  9bf65784ad5f4a8b 4,14-18,26-27
+apps/api/src/user/user.service.ts
+  9bf65784ad5f4a8b 13,19,25
+apps/worker/src/conversation/conversation.service.ts
+  9bf65784ad5f4a8b 1-2,4,8,10-12,14
+apps/worker/src/analysis/analysis-state.ts
+  9bf65784ad5f4a8b 39
+packages/llm/src/index.ts
+  9bf65784ad5f4a8b 50-78
+scripts/phase3-artifacts-regression.mjs
+  9bf65784ad5f4a8b 4,15,136,302-308,310,322-338,340
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "d1860288d0b0d7f8f61dd1ef850473eadf662063",
+  "prompts": {
+    "9bf65784ad5f4a8b": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c3e9-02d5-7bb0-8a36-30ffce8d11ce",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 768,
+      "total_deletions": 1107,
+      "accepted_lines": 653,
+      "overriden_lines": 1
+    }
+  }
+}
