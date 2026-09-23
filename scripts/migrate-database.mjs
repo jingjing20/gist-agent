@@ -10,6 +10,9 @@ const analysisTables = [
     'business_definition_revision',
     'business_definition',
     'business_definition_seed_import',
+    'datasource_memory_candidate',
+    'datasource_memory_revision',
+    'datasource_memory',
     'chart_artifact',
     'query_artifact',
     'conversation_turn',
@@ -44,11 +47,18 @@ try {
             }
             // No CASCADE: any unexpected dependency aborts the transaction instead of deleting unrelated data.
             await tx.query(`DROP TABLE IF EXISTS ${analysisTables.map((name) => `public."${name}"`).join(',')}`);
+        } else {
+            // Replace only the retired business-definition storage. Keep conversations and analysis rows.
+            await tx.query(`DROP TABLE IF EXISTS public.business_definition_candidate, public.business_definition_revision, public.business_definition, public.business_definition_seed_import`);
+            await tx.query(`ALTER TABLE IF EXISTS public.analysis_state_draft DROP COLUMN IF EXISTS definitions, ADD COLUMN IF NOT EXISTS memories JSONB NOT NULL DEFAULT '[]'::jsonb`);
+            await tx.query(`ALTER TABLE IF EXISTS public.query_artifact ADD COLUMN IF NOT EXISTS result_quality JSONB, ADD COLUMN IF NOT EXISTS analysis_context JSONB`);
         }
         await applyCurrentSchema(tx);
         const [tables] = await tx.query("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename");
         const names = new Set(tables.map((row) => row.tablename));
         const [columns] = await tx.query("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='query_artifact'");
+        const [draftColumns] = await tx.query("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name='analysis_state_draft'");
+        if (!draftColumns.some((row) => row.column_name === 'memories')) throw new Error('Outdated analysis state schema: memories missing; use --reset-analysis');
         for (const field of ['analysis_context', 'result_quality']) {
             if (!columns.some((row) => row.column_name === field)) throw new Error(`Outdated evidence schema: ${field} missing; use --reset-analysis`);
         }
@@ -56,16 +66,16 @@ try {
         for (const required of [
             'analysis_state',
             'analysis_state_draft',
-            'business_definition',
-            'business_definition_revision',
-            'business_definition_candidate',
+            'datasource_memory',
+            'datasource_memory_revision',
+            'datasource_memory_candidate',
             'query_artifact',
             'generation',
         ]) {
             if (!names.has(required)) throw new Error(`Missing required table: ${required}`);
         }
         {
-            for (const removed of ['memory_record', 'memory_change_audit', 'message_block', 'retention_cleanup_audit', 'retention_policy']) {
+            for (const removed of ['business_definition_candidate', 'business_definition_revision', 'business_definition', 'business_definition_seed_import']) {
                 if (names.has(removed)) throw new Error(`Retired schema found: ${removed}; use --reset-analysis to discard old test conversations`);
             }
         }

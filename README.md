@@ -17,8 +17,8 @@ Gist Agent 是用于学习和验证 Agent 工程的数据分析项目。模型�
 | 能力 | 实现方式 |
 | --- | --- |
 | 数据接入 | CSV / Excel、多 Sheet 选择、字段推断及 PostgreSQL 参数化批量 INSERT |
-| 单 Agent 分析 | 显式更新状态，按需读取 Schema 与业务定义，查询、验证并结构化提交结果 |
-| 业务定义 | 数据源级指标、术语和关系定义；用户确认、版本及候选确认 |
+| 单 Agent 分析 | 显式更新状态，按需读取 Schema 与记忆，查询、验证并结构化提交结果 |
+| 数据源记忆 | 文本记忆；手动添加、明确对话指令直接保存、提炼候选确认与版本管理 |
 | 多轮状态 | 保存问题、时间、筛选、粒度、临时口径和假设；条件变化后检查证据适用性 |
 | 查询安全 | 单条 SELECT、AST 校验、表字段权限、行数限制、只读连接和查询超时 |
 | 显式 SQL 纠错 | 可修正错误返回主循环，修正后重新校验；执行器内部不调用模型 |
@@ -85,7 +85,7 @@ apps/worker         队列消费、Agent、工具、状态与证据
 apps/web            Vue 3、Pinia、ECharts、多会话和证据展示
 packages/contracts  共享协议与领域类型
 packages/config     环境配置
-packages/database   PostgreSQL 客户端、表结构与业务定义仓库
+packages/database   PostgreSQL 客户端、表结构与记忆仓库
 packages/llm        OpenAI-compatible 模型适配
 ```
 

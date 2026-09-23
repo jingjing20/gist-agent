@@ -19,7 +19,7 @@
 | 亮点 | 代码入口 | 可展示内容 |
 | --- | --- | --- |
 | 受控循环 | [AnalysisAgent](../../apps/worker/src/analysis/analysis-agent.ts) | SQL 错误反馈、修改、预算及提交校验 |
-| 业务口径 | [定义仓库](../../packages/database/src/business-definition-repository.ts) | 候选确认、版本冲突、定义变化 |
+| 数据源记忆 | [记忆仓库](../../packages/database/src/memory-repository.ts) | 候选确认、版本冲突、记忆变化 |
 | 多轮连续性 | [状态校验](../../apps/worker/src/analysis/analysis-state.ts) | 条件变化重查与匹配证据复用 |
 | 上下文选择 | [ContextAssembler](../../apps/worker/src/analysis/context-assembler.ts) | 相同输入的选择报告和 tool-call 配对 |
 | 后台执行 | [Worker ChatService](../../apps/worker/src/chat/chat.service.ts) | 执行与订阅分离、取消与终态边界 |

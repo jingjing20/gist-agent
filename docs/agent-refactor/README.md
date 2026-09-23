@@ -8,7 +8,7 @@
 | --- | --- |
 | [产品与决策](01-product-and-decisions.md) | 目标、D01～D20、保留边界与非目标 |
 | [运行时](02-agent-runtime.md) | Agent / Tool 边界、实际工具、预算与外壳 |
-| [业务定义与状态](03-business-definitions-and-state.md) | 确认、版本、接口、草稿和证据失效 |
+| [数据源记忆与状态](03-datasource-memory-and-state.md) | 确认、版本、接口、草稿和证据失效 |
 | [上下文与证据](04-context-and-evidence.md) | 输入选择、权限、结果与展示 |
 | [交付与验证](05-delivery-and-validation.md) | 当前状态、快速验证与 C/P 验收清单 |
 

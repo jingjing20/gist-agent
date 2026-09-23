@@ -195,8 +195,8 @@ export function normalizeSql(sql: string): string {
     return sql.replace(/\?/g, () => `$${++parameter}`);
 }
 
-export * from './business-definition-schema';
-export * from './business-definition-repository';
+export * from './memory-schema';
+export * from './memory-repository';
 export * from './analysis-state-schema';
 
 export * from './schema';

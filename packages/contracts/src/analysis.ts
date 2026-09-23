@@ -3,7 +3,7 @@ export const ANALYSIS_RUNTIME_VERSIONS = {
     promptPolicy: 'analysis-core-v2',
     toolset: 'analysis-tools-v3',
     contextPolicy: 'analysis-context-v2',
-    memoryPolicy: 'analysis-definitions-v1',
+    memoryPolicy: 'datasource-memory-v1',
     schemaContext: 'schema-context-v4',
 } as const;
 
@@ -44,7 +44,7 @@ export interface AnalysisRunSnapshot {
     requestMessageId: string;
     question: string;
     timeAnchor: string;
-    definitionRefs: Array<{ id: string; version: number }>;
+    memoryRefs: Array<{ id: string; version: number }>;
     schemaTables: string[];
 }
 
@@ -55,8 +55,8 @@ export interface AnalysisState {
     revision: number;
     question: string;
     status: 'active' | 'awaiting_clarification' | 'answered' | 'partial';
-    definitionRefs: Array<{ id: string; version: number }>;
-    temporaryDefinitions: Array<{ name: string; description: string; sourceMessageId: string }>;
+    memoryRefs: Array<{ id: string; version: number }>;
+    temporaryNotes: Array<{ name: string; description: string; sourceMessageId: string }>;
     timeRange: { start: string; endExclusive: string; timezone: string } | null;
     comparisonRange: { start: string; endExclusive: string; timezone: string } | null;
     filters: Array<{ field: string; operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in'; value: string | number | boolean | null | Array<string | number | boolean> }>;
@@ -68,5 +68,5 @@ export interface AnalysisState {
 export interface AnalysisEvidenceContext {
     accessFingerprint?: string;
     state: AnalysisState;
-    definitions: import('./business-definition').BusinessDefinition[];
+    memories: import('./memory').DatasourceMemory[];
 }

@@ -34,7 +34,7 @@ export type QueryExpectedShape = 'scalar' | 'timeseries' | 'category' | 'detail'
 export type ArtifactColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown';
 export type ChartType = 'line' | 'bar' | 'pie' | 'scatter' | 'radar' | 'funnel';
 
-export type AnalysisActivityKind = 'confirm_conditions' | 'inspect_catalog' | 'inspect_definitions' | 'inspect_schema' | 'query_data' | 'inspect_evidence' | 'generate_chart';
+export type AnalysisActivityKind = 'confirm_conditions' | 'inspect_catalog' | 'inspect_memory' | 'inspect_schema' | 'query_data' | 'inspect_evidence' | 'generate_chart';
 export type AnalysisActivityStatus = 'running' | 'completed' | 'warning';
 export interface AnalysisActivityDetailV1 {
     label: string;
@@ -264,4 +264,4 @@ export interface GenerationStreamEvent extends ConversationEvent {
 export interface ConversationEventEmitter {
     send(event: ConversationEvent): void;
 }
-export * from './business-definition';
+export * from './memory';

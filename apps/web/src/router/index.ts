@@ -55,10 +55,10 @@ const router = createRouter({
             ],
         },
         {
-            path: '/business-definitions',
+            path: '/memories',
             component: () => import('../views/MainLayout.vue'),
             meta: { requiresAuth: true },
-            children: [{ path: '', name: 'business-definitions', component: () => import('../views/BusinessDefinitionsView.vue') }],
+            children: [{ path: '', name: 'memories', component: () => import('../views/MemoriesView.vue') }],
         },
         { path: '/:pathMatch(.*)*', redirect: '/' },
     ],

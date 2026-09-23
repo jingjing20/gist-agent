@@ -27,8 +27,8 @@ const g = (id = 'g') => ({
     schemaContextVersion: 'schema-v1',
     promptPolicyVersion: 'analysis-core-v2',
 });
-const def = { id: 'd', version: 1, type: 'term', name: '注册', description: '注册用户', status: 'active', needsReview: false, relatedFields: [] };
-const deps = { definitions: [def], sourceMessageId: 'user-message', fieldAllowed: async (f) => f === 'users.platform', validateEvidence: async () => {} };
+const def = { id: 'd', version: 1, name: '注册', description: '注册用户', status: 'active' };
+const deps = { memories: [def], sourceMessageId: 'user-message', fieldAllowed: async (f) => f === 'users.platform', validateEvidence: async () => {} };
 const patch = (s, p = {}, extra = {}) => patchAnalysisState(s, { expectedRevision: s.revision, reason: '确认条件', patch: p, ...extra }, deps);
 function database() {
     let data = { generations: {}, states: {}, drafts: {}, writes: [] };
@@ -54,7 +54,7 @@ function database() {
                 base_revision: p[2],
                 revision: p[3],
                 state: JSON.parse(p[4]),
-                definitions: JSON.parse(p[5]),
+                memories: JSON.parse(p[5]),
                 context_reports: [],
             };
         else if (sql.startsWith('UPDATE analysis_state_draft SET revision')) {
@@ -98,22 +98,22 @@ await check('whitelist, optimistic revision, source binding, filters and time va
         { filters: [{ field: 'secret.token', operator: 'eq', value: 1 }] },
         { filters: [{ field: 'users.platform', operator: 'in', value: 'android' }] },
         { timeRange: { start: 'bad', endExclusive: 'bad', timezone: 'UTC' } },
-        { definitionRefs: [{ id: 'd', version: 2 }] },
+        { memoryRefs: [{ id: 'd', version: 2 }] },
     ])
         await assert.rejects(() => patch(s, p));
     await assert.rejects(() => patch(s, {}, { expectedRevision: 0 }), /版本冲突/);
     const next = await patch(s, {
-        temporaryDefinitions: [{ name: '临时激活', description: '一天内激活' }],
+        temporaryNotes: [{ name: '临时激活', description: '一天内激活' }],
         filters: [{ field: 'users.platform', operator: 'eq', value: 'Android' }],
     });
-    assert.equal(next.temporaryDefinitions[0].sourceMessageId, 'user-message');
+    assert.equal(next.temporaryNotes[0].sourceMessageId, 'user-message');
     assert.equal(next.revision, 2);
     assert.deepEqual(s.filters, []);
-    await assert.rejects(() => patch(s, { temporaryDefinitions: [{ name: 'x', description: 'y', sourceMessageId: 'forged' }] }));
+    await assert.rejects(() => patch(s, { temporaryNotes: [{ name: 'x', description: 'y', sourceMessageId: 'forged' }] }));
 });
 await check('new task resets inherited conditions; condition change invalidates hypotheses', async () => {
     const s = await patch(newAnalysisState('c', 1, '原问题'), {
-        definitionRefs: [{ id: 'd', version: 1 }],
+        memoryRefs: [{ id: 'd', version: 1 }],
         grain: 'daily',
         hypotheses: [{ id: 'h', statement: '渠道相关', status: 'open', evidenceIds: [] }],
     });
@@ -122,7 +122,7 @@ await check('new task resets inherited conditions; condition change invalidates 
     const reset = await patch(s, { question: '新问题' }, { mode: 'start_new_task' });
     assert.notEqual(reset.taskId, s.taskId);
     assert.equal(reset.grain, null);
-    assert.deepEqual(reset.definitionRefs, []);
+    assert.deepEqual(reset.memoryRefs, []);
 });
 await check('evidence applicability compares conditions, not revision or question wording', async () => {
     const s = newAnalysisState('c', 1, 'q');
@@ -131,7 +131,7 @@ await check('evidence applicability compares conditions, not revision or questio
     for (const state of [
         { ...s, grain: 'daily' },
         { ...s, filters: [{ field: 'users.platform', operator: 'eq', value: 'Android' }] },
-        { ...s, definitionRefs: [{ id: 'd', version: 2 }] },
+        { ...s, memoryRefs: [{ id: 'd', version: 2 }] },
         { ...s, freshness: 'current_generation' },
         { ...s, datasourceId: 2 },
         { ...s, taskId: 'other' },
@@ -181,23 +181,23 @@ await check('promotion conflict rolls back generation completion and leaves newe
     assert.equal(h.data().states.c.revision, 5);
     assert.equal(h.data().generations.g.status, 'running');
 });
-await check('definition versions refresh next generation while existing draft snapshot remains fixed', async () => {
+await check('changed memory references require reselection while existing draft snapshot remains fixed', async () => {
     const h = database(),
         r = new AnalysisStateRepository(h.db);
-    h.data().states.c = { revision: 3, state: { ...newAnalysisState('c', 1, 'q', 3), definitionRefs: [{ id: 'd', version: 1 }], hypotheses: [{ id: 'h' }] } };
+    h.data().states.c = { revision: 3, state: { ...newAnalysisState('c', 1, 'q', 3), memoryRefs: [{ id: 'd', version: 1 }], hypotheses: [{ id: 'h' }] } };
     const gen = g();
     h.add(gen);
     const d = await r.begin(gen, 1, 'followup', [{ ...def, version: 2 }]);
-    assert.equal(d.state.definitionRefs[0].version, 2);
-    assert.equal(d.definitionChanges.length, 1);
+    assert.deepEqual(d.state.memoryRefs, []);
+    assert.equal(d.memoryChanges.length, 1);
     assert.deepEqual(d.state.hypotheses, []);
     const same = await r.begin(gen, 1, 'followup', [{ ...def, version: 3 }]);
-    assert.equal(same.definitions[0].version, 2);
+    assert.equal(same.memories[0].version, 2);
     const other = g('other');
     h.add(other);
     const reset = await r.begin(other, 2, 'new source', []);
     assert.notEqual(reset.state.taskId, d.state.taskId);
-    assert.deepEqual(reset.state.definitionRefs, []);
+    assert.deepEqual(reset.state.memoryRefs, []);
 });
 const toolCall = (id, name = 'x', args = {}) => ({ id, type: 'function', function: { name, arguments: JSON.stringify(args) } });
 const group = (id, content) => [
@@ -248,7 +248,7 @@ await check('context selection is deterministic and preserves latest paired inte
         /孤立/
     );
 });
-await check('artifact persistence round-trips state and definition snapshots without changing legacy input', async () => {
+await check('artifact persistence round-trips state and memory snapshots without changing legacy input', async () => {
     const s = newAnalysisState('c', 1, 'q');
     let inserted;
     const db = {
@@ -270,7 +270,7 @@ await check('artifact persistence round-trips state and definition snapshots wit
                         returned_row_count: 0,
                         is_limited: false,
                         created_at: '2026-09-15',
-                        analysis_context: { state: s, definitions: [def] },
+                        analysis_context: { state: s, memories: [def] },
                     },
                 ];
             if (sql.includes('FROM data_source')) return [{}];
@@ -292,11 +292,11 @@ await check('artifact persistence round-trips state and definition snapshots wit
         rows: [],
         returnedRowCount: 0,
         isLimited: false,
-        analysisContext: { state: s, definitions: [def] },
+        analysisContext: { state: s, memories: [def] },
     });
     assert.ok(inserted.sql.includes('analysis_context'));
     assert.equal(a.analysisContext.state.taskId, s.taskId);
-    assert.equal((await r.readQueryArtifact('a', 1, 'c', 0)).artifact.analysisContext.definitions[0].version, 1);
+    assert.equal((await r.readQueryArtifact('a', 1, 'c', 0)).artifact.analysisContext.memories[0].version, 1);
 });
 let callId = 0;
 const streamCalls = (calls) =>
@@ -518,7 +518,7 @@ await check('failed final evidence validation cannot accidentally return an acce
     assert.equal(outcome.kind, 'clarification');
     assert.deepEqual(outcomes, ['answer', 'clarification']);
 });
-await check('schema and definition pages remain discoverable; permission revocation blocks schema catalog and tools', async () => {
+await check('schema and memory pages remain discoverable; permission revocation blocks schema catalog and tools', async () => {
     const { analysisTools } = require('../apps/worker/dist/analysis/analysis-tools.js');
     const { SchemaService } = require('../apps/worker/dist/database/schema.service.js');
     const cached = new SchemaService({ query: async () => [] });
@@ -526,11 +526,11 @@ await check('schema and definition pages remain discoverable; permission revocat
     let revoked = false;
     const session = {
         state: newAnalysisState('c', 1, 'q'),
-        definitions: Array.from({ length: 25 }, (_, i) => ({ ...def, id: `d${i}`, name: `definition${i}` })),
+        memories: Array.from({ length: 25 }, (_, i) => ({ ...def, id: `d${i}`, name: `memory${i}` })),
         observed: new Map(),
         comparisonIds: new Set(),
         loadedSchema: new Map(),
-        definitionChanges: [],
+        memoryChanges: [],
         prepared: false,
     };
     const schema = {
@@ -561,10 +561,10 @@ await check('schema and definition pages remain discoverable; permission revocat
     const fields = await run('get_schema', { table: 'users', offset: 20 });
     assert.equal(fields.columns[0].name, 'column20');
     assert.equal(fields.nextOffset, 40);
-    assert.equal((await run('list_business_definitions', { offset: 20 })).items.length, 5);
-    assert.equal((await run('read_business_definitions', { id: 'd24' })).name, 'definition24');
+    assert.equal((await run('list_memories', { offset: 20 })).items.length, 5);
+    assert.equal((await run('read_memory', { id: 'd24' })).name, 'memory24');
     revoked = true;
     await assert.rejects(() => run('get_schema', { table: 'users' }), /数据源不可访问/);
-    await assert.rejects(() => run('read_business_definitions', { id: 'd0' }), /数据源不可访问/);
+    await assert.rejects(() => run('read_memory', { id: 'd0' }), /数据源不可访问/);
 });
 console.log(`${checks} S3 mock groups passed (no database, Redis, model, or browser)`);

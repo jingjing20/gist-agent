@@ -11,7 +11,7 @@
             <nav class="header-tabs">
                 <button class="tab-btn" :class="{ active: activeTab === 'chat' }" @click="router.push('/chat')">开始分析</button>
                 <button class="tab-btn" :class="{ active: activeTab === 'datasource' }" @click="goToDataSource">数据源</button>
-                <button class="tab-btn" :class="{ active: activeTab === 'business-definitions' }" @click="router.push('/business-definitions')">业务定义</button>
+                <button class="tab-btn" :class="{ active: activeTab === 'memories' }" @click="router.push('/memories')">记忆</button>
             </nav>
 
             <div class="header-user">
@@ -86,7 +86,7 @@ const dsStore = useDataSourceStore();
 const authStore = useAuthStore();
 const toast = useToastStore();
 
-const activeTab = computed(() => (route.name === 'business-definitions' ? 'business-definitions' : route.name === 'datasource' ? 'datasource' : 'chat'));
+const activeTab = computed(() => (route.name === 'memories' ? 'memories' : route.name === 'datasource' ? 'datasource' : 'chat'));
 
 function goToDataSource() {
     router.push('/datasource');

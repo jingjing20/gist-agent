@@ -9,8 +9,8 @@ export interface ToolActivityData {
 const definitions: Partial<Record<string, { kind: AnalysisActivityKind; label: string }>> = {
     update_analysis_state: { kind: 'confirm_conditions', label: '确认分析条件' },
     list_schema: { kind: 'inspect_catalog', label: '查看数据目录' },
-    list_business_definitions: { kind: 'inspect_definitions', label: '查看业务定义' },
-    read_business_definitions: { kind: 'inspect_definitions', label: '读取业务定义' },
+    list_memories: { kind: 'inspect_memory', label: '查看记忆' },
+    read_memory: { kind: 'inspect_memory', label: '读取记忆' },
     get_schema: { kind: 'inspect_schema', label: '读取表结构' },
     execute_sql_query: { kind: 'query_data', label: '查询数据' },
     generate_chart: { kind: 'generate_chart', label: '生成图表' },
@@ -113,12 +113,12 @@ export function completeActivity(
                 detail('筛选条件', formatFilters(state.filters)),
                 detail('分析粒度', text(state.grain) || '未设置'),
                 detail(
-                    '使用口径',
-                    Array.isArray(state.definitionRefs)
-                        ? state.definitionRefs.map((item: unknown) => `${text(record(item).id)} · v${text(record(item).version)}`).filter(Boolean)
+                    '使用记忆',
+                    Array.isArray(state.memoryRefs)
+                        ? state.memoryRefs.map((item: unknown) => `${text(record(item).id)} · v${text(record(item).version)}`).filter(Boolean)
                         : []
                 ),
-                detail('临时口径', Array.isArray(state.temporaryDefinitions) ? state.temporaryDefinitions.map((item: unknown) => text(record(item).name)).filter(Boolean) : []),
+                detail('临时约定', Array.isArray(state.temporaryNotes) ? state.temporaryNotes.map((item: unknown) => text(record(item).name)).filter(Boolean) : []),
             ])
         );
     } else if (toolName === 'list_schema') {
@@ -141,9 +141,9 @@ export function completeActivity(
                 detail('字段分页', data.nextOffset == null ? '已读取当前表全部字段' : `还有字段，下一页偏移 ${data.nextOffset}`),
             ])
         );
-    } else if (toolName === 'list_business_definitions') {
-        details.push(...compact([detail('候选业务定义', Array.isArray(data.items) ? data.items.map((item: unknown) => text(record(item).name)).filter(Boolean) : [])]));
-    } else if (toolName === 'read_business_definitions') {
+    } else if (toolName === 'list_memories') {
+        details.push(...compact([detail('候选记忆', Array.isArray(data.items) ? data.items.map((item: unknown) => text(record(item).name)).filter(Boolean) : [])]));
+    } else if (toolName === 'read_memory') {
         details.push(...compact([detail('定义名称', text(data.name)), detail('定义类型', text(data.type)), detail('版本', data.version == null ? undefined : `v${data.version}`)]));
     } else if (toolName === 'execute_sql_query') {
         details.push(

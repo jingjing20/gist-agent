@@ -152,13 +152,13 @@ export class AnalysisAgent {
                 get_analysis_state: '读取分析状态',
                 list_schema: '查看数据目录',
                 get_schema: '读取表结构',
-                list_business_definitions: '查看业务定义',
-                read_business_definitions: '读取业务定义',
+                list_memories: '查看记忆',
+                read_memory: '读取记忆',
                 execute_sql_query: '查询数据',
                 read_query_artifact: '读取查询证据',
                 generate_chart: '生成图表',
                 submit_analysis: '提交分析结果',
-                propose_business_definition: '提出业务定义',
+                propose_memory: '提出记忆',
             };
             const actions = [...new Set(batch.map((c) => actionLabels[c.function.name] ?? '执行分析工具'))].join('、');
             for (const call of batch) {

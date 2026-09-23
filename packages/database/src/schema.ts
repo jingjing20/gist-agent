@@ -1,5 +1,5 @@
 import { ANALYSIS_RUNTIME_VERSIONS } from '@gist/contracts';
-import { BUSINESS_DEFINITION_SCHEMA_SQL } from './business-definition-schema';
+import { DATASOURCE_MEMORY_SCHEMA_SQL } from './memory-schema';
 import { ANALYSIS_STATE_SCHEMA_SQL } from './analysis-state-schema';
 
 /** Current schema only: no legacy table creation, conversion or history backfill. */
@@ -200,6 +200,6 @@ CREATE INDEX IF NOT EXISTS idx_generation_trace_span_generation
 `;
 export async function applyCurrentSchema(db: { query(sql: string): Promise<unknown> }): Promise<void> {
     await db.query(CURRENT_SCHEMA_SQL);
-    await db.query(BUSINESS_DEFINITION_SCHEMA_SQL);
+    await db.query(DATASOURCE_MEMORY_SCHEMA_SQL);
     await db.query(ANALYSIS_STATE_SCHEMA_SQL);
 }

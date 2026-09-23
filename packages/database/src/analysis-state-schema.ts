@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS analysis_state_draft (
  base_revision INTEGER NOT NULL CHECK(base_revision >= 0),
  revision INTEGER NOT NULL CHECK(revision > base_revision),
  state JSONB NOT NULL CHECK(jsonb_typeof(state)='object'),
- definitions JSONB NOT NULL,
+ memories JSONB NOT NULL,
  context_reports JSONB NOT NULL DEFAULT '[]'::jsonb,
  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

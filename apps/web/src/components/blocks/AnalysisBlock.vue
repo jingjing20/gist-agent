@@ -83,12 +83,12 @@
                                 <dd>{{ formatRange(evidence[ref.artifactId]!.context.state.comparisonRange) }}</dd>
                                 <dt>筛选条件</dt>
                                 <dd>{{ formatFilters(evidence[ref.artifactId]!.context.state.filters) }}</dd>
-                                <dt>临时口径</dt>
-                                <dd>{{ evidence[ref.artifactId]!.context.state.temporaryDefinitions.map((d) => `${d.name}：${d.description}`).join('；') || '无' }}</dd>
+                                <dt>临时约定</dt>
+                                <dd>{{ evidence[ref.artifactId]!.context.state.temporaryNotes.map((d) => `${d.name}：${d.description}`).join('；') || '无' }}</dd>
                             </dl>
-                            <details v-for="definition in evidence[ref.artifactId]!.context.definitions" :key="definition.id">
-                                <summary>{{ definition.name }} · v{{ definition.version }}（查询时快照）</summary>
-                                <DefinitionContent :content="definition" />
+                            <details v-for="memory in evidence[ref.artifactId]!.context.memories" :key="memory.id">
+                                <summary>{{ memory.name }} · v{{ memory.version }}（查询时快照）</summary>
+                                <MemoryContent :content="memory" />
                             </details>
                             <SqlBlock title="执行 SQL" :content="evidence[ref.artifactId]!.executedSql" />
                             <SqlBlock
@@ -143,21 +143,21 @@
         <section v-if="!isStreaming">
             <p v-if="candidateError" role="alert">{{ candidateError }} <button @click="loadCandidates">刷新候选</button></p>
             <article v-for="candidate in candidates" :key="candidate.id">
-                <h4>待保存：{{ candidate.content.name }}</h4>
+                <h4>待保存记忆：{{ candidate.content.name }}</h4>
                 <p>将写入数据源：{{ sourceName }}（{{ candidate.datasourceId }}）。保存后用于后续分析。</p>
-                <p v-if="candidate.definitionId">修改已有定义 v{{ candidate.expectedVersion }}；不会覆盖冲突版本。</p>
-                <DefinitionContent :content="candidate.content" />
-                <button :disabled="busy" @click="decide(candidate, 'confirm')">保存到业务定义</button>
+                <p v-if="candidate.memoryId">修改已有记忆 v{{ candidate.expectedVersion }}；不会覆盖冲突版本。</p>
+                <MemoryContent :content="candidate.content" />
+                <button :disabled="busy" @click="decide(candidate, 'confirm')">保存到记忆</button>
                 <button :disabled="busy" @click="decide(candidate, 'temporary')">仅本次使用</button>
                 <button :disabled="busy" @click="decide(candidate, 'reject')">放弃保存</button>
-                <p>“仅本次使用”会关闭保存候选，并发送临时口径请求；“放弃保存”不会撤销已经执行的查询。</p>
+                <p>“仅本次使用”会关闭保存候选，并发送临时约定请求；“放弃保存”不会撤销已经执行的查询。</p>
             </article>
         </section>
     </section>
 </template>
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import type { AnalysisEvidenceContext, ArtifactColumnV1, BusinessDefinitionCandidate, ResultQualityV1 } from '@gist/contracts';
+import type { AnalysisEvidenceContext, ArtifactColumnV1, MemoryCandidate, ResultQualityV1 } from '@gist/contracts';
 import type { AnalysisPresentation, MessageBlock } from '../../types';
 import { apiFetch } from '../../api';
 import { useChatStore } from '../../stores/chat';
@@ -167,7 +167,7 @@ import MarkdownBlock from './MarkdownBlock.vue';
 import ChartBlock from './ChartBlock.vue';
 import AnalysisArtifactTable from './AnalysisArtifactTable.vue';
 import SqlBlock from './SqlBlock.vue';
-import DefinitionContent from '../DefinitionContent.vue';
+import MemoryContent from '../MemoryContent.vue';
 function formatRange(range: AnalysisEvidenceContext['state']['timeRange']) {
     return range ? `${range.start} 至 ${range.endExclusive}（不含结束时间，${range.timezone}）` : '未设置';
 }
@@ -254,7 +254,7 @@ async function loadPage(id: string, next = false) {
 function openEvidence(event: Event, id: string) {
     if ((event.target as HTMLDetailsElement).open && !evidence.value[id]) void loadEvidence(id);
 }
-const candidates = ref<BusinessDefinitionCandidate[]>([]),
+const candidates = ref<MemoryCandidate[]>([]),
     candidateError = ref(''),
     busy = ref(false);
 const sourceName = computed(() => sources.list.find((s) => s.id === props.analysis.state.datasourceId)?.name || '当前数据源');
@@ -267,23 +267,23 @@ async function loadCandidates() {
     const state = props.analysis.state;
     if (sources.list.find((s) => s.id === state.datasourceId)?.created_by !== auth.user?.id) return;
     try {
-        const pending: BusinessDefinitionCandidate[] = await request(
-            `/business-definition-candidates?datasourceId=${state.datasourceId}&conversationId=${encodeURIComponent(state.conversationId)}`
+        const pending: MemoryCandidate[] = await request(
+            `/memory-candidates?datasourceId=${state.datasourceId}&conversationId=${encodeURIComponent(state.conversationId)}`
         );
         if (seq === epoch) candidates.value = pending.filter((c) => c.sourceMessageId === props.analysis.snapshot.requestMessageId);
     } catch (e) {
         if (seq === epoch) candidateError.value = (e as Error).message;
     }
 }
-async function decide(c: BusinessDefinitionCandidate, action: 'confirm' | 'reject' | 'temporary') {
+async function decide(c: MemoryCandidate, action: 'confirm' | 'reject' | 'temporary') {
     busy.value = true;
     candidateError.value = '';
     try {
-        if (action === 'temporary' && chat.activeGeneration) throw new Error('请等待当前分析结束后再使用临时口径');
-        if (action === 'temporary' && chat.activeConversationId !== props.analysis.state.conversationId) throw new Error('请回到该会话后使用临时口径');
-        await request(`/business-definition-candidates/${c.id}/${action === 'confirm' ? 'confirm' : 'reject'}`, { expectedVersion: c.version });
+        if (action === 'temporary' && chat.activeGeneration) throw new Error('请等待当前分析结束后再使用临时约定');
+        if (action === 'temporary' && chat.activeConversationId !== props.analysis.state.conversationId) throw new Error('请回到该会话后使用临时约定');
+        await request(`/memory-candidates/${c.id}/${action === 'confirm' ? 'confirm' : 'reject'}`, { expectedVersion: c.version });
         candidates.value = candidates.value.filter((item) => item.id !== c.id);
-        if (action === 'temporary') await chat.sendMessage(`仅在当前分析任务使用以下临时业务口径，不保存为长期定义。请更新分析条件并按需重新查询：\n${JSON.stringify(c.content)}`);
+        if (action === 'temporary') await chat.sendMessage(`仅在当前分析任务使用以下临时约定，不保存为长期定义。请更新分析条件并按需重新查询：\n${JSON.stringify(c.content)}`);
     } catch (e) {
         candidateError.value = (e as Error).message;
     } finally {

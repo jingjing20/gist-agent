@@ -1,4 +1,4 @@
-import type { AnalysisState, BusinessDefinition } from '@gist/contracts';
+import type { AnalysisState, DatasourceMemory } from '@gist/contracts';
 import { DatabaseService } from '../database/database.service';
 import type { GenerationIdentity } from '../chat/generation.service';
 import { GenerationExecutionError } from '../chat/generation-errors';
@@ -17,37 +17,37 @@ export class AnalysisStateRepository {
         g: GenerationIdentity,
         ds: number,
         question: string,
-        definitions: BusinessDefinition[]
-    ): Promise<{ state: AnalysisState; definitions: BusinessDefinition[]; definitionChanges: string[] }> {
+        memories: DatasourceMemory[]
+    ): Promise<{ state: AnalysisState; memories: DatasourceMemory[]; memoryChanges: string[] }> {
         return this.db.withTransaction(async (tx) => {
             await this.owned(tx, g);
-            const [drafts] = await tx.query('SELECT state,definitions FROM analysis_state_draft WHERE generation_id=?', [g.id]);
-            if (drafts.length) return { state: drafts[0].state as AnalysisState, definitions: drafts[0].definitions as BusinessDefinition[], definitionChanges: [] };
+            const [drafts] = await tx.query('SELECT state,memories FROM analysis_state_draft WHERE generation_id=?', [g.id]);
+            if (drafts.length) return { state: drafts[0].state as AnalysisState, memories: drafts[0].memories as DatasourceMemory[], memoryChanges: [] };
             const [rows] = await tx.query('SELECT revision,state FROM analysis_state WHERE conversation_id=?', [g.conversationId]);
             const base = rows[0]?.revision ?? 0;
             const previous = rows[0]?.state as AnalysisState | undefined;
             const state = previous?.datasourceId === ds ? structuredClone(previous) : newAnalysisState(g.conversationId, ds, question);
             state.revision = base + 1;
             state.status = 'active';
-            const definitionChanges: string[] = [];
-            state.definitionRefs = state.definitionRefs.flatMap((ref) => {
-                const current = definitions.find((d) => d.id === ref.id && !d.needsReview);
-                if (!current || current.version !== ref.version) definitionChanges.push(`定义 ${ref.id} v${ref.version} 已变更或不可用，请重新确认当前问题的口径`);
-                return current ? [{ id: current.id, version: current.version }] : [];
+            const memoryChanges: string[] = [];
+            state.memoryRefs = state.memoryRefs.filter((ref) => {
+                const current = memories.find((d) => d.id === ref.id && d.version === ref.version);
+                if (!current) memoryChanges.push(`记忆 ${ref.id} v${ref.version} 已变更或不可用，请重新选择`);
+                return !!current;
             });
-            if (definitionChanges.length) {
+            if (memoryChanges.length) {
                 state.hypotheses = [];
-                state.openQuestions = [...definitionChanges, ...state.openQuestions].slice(0, 30);
+                state.openQuestions = [...memoryChanges, ...state.openQuestions].slice(0, 30);
             }
-            await tx.execute('INSERT INTO analysis_state_draft(generation_id,conversation_id,base_revision,revision,state,definitions) VALUES (?,?,?,?,?::jsonb,?::jsonb)', [
+            await tx.execute('INSERT INTO analysis_state_draft(generation_id,conversation_id,base_revision,revision,state,memories) VALUES (?,?,?,?,?::jsonb,?::jsonb)', [
                 g.id,
                 g.conversationId,
                 base,
                 state.revision,
                 JSON.stringify(state),
-                JSON.stringify(definitions),
+                JSON.stringify(memories),
             ]);
-            return { state, definitions, definitionChanges };
+            return { state, memories, memoryChanges };
         });
     }
     async save(g: GenerationIdentity, expected: number, state: AnalysisState): Promise<void> {

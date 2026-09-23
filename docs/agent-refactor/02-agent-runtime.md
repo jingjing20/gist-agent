@@ -41,9 +41,9 @@ submit_analysis 有四种出口：
 | update_analysis_state | expectedRevision、patch、reason，可选 mode=patch/start_new_task |
 | list_schema | 可选 offset、q，分页授权表目录 |
 | get_schema | table，可选 offset，读取单表字段页 |
-| list_business_definitions | 可选 offset、q，读取本轮固定定义目录 |
-| read_business_definitions | id，读取一个固定版本定义 |
-| propose_business_definition | content，可选 definitionId / expectedVersion；仅生成候选 |
+| list_memories | 可选 offset、q，读取本轮固定记忆目录 |
+| read_memory | id，读取一个固定版本记忆 |
+| propose_memory | content，可选 memoryId / expectedVersion；仅生成候选 |
 | execute_sql_query | title、sql、plan（purpose / expectedGrain / expectedShape），绑定已保存状态 |
 | list_analysis_evidence | 可选 offset，读取成功历史证据目录 |
 | read_query_artifact | queryArtifactId，可选 offset、mode=current/comparison |

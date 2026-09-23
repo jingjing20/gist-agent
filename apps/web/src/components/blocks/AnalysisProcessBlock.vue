@@ -144,7 +144,7 @@ const rawActivities = computed(() =>
         .map((block) => block.activity)
 );
 
-const mergeable = new Set<AnalysisActivityV1['kind']>(['inspect_catalog', 'inspect_definitions', 'inspect_schema']);
+const mergeable = new Set<AnalysisActivityV1['kind']>(['inspect_catalog', 'inspect_memory', 'inspect_schema']);
 const activities = computed(() => {
     const merged: AnalysisActivityV1[] = [];
     for (const activity of rawActivities.value) {

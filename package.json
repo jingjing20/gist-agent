@@ -24,7 +24,7 @@
         "init-db": "pnpm --filter @gist/api init-db",
         "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\"",
         "test:analysis-core": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && pnpm --filter @gist/api build && node scripts/analysis-core-regression.mjs",
-        "test:business-definitions": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/business-definition-regression.mjs",
+        "test:memories": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && node scripts/memory-regression.mjs",
         "test:analysis-state": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/worker build && node scripts/analysis-state-regression.mjs",
         "test:analysis-presentation": "pnpm --filter @gist/api build && node scripts/analysis-presentation-regression.mjs",
         "test:analysis-cutover": "pnpm --filter @gist/contracts build && pnpm --filter @gist/database build && pnpm --filter @gist/llm build && pnpm --filter @gist/worker build && pnpm --filter @gist/api build && node scripts/analysis-cutover-regression.mjs",

@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { AnalysisState, BusinessDefinition, QueryArtifactV1 } from '@gist/contracts';
+import type { AnalysisState, DatasourceMemory, QueryArtifactV1 } from '@gist/contracts';
 import { stableStringify } from '../chat/artifact.repository';
 import { exactKeys, record } from './submission';
 
@@ -11,8 +11,8 @@ export function newAnalysisState(conversationId: string, datasourceId: number, q
         revision,
         question,
         status: 'active',
-        definitionRefs: [],
-        temporaryDefinitions: [],
+        memoryRefs: [],
+        temporaryNotes: [],
         timeRange: null,
         comparisonRange: null,
         filters: [],
@@ -26,8 +26,8 @@ export function conditionSignature(state: AnalysisState): string {
     return stableStringify({
         taskId: state.taskId,
         datasourceId: state.datasourceId,
-        definitionRefs: [...state.definitionRefs].sort((a, b) => a.id.localeCompare(b.id)),
-        temporaryDefinitions: state.temporaryDefinitions,
+        memoryRefs: [...state.memoryRefs].sort((a, b) => a.id.localeCompare(b.id)),
+        temporaryNotes: state.temporaryNotes,
         timeRange: state.timeRange,
         comparisonRange: state.comparisonRange,
         filters: state.filters,
@@ -97,7 +97,7 @@ export async function patchAnalysisState(
     current: AnalysisState,
     args: Record<string, unknown>,
     deps: {
-        definitions: BusinessDefinition[];
+        memories: DatasourceMemory[];
         sourceMessageId: string;
         fieldAllowed(field: string): Promise<boolean>;
         validateEvidence(id: string, state: AnalysisState): Promise<void>;
@@ -108,21 +108,21 @@ export async function patchAnalysisState(
     text(args.reason);
     if (args.mode !== undefined && !['patch', 'start_new_task'].includes(String(args.mode))) throw new Error('状态模式无效');
     const patch = record(args.patch);
-    exactKeys(patch, ['question', 'definitionRefs', 'temporaryDefinitions', 'timeRange', 'comparisonRange', 'filters', 'grain', 'freshness', 'hypotheses', 'openQuestions']);
+    exactKeys(patch, ['question', 'memoryRefs', 'temporaryNotes', 'timeRange', 'comparisonRange', 'filters', 'grain', 'freshness', 'hypotheses', 'openQuestions']);
     const state = args.mode === 'start_new_task' ? newAnalysisState(current.conversationId, current.datasourceId, current.question, current.revision) : structuredClone(current);
     if (patch.question !== undefined) state.question = text(patch.question);
-    if (patch.definitionRefs !== undefined) {
-        state.definitionRefs = list(patch.definitionRefs).map((v) => {
+    if (patch.memoryRefs !== undefined) {
+        state.memoryRefs = list(patch.memoryRefs).map((v) => {
             const r = record(v);
             exactKeys(r, ['id', 'version']);
-            const d = deps.definitions.find((d) => d.id === r.id && d.version === r.version && !d.needsReview && d.status === 'active');
+            const d = deps.memories.find((d) => d.id === r.id && d.version === r.version && d.status === 'active');
             if (!d) throw new Error('定义不存在、版本过期或字段失效，请读取本轮定义目录');
             return { id: d.id, version: d.version };
         });
-        if (new Set(state.definitionRefs.map((d) => d.id)).size !== state.definitionRefs.length) throw new Error('定义引用重复');
+        if (new Set(state.memoryRefs.map((d) => d.id)).size !== state.memoryRefs.length) throw new Error('定义引用重复');
     }
-    if (patch.temporaryDefinitions !== undefined)
-        state.temporaryDefinitions = list(patch.temporaryDefinitions).map((v) => {
+    if (patch.temporaryNotes !== undefined)
+        state.temporaryNotes = list(patch.temporaryNotes).map((v) => {
             const d = record(v);
             exactKeys(d, ['name', 'description']);
             return { name: text(d.name), description: text(d.description), sourceMessageId: deps.sourceMessageId };
