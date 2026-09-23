@@ -1,74 +1,197 @@
 <template>
-    <main class="definitions">
-        <header>
-            <div>
-                <h1>记忆</h1>
-                <p>按数据源管理已保存记忆。修改在下一轮分析生效，历史版本会保留。</p>
-            </div>
-            <button :disabled="!canWrite || busy" @click="startEdit()">新增记忆</button>
-        </header>
-        <section class="filters">
-            <label
-                >数据源<select v-model="datasourceId" :disabled="busy">
-                    <option :value="0">请选择数据源</option>
-                    <option v-for="ds in sources.list" :key="ds.id" :value="ds.id">{{ ds.name }}</option>
-                </select></label
-            >
-            <label>搜索<input v-model="search" placeholder="标题或内容" @keyup.enter="refresh" /></label
-            ><button :disabled="!datasourceId || busy" @click="refresh">查询 / 刷新</button>
-        </section>
-        <p v-if="datasourceId && !canWrite">当前为只读；只有数据源所有者可以修改记忆和确认候选。</p>
-        <p v-if="error" role="alert" class="error">{{ error }}</p>
-        <p v-if="loading">正在读取…</p>
-        <section v-if="editing" class="editor">
-            <h2>{{ editing.id ? '修改记忆' : '新增记忆' }}</h2>
-            <p>保存即确认这条记忆，用于此数据源后续分析。</p>
-            <label>标题<input v-model="form.name" maxlength="200" /></label>
-            <label>内容<textarea v-model="form.description" rows="6" /></label>
-            <div class="actions"><button :disabled="busy" @click="save">确认保存</button><button :disabled="busy" @click="editing = null">取消</button></div>
-        </section>
-        <section v-if="candidates.length">
-            <h2>待确认候选</h2>
-            <p>候选尚未进入正式记忆。请检查完整内容后保存，或放弃。</p>
-            <article v-for="candidate in candidates" :key="candidate.id">
-                <h3>{{ candidate.content.name }}</h3>
-                <p>{{ candidate.content.description }}</p>
-                <p v-if="candidate.memoryId">修改现有记忆 · 目标版本 {{ candidate.expectedVersion }}</p>
-                <div class="actions">
-                    <button :disabled="busy" @click="decide(candidate, true)">保存到记忆</button><button :disabled="busy" @click="decide(candidate, false)">放弃</button>
+    <main class="memories-page dark h-full w-full overflow-auto bg-background px-6 py-10 text-foreground lg:px-14">
+        <div class="mx-auto max-w-6xl">
+            <header class="mb-8 flex flex-wrap items-start justify-between gap-6">
+                <div>
+                    <p class="mb-2 text-xs font-semibold tracking-widest text-blue-400">WORKSPACE / MEMORY</p>
+                    <h1 class="mb-2 text-3xl font-semibold tracking-tight">记忆</h1>
+                    <p class="text-sm leading-6 text-muted-foreground">按数据源管理已保存记忆。修改在下一轮分析生效，历史版本会保留。</p>
                 </div>
-            </article>
-        </section>
-        <section>
-            <h2>已保存记忆</h2>
-            <p v-if="!loading && !items.length">暂无匹配的记忆。</p>
-            <article v-for="item in items" :key="item.id">
-                <h3>
-                    {{ item.name }} <small>v{{ item.version }}</small>
-                </h3>
-                <p>{{ item.description }}</p>
-                <div class="actions">
-                    <button :disabled="!canWrite || busy" @click="startEdit(item)">修改</button><button :disabled="!canWrite || busy" @click="deleting = item">删除</button
-                    ><button :disabled="busy" @click="openHistory(item)">历史版本</button>
+                <Button :disabled="!canWrite || busy" class="mt-3" @click="startEdit()"><Plus class="size-4" />新增记忆</Button>
+            </header>
+
+            <section class="mb-9 flex flex-wrap items-end gap-4 rounded-xl border border-border bg-card p-5" aria-label="筛选记忆">
+                <div class="grid w-full gap-2 sm:w-64">
+                    <label id="source-label" class="text-sm font-medium">数据源</label>
+                    <Select :model-value="datasourceId ? String(datasourceId) : undefined" :disabled="busy" @update:model-value="selectSource">
+                        <SelectTrigger class="w-full" aria-labelledby="source-label"><SelectValue placeholder="请选择数据源" /></SelectTrigger>
+                        <SelectContent class="memory-ui dark"
+                            ><SelectItem v-for="ds in sources.list" :key="ds.id" :value="String(ds.id)">{{ ds.name }}</SelectItem></SelectContent
+                        >
+                    </Select>
                 </div>
-            </article>
-            <button v-if="nextCursor" :disabled="loading || busy" @click="load(true)">加载更多</button>
-        </section>
-        <section v-if="deleting" class="editor" role="alertdialog" aria-label="确认删除记忆">
-            <p>删除“{{ deleting.name }}”后，后续分析不再默认使用；历史版本仍保留。</p>
-            <button :disabled="busy" @click="remove">确认删除</button><button :disabled="busy" @click="deleting = null">取消</button>
-        </section>
-        <section v-if="history" class="editor">
-            <h2>{{ history.name }} · 历史版本</h2>
-            <label>版本<input v-model.number="historyVersion" type="number" min="1" :max="historyMax" /></label><button @click="readHistory">读取版本</button
-            ><button @click="history = null">关闭</button>
-            <p>{{ history.description }}</p>
-            <p>v{{ history.version }} · {{ history.status === 'deleted' ? '已删除' : '有效记录' }}</p>
-        </section>
+                <div class="grid w-full gap-2 sm:w-80">
+                    <label for="memory-search" class="text-sm font-medium">搜索</label>
+                    <div class="relative">
+                        <Search class="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" /><Input
+                            id="memory-search"
+                            v-model="search"
+                            class="pl-9"
+                            placeholder="搜索标题或内容"
+                            @keyup.enter="refresh"
+                        />
+                    </div>
+                </div>
+                <Button variant="secondary" :disabled="!datasourceId || busy" @click="refresh"><Search class="size-4" />查询</Button>
+            </section>
+            <p v-if="datasourceId && !canWrite" class="mb-6 rounded-lg border border-border p-3 text-sm text-muted-foreground">
+                当前为只读；只有数据源所有者可以修改记忆和确认候选。
+            </p>
+            <p v-if="error" role="alert" class="mb-6 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{{ error }}</p>
+
+            <section v-if="candidates.length" class="mb-10">
+                <div class="mb-4">
+                    <h2 class="text-lg font-semibold">
+                        待确认候选 <Badge variant="secondary">{{ candidates.length }}</Badge>
+                    </h2>
+                    <p class="mt-1 text-sm text-muted-foreground">检查完整内容后保存到记忆，或放弃候选。</p>
+                </div>
+                <div class="grid gap-3">
+                    <article
+                        v-for="candidate in candidates"
+                        :key="candidate.id"
+                        class="flex flex-wrap items-center justify-between gap-5 rounded-xl border border-border bg-card p-5"
+                    >
+                        <div class="min-w-0 flex-1">
+                            <h3 class="font-medium">{{ candidate.content.name }}</h3>
+                            <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{{ candidate.content.description }}</p>
+                            <p v-if="candidate.memoryId" class="mt-2 text-xs text-muted-foreground">修改现有记忆 · 目标版本 {{ candidate.expectedVersion }}</p>
+                        </div>
+                        <div class="flex gap-2">
+                            <Button variant="outline" :disabled="busy" @click="decide(candidate, false)">放弃</Button
+                            ><Button :disabled="busy" @click="decide(candidate, true)">保存到记忆</Button>
+                        </div>
+                    </article>
+                </div>
+            </section>
+
+            <section>
+                <div class="mb-4 flex items-center justify-between">
+                    <div>
+                        <h2 class="text-lg font-semibold">
+                            已保存记忆 <Badge v-if="items.length" variant="secondary">{{ items.length }}{{ nextCursor ? '+' : '' }}</Badge>
+                        </h2>
+                        <p class="mt-1 text-sm text-muted-foreground">查看、修改和管理此数据源的记忆。</p>
+                    </div>
+                    <span v-if="loading" class="text-sm text-muted-foreground">正在读取…</span>
+                </div>
+                <div class="overflow-hidden rounded-xl border border-border bg-card">
+                    <Table class="min-w-[760px] table-fixed"
+                        ><TableHeader
+                            ><TableRow class="bg-muted/50"
+                                ><TableHead class="w-[19%] pl-5">标题</TableHead><TableHead class="w-[45%]">内容</TableHead><TableHead class="w-[9%]">版本</TableHead
+                                ><TableHead class="w-[27%] pr-5 text-right">操作</TableHead></TableRow
+                            ></TableHeader
+                        >
+                        <TableBody
+                            ><TableRow v-for="item in items" :key="item.id"
+                                ><TableCell class="break-words pl-5 font-medium whitespace-normal">{{ item.name }}</TableCell
+                                ><TableCell class="text-muted-foreground whitespace-normal"
+                                    ><span class="line-clamp-2 whitespace-pre-wrap break-words">{{ item.description }}</span></TableCell
+                                ><TableCell
+                                    ><Badge variant="outline">v{{ item.version }}</Badge></TableCell
+                                ><TableCell class="pr-5"
+                                    ><div class="flex justify-end gap-1">
+                                        <Button variant="ghost" size="sm" @click="viewing = item">查看</Button
+                                        ><Button variant="ghost" size="sm" :disabled="!canWrite || busy" @click="startEdit(item)">修改</Button
+                                        ><Button variant="ghost" size="sm" :disabled="busy" @click="openHistory(item)">历史</Button
+                                        ><Button variant="ghost" size="sm" class="text-red-400 hover:text-red-300" :disabled="!canWrite || busy" @click="deleting = item"
+                                            >删除</Button
+                                        >
+                                    </div></TableCell
+                                ></TableRow
+                            >
+                            <TableEmpty v-if="!loading && !items.length" :colspan="4"
+                                ><div class="flex flex-col items-center gap-2 text-muted-foreground">
+                                    <BookOpen class="size-7" /><strong class="text-foreground">{{ datasourceId ? '暂无匹配的记忆' : '请选择数据源' }}</strong
+                                    ><span>{{ datasourceId ? '可以调整搜索词，或新增一条记忆。' : '选择数据源后查看和管理记忆。' }}</span>
+                                </div></TableEmpty
+                            >
+                        </TableBody></Table
+                    >
+                    <div v-if="nextCursor" class="border-t border-border p-4 text-center">
+                        <Button variant="outline" :disabled="loading || busy" @click="load(true)">加载更多</Button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <Dialog :open="!!editing" @update:open="closeEditing"
+            ><DialogContent class="memory-ui dark sm:max-w-xl"
+                ><DialogHeader
+                    ><DialogTitle>{{ editing?.id ? '修改记忆' : '新增记忆' }}</DialogTitle
+                    ><DialogDescription>保存即确认这条记忆，用于此数据源后续分析。</DialogDescription></DialogHeader
+                >
+                <div class="grid gap-3">
+                    <label for="memory-name" class="text-sm font-medium">标题</label><Input id="memory-name" v-model="form.name" maxlength="200" /><label
+                        for="memory-description"
+                        class="text-sm font-medium"
+                        >内容</label
+                    ><Textarea id="memory-description" v-model="form.description" rows="7" />
+                </div>
+                <DialogFooter
+                    ><Button variant="outline" :disabled="busy" @click="editing = null">取消</Button><Button :disabled="busy" @click="save">确认保存</Button></DialogFooter
+                ></DialogContent
+            ></Dialog
+        >
+        <Dialog :open="!!viewing" @update:open="closeViewing"
+            ><DialogContent class="memory-ui dark sm:max-w-xl"
+                ><DialogHeader
+                    ><DialogTitle>{{ viewing?.name }}</DialogTitle
+                    ><DialogDescription>当前版本 v{{ viewing?.version }}</DialogDescription></DialogHeader
+                >
+                <div class="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words text-sm leading-7">{{ viewing?.description }}</div>
+                <DialogFooter
+                    ><Button variant="outline" @click="viewing = null">关闭</Button><Button :disabled="!canWrite || busy" @click="editViewed">修改记忆</Button></DialogFooter
+                ></DialogContent
+            ></Dialog
+        >
+        <AlertDialog :open="!!deleting" @update:open="closeDeleting"
+            ><AlertDialogContent class="memory-ui dark"
+                ><AlertDialogHeader
+                    ><AlertDialogTitle>删除记忆？</AlertDialogTitle
+                    ><AlertDialogDescription>删除“{{ deleting?.name }}”后，后续分析不再默认使用；历史版本仍保留。</AlertDialogDescription></AlertDialogHeader
+                ><AlertDialogFooter
+                    ><AlertDialogCancel :disabled="busy">取消</AlertDialogCancel><Button variant="destructive" :disabled="busy" @click="remove">确认删除</Button></AlertDialogFooter
+                ></AlertDialogContent
+            ></AlertDialog
+        >
+        <Dialog :open="!!history" @update:open="closeHistory"
+            ><DialogContent class="memory-ui dark sm:max-w-xl"
+                ><DialogHeader
+                    ><DialogTitle>{{ history?.name }} · 历史版本</DialogTitle><DialogDescription>选择版本查看当时保存的内容。</DialogDescription></DialogHeader
+                >
+                <div class="grid gap-4">
+                    <div class="flex items-end gap-3">
+                        <div class="grid w-28 gap-2">
+                            <label for="history-version" class="text-sm font-medium">版本</label
+                            ><Input id="history-version" v-model.number="historyVersion" type="number" min="1" :max="historyMax" />
+                        </div>
+                        <Button variant="outline" :disabled="busy" @click="readHistory">读取版本</Button>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <Badge variant="outline">v{{ history?.version }}</Badge
+                        ><span class="text-sm text-muted-foreground">{{ history?.status === 'deleted' ? '已删除' : '有效记录' }}</span>
+                    </div>
+                    <div class="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words text-sm leading-7">{{ history?.description }}</div>
+                </div>
+                <DialogFooter><Button variant="outline" @click="history = null">关闭</Button></DialogFooter></DialogContent
+            ></Dialog
+        >
     </main>
 </template>
+
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { BookOpen, Plus, Search } from '@lucide/vue';
 import { apiFetch } from '../api';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
@@ -84,12 +207,28 @@ const items = ref<DatasourceMemory[]>([]),
     candidates = ref<MemoryCandidate[]>([]),
     nextCursor = ref<string | null>(null);
 const editing = ref<{ id?: string; version?: number } | null>(null),
+    viewing = ref<DatasourceMemory | null>(null),
     deleting = ref<DatasourceMemory | null>(null),
     history = ref<DatasourceMemory | null>(null),
     historyVersion = ref(1),
     historyMax = ref(1);
 const canWrite = computed(() => !!datasourceId.value && sources.list.find((s) => s.id === datasourceId.value)?.created_by === auth.user?.id);
 const form = reactive({ name: '', description: '' });
+function closeEditing(open: boolean) {
+    if (!open && !busy.value) editing.value = null;
+}
+function closeViewing(open: boolean) {
+    if (!open) viewing.value = null;
+}
+function closeDeleting(open: boolean) {
+    if (!open && !busy.value) deleting.value = null;
+}
+function closeHistory(open: boolean) {
+    if (!open) history.value = null;
+}
+function selectSource(value: string | number | bigint | Record<string, unknown> | null | undefined) {
+    datasourceId.value = Number(value || 0);
+}
 async function request(url: string, method = 'GET', body?: unknown) {
     const res = await apiFetch(url, { method, ...(body ? { body: JSON.stringify(body) } : {}) });
     if (!res.ok) {
@@ -129,6 +268,7 @@ watch(datasourceId, () => {
     candidates.value = [];
     nextCursor.value = null;
     editing.value = null;
+    viewing.value = null;
     deleting.value = null;
     history.value = null;
     loading.value = false;
@@ -141,6 +281,12 @@ onMounted(async () => {
 function startEdit(item?: DatasourceMemory) {
     editing.value = item ? { id: item.id, version: item.version } : {};
     Object.assign(form, { name: item?.name ?? '', description: item?.description ?? '' });
+}
+function editViewed() {
+    const item = viewing.value;
+    if (!item) return;
+    viewing.value = null;
+    startEdit(item);
 }
 async function mutate(fn: () => Promise<unknown>) {
     busy.value = true;
@@ -194,95 +340,3 @@ async function readHistory() {
     }
 }
 </script>
-<style scoped>
-.definitions {
-    width: 100%;
-    overflow: auto;
-    padding: 28px;
-    max-width: 1200px;
-    margin: auto;
-    height: 100%;
-    box-sizing: border-box;
-}
-header,
-.filters,
-.actions {
-    display: flex;
-    gap: 16px;
-    align-items: center;
-    flex-wrap: wrap;
-}
-header {
-    justify-content: space-between;
-}
-h1 {
-    margin: 0;
-}
-p {
-    color: var(--da-text-muted);
-    line-height: 1.6;
-}
-h2 {
-    margin-top: 28px;
-}
-label {
-    display: flex;
-    flex-direction: column;
-    gap: 7px;
-    margin: 12px 0;
-}
-input,
-textarea,
-select,
-button {
-    font: inherit;
-    padding: 9px 12px;
-    border-radius: 6px;
-    border: 1px solid var(--da-border);
-    background: var(--da-bg);
-    color: var(--da-text-main);
-}
-button {
-    cursor: pointer;
-}
-button:disabled {
-    opacity: 0.45;
-    cursor: default;
-}
-article,
-.editor {
-    border: 1px solid var(--da-border);
-    background: var(--da-panel);
-    border-radius: 12px;
-    padding: 20px;
-    margin: 16px 0;
-}
-.metric-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 12px;
-}
-.error {
-    color: #f87171;
-}
-small {
-    font-weight: normal;
-    color: var(--da-text-muted);
-}
-dl {
-    display: grid;
-    grid-template-columns: 100px 1fr;
-    gap: 8px;
-}
-dt {
-    color: var(--da-text-muted);
-}
-dd {
-    margin: 0;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-}
-textarea {
-    resize: vertical;
-}
-</style>

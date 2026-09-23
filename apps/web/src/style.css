@@ -1,122 +1,198 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@layer theme, base, components, utilities;
+@import 'tailwindcss/theme';
+@import 'tailwindcss/utilities';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
 
 :root {
-  --bg-primary: #0f0f13;
-  --bg-secondary: #1a1a23;
-  --bg-sidebar: #13131a;
-  --bg-hover: #22222e;
-  --bg-active: #2a2a3a;
-  --bg-code: #1e1e2e;
-  --bg-code-header: #16161f;
-  --border: #2a2a3a;
-  --border-light: #1f1f2e;
-  --text-primary: #e4e4e7;
-  --text-secondary: #71717a;
-  --accent: #0ea5e9;
-  --accent-hover: #0284c7;
-  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --bg-primary: #0f0f13;
+    --bg-secondary: #1a1a23;
+    --bg-sidebar: #13131a;
+    --bg-hover: #22222e;
+    --bg-active: #2a2a3a;
+    --bg-code: #1e1e2e;
+    --bg-code-header: #16161f;
+    --border: #2a2a3a;
+    --border-light: #1f1f2e;
+    --text-primary: #e4e4e7;
+    --text-secondary: #71717a;
+    --accent: #0ea5e9;
+    --accent-hover: #0284c7;
+    --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
 
-  /* Gist Agent Theme Variables */
-  --da-bg: #171a25;
-  --da-panel: #1e2330;
-  --da-card: #252b3b;
-  --da-border: #333a4d;
-  --da-text-main: #e2e8f0;
-  --da-text-muted: #94a3b8;
-  --da-primary: #0ea5e9;
-  --da-primary-hover: #0284c7;
-  --da-gradient-start: #8b5cf6;
-  --da-gradient-end: #3b82f6;
-  --da-chart-bg: #1a1f2e;
+    /* Gist Agent Theme Variables */
+    --da-bg: #171a25;
+    --da-panel: #1e2330;
+    --da-card: #252b3b;
+    --da-border: #333a4d;
+    --da-text-main: #e2e8f0;
+    --da-text-muted: #94a3b8;
+    --da-primary: #0ea5e9;
+    --da-primary-hover: #0284c7;
+    --da-gradient-start: #8b5cf6;
+    --da-gradient-end: #3b82f6;
+    --da-chart-bg: #1a1f2e;
+    --radius: 0.625rem;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+@layer base {
+    *,
+    *::before,
+    *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+    }
+
+    /* shadcn-vue controls need the form resets supplied by Tailwind preflight.
+       Scope them to the memory UI so other pages keep their existing styles. */
+    :where(.memories-page, .memory-ui) :where(button, input, textarea) {
+        font: inherit;
+        color: inherit;
+        background: transparent;
+    }
 }
 
-html, body {
-  height: 100%;
-  font-family: var(--font-family);
-  background: var(--bg-primary); /* Keeps old default, ChatView will force its own bg */
-  color: var(--text-primary);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+html,
+body {
+    height: 100%;
+    font-family: var(--font-family);
+    background: var(--bg-primary); /* Keeps old default, ChatView will force its own bg */
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
-  height: 100%;
+    height: 100%;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
+    width: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: transparent;
+    background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+    background: var(--border);
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+    background: var(--text-secondary);
 }
 
 /* highlight.js theme overrides for dark mode */
 .hljs {
-  background: transparent !important;
-  color: #e4e4e7;
+    background: transparent !important;
+    color: #e4e4e7;
 }
-.hljs-keyword { color: #c792ea; }
-.hljs-string { color: #c3e88d; }
-.hljs-number { color: #f78c6c; }
-.hljs-built_in { color: #82aaff; }
-.hljs-title { color: #82aaff; }
-.hljs-comment { color: #546e7a; }
+.hljs-keyword {
+    color: #c792ea;
+}
+.hljs-string {
+    color: #c3e88d;
+}
+.hljs-number {
+    color: #f78c6c;
+}
+.hljs-built_in {
+    color: #82aaff;
+}
+.hljs-title {
+    color: #82aaff;
+}
+.hljs-comment {
+    color: #546e7a;
+}
 
 /* Global Modal Styles */
 .modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
 }
 
 .modal-close {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
-  border: none;
-  background: transparent;
-  color: var(--da-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  transition: all 0.2s;
-  z-index: 10;
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--da-text-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    transition: all 0.2s;
+    z-index: 10;
 }
 
 .modal-close:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
+    background: rgba(255, 255, 255, 0.05);
+    color: #fff;
 }
 
 .da-modal {
-  position: relative;
+    position: relative;
 }
 
+@theme inline {
+    --font-heading: var(--font-sans);
+    --color-ring: var(--ring);
+    --color-input: var(--input);
+    --color-border: var(--border);
+    --color-destructive: var(--destructive);
+    --color-accent-foreground: var(--accent-foreground);
+    --color-accent: var(--accent);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-muted: var(--muted);
+    --color-secondary-foreground: var(--secondary-foreground);
+    --color-secondary: var(--secondary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-primary: var(--primary);
+    --color-popover-foreground: var(--popover-foreground);
+    --color-popover: var(--popover);
+    --color-card-foreground: var(--card-foreground);
+    --color-card: var(--card);
+    --color-foreground: var(--foreground);
+    --color-background: var(--background);
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: calc(var(--radius) + 4px);
+}
+
+.dark {
+    --background: #171a25;
+    --foreground: #e2e8f0;
+    --card: #1e2330;
+    --card-foreground: #e2e8f0;
+    --popover: #252b3b;
+    --popover-foreground: #e2e8f0;
+    --primary: #3b82f6;
+    --primary-foreground: #fff;
+    --secondary: #30394b;
+    --secondary-foreground: #e2e8f0;
+    --muted: #2a3343;
+    --muted-foreground: #94a3b8;
+    --accent: #37465f;
+    --accent-foreground: #e2e8f0;
+    --destructive: #dc2626;
+    --border: #333a4d;
+    --input: #3b4559;
+    --ring: #60a5fa;
+}
