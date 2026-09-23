@@ -1,0 +1,169 @@
+apps/web/src/components/ui/textarea/index.ts
+  72faeafb3e510982 1
+apps/web/src/components/ui/table/Table.vue
+  72faeafb3e510982 1-16
+apps/web/tsconfig.app.json
+  72faeafb3e510982 16-17
+apps/web/src/components/ui/alert-dialog/AlertDialogFooter.vue
+  72faeafb3e510982 1-22
+apps/web/tsconfig.json
+  72faeafb3e510982 3
+apps/web/src/views/MemoriesView.vue
+  72faeafb3e510982 2-8,10-21,23-180,183,186-194,210,217-231,271,285-290
+apps/web/src/components/ui/dialog/Dialog.vue
+  72faeafb3e510982 1-19
+apps/web/src/components/ui/select/Select.vue
+  72faeafb3e510982 1-19
+apps/web/src/components/ui/select/SelectLabel.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/table/TableFooter.vue
+  72faeafb3e510982 1-17
+apps/web/src/lib/utils.ts
+  72faeafb3e510982 1-7
+apps/web/src/components/ui/input/Input.vue
+  72faeafb3e510982 1-31
+apps/web/src/components/ui/dialog/DialogTitle.vue
+  72faeafb3e510982 1-23
+apps/web/src/components/ui/select/SelectGroup.vue
+  72faeafb3e510982 1-21
+apps/web/src/components/ui/alert-dialog/index.ts
+  72faeafb3e510982 1-10
+apps/web/src/components/ui/select/SelectTrigger.vue
+  72faeafb3e510982 1-34
+apps/web/src/components/ui/select/SelectScrollDownButton.vue
+  72faeafb3e510982 1-27
+apps/web/src/components/ui/badge/index.ts
+  72faeafb3e510982 1-24
+apps/web/src/components/ui/dialog/DialogClose.vue
+  72faeafb3e510982 1-15
+apps/web/src/components/ui/alert-dialog/AlertDialogCancel.vue
+  72faeafb3e510982 1-37
+apps/web/src/components/ui/table/TableRow.vue
+  72faeafb3e510982 1-17
+apps/web/package.json
+  72faeafb3e510982 14-17,22-23,29-30,32-33
+apps/web/src/components/ui/table/index.ts
+  72faeafb3e510982 1-9
+apps/web/src/components/ui/table/TableBody.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/alert-dialog/AlertDialog.vue
+  72faeafb3e510982 1-15
+apps/web/src/components/ui/alert-dialog/AlertDialogMedia.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/select/SelectItemText.vue
+  72faeafb3e510982 1-15
+apps/web/src/components/ui/dialog/DialogOverlay.vue
+  72faeafb3e510982 1-21
+apps/web/src/components/ui/button/index.ts
+  72faeafb3e510982 1-35
+apps/web/src/components/ui/table/TableHead.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/badge/Badge.vue
+  72faeafb3e510982 1-27
+apps/web/src/components/ui/dialog/DialogDescription.vue
+  72faeafb3e510982 1-23
+apps/web/src/components/ui/alert-dialog/AlertDialogHeader.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/alert-dialog/AlertDialogContent.vue
+  72faeafb3e510982 1-53
+apps/web/src/components/ui/dialog/DialogScrollContent.vue
+  72faeafb3e510982 1-60
+apps/web/src/components/ui/dialog/index.ts
+  72faeafb3e510982 1-10
+apps/web/src/components/ui/table/TableHeader.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/textarea/Textarea.vue
+  72faeafb3e510982 1-28
+apps/web/src/components/ui/select/SelectValue.vue
+  72faeafb3e510982 1-15
+apps/web/src/components/ui/select/SelectScrollUpButton.vue
+  72faeafb3e510982 1-27
+apps/web/src/components/ui/button/Button.vue
+  72faeafb3e510982 1-31
+apps/web/src/components/ui/alert-dialog/AlertDialogTitle.vue
+  72faeafb3e510982 1-21
+apps/web/vite.config.ts
+  72faeafb3e510982 3-4,8-9
+apps/web/src/components/ui/dialog/DialogFooter.vue
+  72faeafb3e510982 1-27
+apps/web/src/components/ui/table/TableCell.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/dialog/DialogTrigger.vue
+  72faeafb3e510982 1-15
+apps/web/src/components/ui/table/TableCaption.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/alert-dialog/AlertDialogAction.vue
+  72faeafb3e510982 1-33
+apps/web/src/style.css
+  72faeafb3e510982 2-7,10-65,69,73,77,81-82,86,91-110,115-122,126-141,145-146,150-176,179-198
+apps/web/src/components/ui/alert-dialog/AlertDialogTrigger.vue
+  72faeafb3e510982 1-12
+apps/web/src/components/ui/select/SelectItem.vue
+  72faeafb3e510982 1-45
+apps/web/src/components/ui/select/SelectSeparator.vue
+  72faeafb3e510982 1-19
+apps/web/src/components/ui/dialog/DialogContent.vue
+  72faeafb3e510982 1-53
+apps/web/src/components/ui/dialog/DialogHeader.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/select/index.ts
+  72faeafb3e510982 1-11
+apps/web/components.json
+  72faeafb3e510982 1-24
+apps/web/src/components/ui/alert-dialog/AlertDialogDescription.vue
+  72faeafb3e510982 1-23
+apps/web/src/components/ui/input/index.ts
+  72faeafb3e510982 1
+apps/web/src/components/ui/table/TableEmpty.vue
+  72faeafb3e510982 1-34
+apps/web/src/components/ui/select/SelectContent.vue
+  72faeafb3e510982 1-58
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "f73fe9f293a3a77367d674fb734ce619fa0d6511",
+  "prompts": {
+    "0e7e6acb8ee683c1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cd5a-7ff9-7312-9470-110c9951ed38",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/23/rollout-2026-09-23T16-20-55-01a0cd5a-7ff9-7312-9470-110c9951ed38.jsonl",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "72faeafb3e510982": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdae-49b6-7b40-9671-872eecd42291",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/23/rollout-2026-09-23T17-52-26-01a0cdae-49b6-7b40-9671-872eecd42291.jsonl",
+      "total_additions": 1997,
+      "total_deletions": 1402,
+      "accepted_lines": 1626,
+      "overriden_lines": 0
+    },
+    "c4154ae33f8753c5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c82f-10a7-70c0-9c52-cdc1e0dfa050",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
