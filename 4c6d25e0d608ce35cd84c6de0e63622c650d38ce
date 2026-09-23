@@ -1,0 +1,107 @@
+scripts/memory-regression.mjs
+  0e7e6acb8ee683c1 4,13-16,28-29,34-47,52-54,71-74,81,88,109-113,119-120,181,196-214
+apps/web/src/components/MemoryContent.vue
+  0e7e6acb8ee683c1 11-13
+apps/worker/src/analysis/propose-memory-tool.ts
+  0e7e6acb8ee683c1 1,6-7,12,20-21,23,30,33-34,43,48
+DEPLOY.md
+  0e7e6acb8ee683c1 69,76
+packages/database/src/index.ts
+  0e7e6acb8ee683c1 198-199
+apps/web/src/components/blocks/AnalysisBlock.vue
+  0e7e6acb8ee683c1 86-87,89-91,146,148-150,153,160,170,257,270-271,278,282-284,286
+packages/contracts/src/analysis.ts
+  0e7e6acb8ee683c1 6,47,58-59,71
+apps/web/src/components/blocks/AnalysisProcessBlock.vue
+  0e7e6acb8ee683c1 147
+apps/web/src/router/index.ts
+  0e7e6acb8ee683c1 58,61
+docs/agent-refactor/02-agent-runtime.md
+  0e7e6acb8ee683c1 44-46
+apps/worker/src/analysis/analysis-activity.ts
+  0e7e6acb8ee683c1 12-13,116-118,121,144-146
+packages/database/src/memory-repository.ts
+  0e7e6acb8ee683c1 1,5,15,18-19,24,27-30,35-36,38-39,52,58,68,70,73-74,80,90,96,100,103-104,108,110,117,122,127-129,131,133,141,153-161,163-167,172,176,178,181,183,188-191,193,199,201-204,206-207,209,211,213,216,218,222,231-232,241,245,249,253-254,256,258,264
+package.json
+  0e7e6acb8ee683c1 27
+docs/career/resume-highlights.md
+  0e7e6acb8ee683c1 22
+scripts/analysis-core-regression.mjs
+  0e7e6acb8ee683c1 63-64,427,455
+apps/web/src/views/MemoriesView.vue
+  0e7e6acb8ee683c1 8,17-24,32-36,44,57,75,83-88,97,111-115,141,160-162,173-180,190
+scripts/migrate-database.mjs
+  0e7e6acb8ee683c1 13-15,50-54,69-71,78
+apps/worker/src/analysis/analysis-tools.ts
+  0e7e6acb8ee683c1 3,47,51,86,96,105,159,183,218,222,234,236-237
+scripts/analysis-state-regression.mjs
+  0e7e6acb8ee683c1 30-31,57,101,106,109,112,116,125,134,184,187,191-192,195,200,251,273,295,299,521,529,533,564-565,568
+apps/web/src/views/MainLayout.vue
+  0e7e6acb8ee683c1 14,89
+apps/worker/src/analysis/analysis-agent.ts
+  0e7e6acb8ee683c1 155-156,161
+README.md
+  0e7e6acb8ee683c1 20-21,88
+docs/agent-refactor/01-product-and-decisions.md
+  0e7e6acb8ee683c1 3,18-21
+apps/api/src/memory/memory.module.ts
+  0e7e6acb8ee683c1 1-7,9-25,28-29,31-37,39-42,44-48,50-53,55-59,61,63-67,69-77,79
+apps/api/src/app.module.ts
+  0e7e6acb8ee683c1 2,15
+packages/database/src/schema.ts
+  0e7e6acb8ee683c1 2,203
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  0e7e6acb8ee683c1 5,18,24-25,30,35,100,102-105,110,122,125,162,195,262,294,296-297,306,308,373
+docs/agent-refactor/03-datasource-memory-and-state.md
+  0e7e6acb8ee683c1 1-17
+packages/database/src/memory-schema.ts
+  0e7e6acb8ee683c1 1-46
+docs/agent-refactor/05-delivery-and-validation.md
+  0e7e6acb8ee683c1 2,13,30
+apps/worker/src/analysis/analysis-state.ts
+  0e7e6acb8ee683c1 2,14-15,29-30,100,111,114-115,118,122,124-125
+packages/contracts/src/index.ts
+  0e7e6acb8ee683c1 37,267
+packages/database/src/analysis-state-schema.ts
+  0e7e6acb8ee683c1 17
+packages/contracts/src/memory.ts
+  0e7e6acb8ee683c1 1,5,17,21-22
+docs/agent-refactor/04-context-and-evidence.md
+  0e7e6acb8ee683c1 7,23,25,27,29,91,95
+apps/worker/src/analysis/analysis-state.repository.ts
+  0e7e6acb8ee683c1 1,20-21,24-25,32-36,38,40,42,48,50
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "4c6d25e0d608ce35cd84c6de0e63622c650d38ce",
+  "prompts": {
+    "0e7e6acb8ee683c1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cd5a-7ff9-7312-9470-110c9951ed38",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/23/rollout-2026-09-23T16-20-55-01a0cd5a-7ff9-7312-9470-110c9951ed38.jsonl",
+      "total_additions": 1659,
+      "total_deletions": 1337,
+      "accepted_lines": 514,
+      "overriden_lines": 14
+    },
+    "c4154ae33f8753c5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c82f-10a7-70c0-9c52-cdc1e0dfa050",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
