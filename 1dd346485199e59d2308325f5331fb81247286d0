@@ -1,0 +1,155 @@
+apps/web/src/components/blocks/AnalysisBlock.vue
+  8d1627722e6e1a76 3,8-36,38-127,132-133,139-142,161,167-168,180,187-202,301-302,304-396,398-459,461-484,489-499,510,528-531,549-559
+apps/web/src/utils/analysis-activity.js
+  894af752d9626c3f 1-3,11-13
+  bbdeaf6acd357c5a 10
+  a43ec5ace26396a0 4-9
+scripts/analysis-core-regression.mjs
+  bbdeaf6acd357c5a 9,103-142
+  8d1627722e6e1a76 7,171,174,218-257,281-282,288,291-297,330,336
+  894af752d9626c3f 3,8,78-102,143-163,201-206,275-279
+  a43ec5ace26396a0 164-170,172-173,175-178
+apps/web/src/components/blocks/AnalysisProcessBlock.vue
+  894af752d9626c3f 1-44,52-141,145-339,356-486
+  bbdeaf6acd357c5a 45-51,340-355
+  fa474e604b31c212 142-144
+apps/worker/src/chat/tools/sql-query.tool.ts
+  894af752d9626c3f 70,152-158,187-192
+packages/contracts/src/analysis.ts
+  8d1627722e6e1a76 19-20,26-30,32,34-35
+apps/web/src/components/ChatMessageItem.vue
+  894af752d9626c3f 15,20,22,36,38,52-59,61,66-69,72-75,78-80,117-126,201-223
+  8d1627722e6e1a76 70-71,76-77,96
+  a43ec5ace26396a0 21,62
+apps/web/src/stores/chat.ts
+  894af752d9626c3f 66-77,201-212,227-231,275,277,347-368,398
+apps/web/src/components/ChatDetail.vue
+  894af752d9626c3f 18-21,77-81,109,165-186
+apps/web/src/utils/analysis-activity.d.ts
+  894af752d9626c3f 1-3
+apps/worker/src/analysis/submission.ts
+  8d1627722e6e1a76 34,39-57,59,68,70-112,121-155,159,194-212,221-222,225-227,229-230
+  a43ec5ace26396a0 175
+packages/contracts/src/index.ts
+  8d1627722e6e1a76 12
+  894af752d9626c3f 37-42,48-59,62-72,234-250
+  bbdeaf6acd357c5a 43-47,60-61
+apps/web/src/types/index.ts
+  894af752d9626c3f 1,26-41,52,54-55,71,73
+apps/worker/src/chat/tools/base-tool.ts
+  894af752d9626c3f 18-20,45
+apps/web/src/components/ChatInput.vue
+  894af752d9626c3f 27
+apps/worker/src/analysis/analysis-agent.ts
+  8d1627722e6e1a76 39,44-46,58,60-61,68-74,118,129,136,179,182-192,232-233,276,280-283
+  894af752d9626c3f 5-6,167-173,204-205,217,226-229,250
+apps/api/src/conversation/conversation.service.ts
+  894af752d9626c3f 22-24,62-69
+apps/worker/src/analysis/analysis-activity.ts
+  bbdeaf6acd357c5a 1,36-39,171,173-181,183,186,190-191
+  894af752d9626c3f 2-35,40-170,172,182,184-185,187-189,192-215
+apps/worker/src/chat/agents/sql-executor.ts
+  894af752d9626c3f 21-22,177-178,185-186,190-197
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  894af752d9626c3f 126-136
+  8d1627722e6e1a76 34,36,41-60,211-238,346-354
+apps/web/src/components/blocks/TableBlock.vue
+  894af752d9626c3f 29,36-46,49
+apps/worker/src/chat/result-quality.ts
+  bbdeaf6acd357c5a 17-18,23-26,33-36,46-53,70-73
+scripts/analysis-failure-regression.mjs
+  8d1627722e6e1a76 92,103-104,106
+apps/web/src/components/blocks/AnalysisArtifactTable.vue
+  8d1627722e6e1a76 1-179
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.34",
+  "base_commit_sha": "1dd346485199e59d2308325f5331fb81247286d0",
+  "prompts": {
+    "894af752d9626c3f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c87a-e8cd-7ed0-8558-97d298776485",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1450,
+      "total_deletions": 425,
+      "accepted_lines": 1027,
+      "overriden_lines": 0
+    },
+    "8d1627722e6e1a76": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cc4a-e0c1-71e1-9d16-e33731adc5d4",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 1011,
+      "total_deletions": 364,
+      "accepted_lines": 858,
+      "overriden_lines": 0
+    },
+    "a43ec5ace26396a0": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c87a-e8cd-7ed0-8558-97d298776485",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 36,
+      "total_deletions": 21,
+      "accepted_lines": 23,
+      "overriden_lines": 0
+    },
+    "bbdeaf6acd357c5a": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cc31-902a-7980-9730-fa1af4dd61dc",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 114,
+      "total_deletions": 12,
+      "accepted_lines": 113,
+      "overriden_lines": 0
+    },
+    "c4154ae33f8753c5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c82f-10a7-70c0-9c52-cdc1e0dfa050",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 34,
+      "total_deletions": 0,
+      "accepted_lines": 34,
+      "overriden_lines": 0
+    },
+    "fa474e604b31c212": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cd3d-9d87-7940-b55e-5372a280448c",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "messages": [],
+      "total_additions": 3,
+      "total_deletions": 11,
+      "accepted_lines": 3,
+      "overriden_lines": 0
+    }
+  }
+}
