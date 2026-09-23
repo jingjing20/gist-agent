@@ -9,6 +9,7 @@ export const GENERATION_ERROR_CODES = [
     'EMPTY_LLM_RESPONSE',
     'CONTEXT_BUDGET_EXCEEDED',
     'ANALYSIS_PROTOCOL_ERROR',
+    'ANALYSIS_NO_PROGRESS',
     'MAX_AGENT_ITERATIONS_EXCEEDED',
     'LLM_REQUEST_FAILED',
     'TOOL_EXECUTION_FAILED',
@@ -32,6 +33,42 @@ export type GenerationStatus = 'pending' | 'starting' | 'running' | 'completed' 
 export type QueryExpectedShape = 'scalar' | 'timeseries' | 'category' | 'detail';
 export type ArtifactColumnType = 'number' | 'string' | 'date' | 'boolean' | 'unknown';
 export type ChartType = 'line' | 'bar' | 'pie' | 'scatter' | 'radar' | 'funnel';
+
+export type AnalysisActivityKind = 'confirm_conditions' | 'inspect_catalog' | 'inspect_definitions' | 'inspect_schema' | 'query_data' | 'inspect_evidence' | 'generate_chart';
+export type AnalysisActivityStatus = 'running' | 'completed' | 'warning';
+export interface AnalysisActivityDetailV1 {
+    label: string;
+    value: string | string[];
+}
+export interface AnalysisActivityMessageV1 {
+    severity: ResultQualitySeverity;
+    message: string;
+    action?: string;
+}
+export interface AnalysisActivityV1 {
+    version: 1;
+    id: string;
+    groupId: string;
+    kind: AnalysisActivityKind;
+    status: AnalysisActivityStatus;
+    label: string;
+    subject?: string;
+    details: AnalysisActivityDetailV1[];
+    startedAt: string;
+    completedAt?: string;
+    durationMs?: number;
+    qualityMessages?: AnalysisActivityMessageV1[];
+    /** @deprecated Use qualityMessages. Kept for persisted activity snapshots created by older versions. */
+    warning?: string;
+    query?: {
+        artifactId: string;
+        originalSql: string;
+        executedSql: string;
+        adjusted: boolean;
+        rowCount: number;
+        isLimited: boolean;
+    };
+}
 
 export interface QueryPlanV1 {
     purpose: string;
@@ -194,7 +231,23 @@ export function parseGenerationTerminalOutboxPayload(value: unknown): Generation
 }
 
 export interface ConversationEvent {
-    type: 'sql' | 'sql_chunk' | 'table' | 'text' | 'text_chunk' | 'reasoning_chunk' | 'thinking' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading' | 'log_update';
+    type:
+        | 'sql'
+        | 'sql_chunk'
+        | 'table'
+        | 'text'
+        | 'text_chunk'
+        | 'reasoning_chunk'
+        | 'thinking'
+        | 'error'
+        | 'done'
+        | 'log'
+        | 'chart'
+        | 'chart_loading'
+        | 'log_update'
+        | 'log_remove'
+        | 'analysis_activity'
+        | 'analysis_activity_remove';
     [key: string]: unknown;
 }
 

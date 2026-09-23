@@ -67,6 +67,7 @@ export class SqlQueryTool implements Tool {
     }
 
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
+        const startedAt = Date.now();
         await ctx.assertWritable();
         if (ctx.signal.aborted) throw ctx.signal.reason ?? new Error('已取消');
         const sql = args.sql as string;
@@ -148,7 +149,13 @@ export class SqlQueryTool implements Tool {
                 await ctx.assertWritable();
             }
 
-            ctx.emitter.send({ type: 'log_update', title: queryTitle, content: `已完成查询，返回 ${r.rowCount} 行。` });
+            ctx.emitter.send({
+                type: 'log_update',
+                title: queryTitle,
+                content: `已完成查询，返回 ${r.rowCount} 行。`,
+                rowCount: r.rowCount,
+                durationMs: Date.now() - startedAt,
+            });
             const execLogIndex = blocks.indexOf(execLog);
             if (execLogIndex >= 0) blocks.splice(execLogIndex, 1);
 
@@ -177,7 +184,12 @@ export class SqlQueryTool implements Tool {
                 data: resultRows,
             });
 
-            return { toolResult, blocks, succeeded: true };
+            return {
+                toolResult,
+                blocks,
+                succeeded: true,
+                activityData: { executedSql: r.finalSql, sourceTables: r.sourceTables, sourceFields: r.sourceFields },
+            };
         } catch (e: any) {
             if (ctx.signal.aborted) throw ctx.signal.reason ?? e;
             {

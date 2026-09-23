@@ -24,7 +24,7 @@
                 @keydown.enter.exact="handleSubmit"
                 @input="autoResize"
             />
-            <button v-if="chatStore.isLoading" class="send-btn stop-btn" @click="chatStore.abortStream()"><i class="fas fa-stop"></i> 取消</button>
+            <button v-if="chatStore.isLoading" class="send-btn stop-btn" @click="chatStore.abortStream()"><i class="fas fa-stop"></i> 停止分析</button>
             <button v-else class="send-btn" :disabled="!inputText.trim()" @click="handleSubmit">发送 <i class="fas fa-arrow-right text-xs"></i></button>
         </div>
     </div>

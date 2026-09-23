@@ -26,25 +26,27 @@
                 </tbody>
             </table>
         </div>
-        <div v-if="rows && rows.length > MAX_DISPLAY" class="table-footer">仅展示前 {{ MAX_DISPLAY }} 条，当前返回的全部数据可导出或进一步分析</div>
+        <div v-if="rows && rows.length > maxDisplay" class="table-footer">仅展示前 {{ maxDisplay }} 条，当前返回的全部数据可导出或进一步分析</div>
     </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 
-const MAX_DISPLAY = 200;
-
-const props = defineProps<{
-    title?: string;
-    columns?: string[];
-    rows?: Record<string, unknown>[];
-    rowCount?: number;
-    isLimited?: boolean;
-}>();
+const props = withDefaults(
+    defineProps<{
+        title?: string;
+        columns?: string[];
+        rows?: Record<string, unknown>[];
+        rowCount?: number;
+        isLimited?: boolean;
+        maxDisplay?: number;
+    }>(),
+    { maxDisplay: 200 }
+);
 
 const displayRows = computed(() => {
-    return (props.rows || []).slice(0, MAX_DISPLAY);
+    return (props.rows || []).slice(0, props.maxDisplay);
 });
 
 function formatCell(value: unknown): string {

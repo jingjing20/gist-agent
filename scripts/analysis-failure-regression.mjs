@@ -89,7 +89,7 @@ await regression('PostgreSQL monthly revenue query remains authorized', async ()
 });
 await regression('clarification repairs rejected fields before exhausting calls', async () => {
     const malformed = { kind: 'clarification', question: '确认收入与时间范围？', explanation: '需要确认', answer: answer().answer };
-    const h = harness([], { limits: { modelCalls: 4 } });
+    const h = harness([]);
     h.options.stream = async (history) => {
         const feedback = history.filter((m) => m.role === 'tool').at(-1)?.content ?? '';
         const repaired = /explanation/.test(feedback) && /answer/.test(feedback) && /question/.test(feedback);
@@ -100,10 +100,10 @@ await regression('clarification repairs rejected fields before exhausting calls'
 });
 await regression('invalid submissions report protocol failure, not a quota error', async () => {
     const invalid = { kind: 'clarification', question: 'Confirm?', explanation: 'extra' };
-    const h = harness([[call('submit_analysis', invalid)], [call('submit_analysis', invalid)]], { limits: { modelCalls: 2 } });
-    await assert.rejects(h.run(), { code: 'ANALYSIS_PROTOCOL_ERROR' });
+    const h = harness([[call('submit_analysis', invalid)], [call('submit_analysis', invalid)], [call('submit_analysis', invalid)]]);
+    await assert.rejects(h.run(), { code: 'ANALYSIS_NO_PROGRESS' });
     const feedback = JSON.parse(h.turnMessages.at(-1).content);
-    assert.equal(feedback.requiredKind, 'partial');
+    assert.equal(feedback.requiredKind, undefined);
     assert.match(feedback.submissionGuide, /reason/);
 });
 await regression('parser rejection is repairable and never executes unchecked SQL', async () => {

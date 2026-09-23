@@ -18,6 +18,8 @@ export interface QueryResult {
     rows: Record<string, unknown>[];
     rowCount: number;
     isLimited: boolean;
+    sourceTables: string[];
+    sourceFields: string[];
 }
 
 @Injectable()
@@ -172,13 +174,25 @@ export class SqlExecutorAgent {
         const normalized = this.normalizeRows(detailed.rows as Record<string, unknown>[], detailed.fields);
         this.applyColumnMasks(normalized.rows, columnPolicies);
         const limit = this.extractLimit(safeSql);
+        const sourceTables = [...new Set((astResult.tableList as string[]).map((item) => this.cleanAstReference(item)).filter(Boolean))];
+        const sourceFields = [...new Set((astResult.columnList as string[]).map((item) => this.cleanAstReference(item)).filter((item) => item && item !== '*'))];
         return {
             finalSql: safeSql,
             columns: normalized.columns,
             rows: normalized.rows,
             rowCount: normalized.rows.length,
             isLimited: limit !== null && normalized.rows.length >= limit,
+            sourceTables,
+            sourceFields,
         };
+    }
+
+    private cleanAstReference(value: string): string {
+        const parts = value.split('::').map((item) => item.replace(/["`]/g, ''));
+        const name = parts.at(-1);
+        const qualifier = parts.at(-2);
+        if (!name || name === 'null') return '';
+        return qualifier && qualifier !== 'null' && !['select', 'where', 'groupby', 'orderby', 'having', 'join'].includes(qualifier.toLowerCase()) ? `${qualifier}.${name}` : name;
     }
 
     private extractLimit(sql: string): number | null {

@@ -19,6 +19,9 @@ export interface Message {
     blocks: unknown[];
     llm_messages: unknown[];
     created_at: string;
+    generation_id?: string;
+    generation_status?: string;
+    generation_sequence?: number;
 }
 
 @Injectable()
@@ -56,9 +59,14 @@ export class ConversationService {
         const conv = await this.findOne(conversationId, userId);
         if (!conv) return [];
 
-        const rows = await this.db.query<QueryRow[]>("SELECT * FROM message WHERE conversation_id = ? ORDER BY created_at ASC, CASE WHEN role='user' THEN 0 ELSE 1 END, id ASC", [
-            conversationId,
-        ]);
+        const rows = await this.db.query<QueryRow[]>(
+            `SELECT m.*,g.id AS generation_id,g.status AS generation_status,g.last_sequence AS generation_sequence
+               FROM message m
+               LEFT JOIN generation g ON g.response_message_id=m.id
+              WHERE m.conversation_id=?
+              ORDER BY m.created_at ASC,CASE WHEN m.role='user' THEN 0 ELSE 1 END,m.id ASC`,
+            [conversationId]
+        );
 
         return rows as unknown as Message[];
     }

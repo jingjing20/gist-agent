@@ -15,6 +15,10 @@
             <div class="message-list no-scrollbar" ref="messageListRef" @scroll="handleScroll">
                 <ChatMessageItem v-for="msg in store.activeConversation.messages" :key="msg.id" :msg="msg" :isStreaming="store.isLoading && isLastAssistantMsg(msg)" />
             </div>
+            <button v-if="isUserScrolledUp && store.isLoading" class="latest-button" type="button" @click="returnToLatest">
+                <i class="fas fa-arrow-down"></i>
+                回到最新进度
+            </button>
         </template>
         <template v-else>
             <ChatEmptyState :sidebar-collapsed="sidebarCollapsed" @select="handleExample" @open-sidebar="emit('open-sidebar')" />
@@ -70,6 +74,11 @@ function scrollToBottom(force = false) {
     });
 }
 
+function returnToLatest() {
+    isUserScrolledUp.value = false;
+    nextTick(() => messageListRef.value?.scrollTo({ top: messageListRef.value.scrollHeight, behavior: 'smooth' }));
+}
+
 watch(
     () => store.activeConversation?.messages.length,
     (newLen, oldLen) => {
@@ -97,6 +106,7 @@ async function handleExample(query: string) {
 
 <style scoped>
 .chat-detail {
+    position: relative;
     flex: 1;
     display: flex;
     flex-direction: column;
@@ -150,6 +160,28 @@ async function handleExample(query: string) {
     flex: 1;
     overflow-y: auto;
     padding: 24px;
+}
+
+.latest-button {
+    position: absolute;
+    left: 50%;
+    bottom: 112px;
+    transform: translateX(-50%);
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--da-border);
+    background: rgba(24, 30, 43, 0.94);
+    color: var(--da-text-main);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+    cursor: pointer;
+}
+
+.latest-button:hover {
+    border-color: var(--da-primary);
 }
 
 .no-scrollbar::-webkit-scrollbar {

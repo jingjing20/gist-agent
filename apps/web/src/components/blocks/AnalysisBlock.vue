@@ -1,83 +1,145 @@
 <template>
     <section class="analysis-result">
-        <p class="status">
+        <p v-if="outcome.kind !== 'response' && outcome.kind !== 'table' && outcome.kind !== 'direct'" class="status" :class="{ partial: outcome.kind === 'partial' }">
             {{
                 outcome.kind === 'partial' ? '部分结果 · 仍有待查项' : outcome.kind === 'clarification' ? '需要补充信息' : outcome.kind === 'refusal' ? '本次无法分析' : '分析结果'
             }}
         </p>
+        <template v-if="outcome.kind === 'response'">
+            <p v-if="outcome.status === 'partial'" class="partial-reason">部分结果：{{ outcome.reason }}</p>
+            <div class="composed-result">
+                <template v-for="(block, index) in outcome.blocks" :key="index">
+                    <MarkdownBlock v-if="block.type === 'markdown'" :content="block.content" />
+                    <AnalysisArtifactTable
+                        v-else-if="block.type === 'table'"
+                        :artifact-id="block.artifactId"
+                        :conversation-id="analysis.state.conversationId"
+                        :title="block.title"
+                    />
+                    <ChartBlock v-else-if="chartFor(block.chartArtifactId)" :chart-data="chartFor(block.chartArtifactId)?.chartData" />
+                    <p v-else class="missing-chart">图表暂时无法读取。</p>
+                </template>
+            </div>
+        </template>
+        <template v-if="outcome.kind === 'table'">
+            <div class="result-tables">
+                <AnalysisArtifactTable
+                    v-for="table in outcome.tables"
+                    :key="table.artifactId"
+                    :artifact-id="table.artifactId"
+                    :conversation-id="analysis.state.conversationId"
+                    :title="table.title"
+                />
+            </div>
+            <p v-if="outcome.note" class="table-note">{{ outcome.note }}</p>
+        </template>
+        <MarkdownBlock v-if="outcome.kind === 'direct'" :content="outcome.content" />
         <template v-if="outcome.kind === 'answer' || outcome.kind === 'partial'">
-            <MarkdownBlock :content="outcome.answer.summary" />
-            <p v-if="outcome.kind === 'partial' && outcome.reason">{{ outcome.reason }}</p>
-            <article v-for="finding in outcome.answer.findings" :key="finding.id">
-                <small>{{ kinds[finding.kind] }}</small>
-                <MarkdownBlock :content="finding.text" />
-                <details v-for="ref in finding.evidence" :key="ref.artifactId + ref.role" @toggle="openEvidence($event, ref.artifactId)">
-                    <summary>{{ roles[ref.role] }}{{ ref.comparisonLabel ? ` · ${ref.comparisonLabel}` : '' }} · 展开证据</summary>
-                    <p v-if="errors[ref.artifactId]" role="alert">{{ errors[ref.artifactId] }} <button @click="loadEvidence(ref.artifactId)">重试</button></p>
-                    <p v-else-if="!evidence[ref.artifactId]">正在读取证据…</p>
-                    <template v-else>
-                        <p>{{ evidence[ref.artifactId]!.purpose }} · 结果粒度：{{ evidence[ref.artifactId]!.expectedGrain }}</p>
-                        <p>查询时间：{{ evidence[ref.artifactId]!.createdAt }} · 返回 {{ evidence[ref.artifactId]!.returnedRowCount }} 行</p>
-                        <p v-if="evidence[ref.artifactId]!.isLimited" class="warning">查询结果受限，不能视为完整总体。</p>
-                        <p v-if="evidence[ref.artifactId]!.returnedRowCount === 0" class="warning">查询结果为空；不能据此认定业务数量为零。</p>
-                        <p v-for="(warning, i) in evidence[ref.artifactId]!.quality?.warnings" :key="i" class="warning">{{ warning.message }} {{ warning.action }}</p>
-                        <p>质量检查只覆盖已记录信号，不代表结论已获业务验证。</p>
-                        <dl>
-                            <dt>时间范围</dt>
-                            <dd>{{ formatRange(evidence[ref.artifactId]!.context.state.timeRange) }}</dd>
-                            <dt>对比范围</dt>
-                            <dd>{{ formatRange(evidence[ref.artifactId]!.context.state.comparisonRange) }}</dd>
-                            <dt>筛选条件</dt>
-                            <dd>{{ formatFilters(evidence[ref.artifactId]!.context.state.filters) }}</dd>
-                            <dt>临时口径</dt>
-                            <dd>{{ evidence[ref.artifactId]!.context.state.temporaryDefinitions.map((d) => `${d.name}：${d.description}`).join('；') || '无' }}</dd>
-                        </dl>
-                        <details v-for="definition in evidence[ref.artifactId]!.context.definitions" :key="definition.id">
-                            <summary>{{ definition.name }} · v{{ definition.version }}（查询时快照）</summary>
-                            <DefinitionContent :content="definition" />
-                        </details>
-                        <SqlBlock title="执行 SQL" :content="evidence[ref.artifactId]!.executedSql" />
-                        <SqlBlock
-                            v-if="evidence[ref.artifactId]!.originalSql !== evidence[ref.artifactId]!.executedSql"
-                            title="原始 SQL"
-                            :content="evidence[ref.artifactId]!.originalSql"
-                        />
-                        <div class="table-scroll">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th v-for="col in evidence[ref.artifactId]!.columns" :key="col.name">{{ col.name }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-for="(row, i) in pages[ref.artifactId]?.rows" :key="i">
-                                        <td v-for="col in evidence[ref.artifactId]!.columns" :key="col.name">{{ row[col.name] ?? '—' }}</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                        <p v-if="pageErrors[ref.artifactId]" role="alert">{{ pageErrors[ref.artifactId] }}</p>
-                        <button v-if="pages[ref.artifactId]?.nextCursor" :disabled="loading[ref.artifactId]" @click="loadPage(ref.artifactId, true)">下一页</button>
-                        <button v-if="pageErrors[ref.artifactId]" :disabled="loading[ref.artifactId]" @click="loadPage(ref.artifactId, !!pages[ref.artifactId]?.nextCursor)">
-                            重试读取结果
-                        </button>
-                    </template>
-                </details>
-            </article>
-            <div v-if="outcome.answer.limitations.length">
-                <h4>限制说明</h4>
+            <header class="report-header">
+                <h2>核心结论</h2>
+                <MarkdownBlock class="report-summary" :content="outcome.answer.summary" />
+                <ul v-if="outcome.answer.keyPoints?.length" class="key-points">
+                    <li v-for="point in outcome.answer.keyPoints" :key="point">{{ point }}</li>
+                </ul>
+                <p v-if="outcome.kind === 'partial' && outcome.reason" class="partial-reason">尚未完成：{{ outcome.reason }}</p>
+            </header>
+            <section v-if="outcome.answer.metrics?.length || primaryChart" class="report-section">
+                <h3>关键数据与图表</h3>
+                <div v-if="outcome.answer.metrics?.length" class="metric-grid">
+                    <div v-for="metric in outcome.answer.metrics" :key="metric.findingId + metric.label" class="metric-card">
+                        <span class="metric-label">{{ metric.label }}</span>
+                        <strong class="metric-value">{{ metric.value }}</strong>
+                        <span v-if="metric.detail" class="metric-detail">{{ metric.detail }}</span>
+                    </div>
+                </div>
+                <div v-if="primaryChart" class="featured-chart"><ChartBlock :chart-data="primaryChart.chartData" /></div>
+            </section>
+            <section v-if="outcome.answer.findings.length" class="report-section">
+                <h3>分析发现</h3>
+                <article v-for="(finding, index) in outcome.answer.findings" :key="finding.id" class="finding-card">
+                    <div class="finding-heading">
+                        <span class="finding-index">{{ String(index + 1).padStart(2, '0') }}</span
+                        ><span class="finding-kind" :class="finding.kind">{{ kinds[finding.kind] }}</span>
+                    </div>
+                    <MarkdownBlock class="finding-text" :content="finding.text" />
+                    <div v-for="chart in chartsForFinding(finding)" :key="chart.chartArtifactId || chart.title" class="finding-chart">
+                        <ChartBlock :chart-data="chart.chartData" />
+                    </div>
+                    <details v-for="ref in finding.evidence" :key="ref.artifactId + ref.role" @toggle="openEvidence($event, ref.artifactId)">
+                        <summary>{{ roles[ref.role] }}{{ ref.comparisonLabel ? ` · ${ref.comparisonLabel}` : '' }} · 展开证据</summary>
+                        <p v-if="errors[ref.artifactId]" role="alert">{{ errors[ref.artifactId] }} <button @click="loadEvidence(ref.artifactId)">重试</button></p>
+                        <p v-else-if="!evidence[ref.artifactId]">正在读取证据…</p>
+                        <template v-else>
+                            <p>{{ evidence[ref.artifactId]!.purpose }} · 结果粒度：{{ evidence[ref.artifactId]!.expectedGrain }}</p>
+                            <p>查询时间：{{ evidence[ref.artifactId]!.createdAt }} · 返回 {{ evidence[ref.artifactId]!.returnedRowCount }} 行</p>
+                            <p v-if="evidence[ref.artifactId]!.isLimited" class="warning">查询结果受限，不能视为完整总体。</p>
+                            <p v-if="evidence[ref.artifactId]!.returnedRowCount === 0" class="warning">查询结果为空；不能据此认定业务数量为零。</p>
+                            <p v-for="(warning, i) in evidence[ref.artifactId]!.quality?.warnings" :key="i" class="warning">{{ warning.message }} {{ warning.action }}</p>
+                            <p>质量检查只覆盖已记录信号，不代表结论已获业务验证。</p>
+                            <dl>
+                                <dt>时间范围</dt>
+                                <dd>{{ formatRange(evidence[ref.artifactId]!.context.state.timeRange) }}</dd>
+                                <dt>对比范围</dt>
+                                <dd>{{ formatRange(evidence[ref.artifactId]!.context.state.comparisonRange) }}</dd>
+                                <dt>筛选条件</dt>
+                                <dd>{{ formatFilters(evidence[ref.artifactId]!.context.state.filters) }}</dd>
+                                <dt>临时口径</dt>
+                                <dd>{{ evidence[ref.artifactId]!.context.state.temporaryDefinitions.map((d) => `${d.name}：${d.description}`).join('；') || '无' }}</dd>
+                            </dl>
+                            <details v-for="definition in evidence[ref.artifactId]!.context.definitions" :key="definition.id">
+                                <summary>{{ definition.name }} · v{{ definition.version }}（查询时快照）</summary>
+                                <DefinitionContent :content="definition" />
+                            </details>
+                            <SqlBlock title="执行 SQL" :content="evidence[ref.artifactId]!.executedSql" />
+                            <SqlBlock
+                                v-if="evidence[ref.artifactId]!.originalSql !== evidence[ref.artifactId]!.executedSql"
+                                title="原始 SQL"
+                                :content="evidence[ref.artifactId]!.originalSql"
+                            />
+                            <div class="table-scroll">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th v-for="col in evidence[ref.artifactId]!.columns" :key="col.name">{{ col.name }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr v-for="(row, i) in pages[ref.artifactId]?.rows" :key="i">
+                                            <td v-for="col in evidence[ref.artifactId]!.columns" :key="col.name">{{ row[col.name] ?? '—' }}</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p v-if="pageErrors[ref.artifactId]" role="alert">{{ pageErrors[ref.artifactId] }}</p>
+                            <button v-if="pages[ref.artifactId]?.nextCursor" :disabled="loading[ref.artifactId]" @click="loadPage(ref.artifactId, true)">下一页</button>
+                            <button v-if="pageErrors[ref.artifactId]" :disabled="loading[ref.artifactId]" @click="loadPage(ref.artifactId, !!pages[ref.artifactId]?.nextCursor)">
+                                重试读取结果
+                            </button>
+                        </template>
+                    </details>
+                </article>
+            </section>
+            <section v-if="extraCharts.length" class="report-section">
+                <h3>补充图表</h3>
+                <div v-for="chart in extraCharts" :key="chart.chartArtifactId || chart.title" class="finding-chart"><ChartBlock :chart-data="chart.chartData" /></div>
+            </section>
+            <div v-if="outcome.answer.limitations.length" class="report-notes">
+                <h3>局限</h3>
                 <ul>
                     <li v-for="item in outcome.answer.limitations" :key="item">{{ item }}</li>
                 </ul>
             </div>
-            <div v-if="outcome.answer.unresolvedQuestions.length">
-                <h4>仍待验证</h4>
+            <div v-if="outcome.answer.unresolvedQuestions.length" class="report-notes">
+                <h3>待验证</h3>
                 <ul>
                     <li v-for="item in outcome.answer.unresolvedQuestions" :key="item">{{ item }}</li>
                 </ul>
             </div>
         </template>
-        <MarkdownBlock v-else :content="outcome.kind === 'clarification' ? outcome.question : outcome.kind === 'refusal' ? outcome.explanation : ''" />
+        <MarkdownBlock
+            v-else-if="outcome.kind === 'clarification' || outcome.kind === 'refusal'"
+            :content="outcome.kind === 'clarification' ? outcome.question : outcome.explanation"
+        />
         <section v-if="!isStreaming">
             <p v-if="candidateError" role="alert">{{ candidateError }} <button @click="loadCandidates">刷新候选</button></p>
             <article v-for="candidate in candidates" :key="candidate.id">
@@ -96,12 +158,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
 import type { AnalysisEvidenceContext, ArtifactColumnV1, BusinessDefinitionCandidate, ResultQualityV1 } from '@gist/contracts';
-import type { AnalysisPresentation } from '../../types';
+import type { AnalysisPresentation, MessageBlock } from '../../types';
 import { apiFetch } from '../../api';
 import { useChatStore } from '../../stores/chat';
 import { useDataSourceStore } from '../../stores/datasource';
 import { useAuthStore } from '../../stores/auth';
 import MarkdownBlock from './MarkdownBlock.vue';
+import ChartBlock from './ChartBlock.vue';
+import AnalysisArtifactTable from './AnalysisArtifactTable.vue';
 import SqlBlock from './SqlBlock.vue';
 import DefinitionContent from '../DefinitionContent.vue';
 function formatRange(range: AnalysisEvidenceContext['state']['timeRange']) {
@@ -113,13 +177,29 @@ function formatFilters(filters: AnalysisEvidenceContext['state']['filters']) {
         filters.map((f) => `${f.field} ${operators[f.operator]} ${Array.isArray(f.value) ? f.value.join('、') : f.value === null ? '空值' : String(f.value)}`).join('；') || '无'
     );
 }
-const props = defineProps<{ analysis: AnalysisPresentation; messageId: string; isStreaming: boolean }>();
+const props = defineProps<{ analysis: AnalysisPresentation; charts?: MessageBlock[]; messageId: string; isStreaming: boolean }>();
 const chat = useChatStore(),
     sources = useDataSourceStore(),
     auth = useAuthStore();
 const outcome = computed(() => props.analysis.outcome);
 const kinds = { observation: '观察发现', supported_explanation: '有验证证据的解释', hypothesis: '待验证假设' };
 const roles = { observation: '观察依据', verification: '验证依据', comparison: '比较依据' };
+function chartFor(id: string) {
+    return (props.charts ?? []).find((chart) => chart.chartArtifactId === id);
+}
+const findings = computed(() => (outcome.value.kind === 'answer' || outcome.value.kind === 'partial' ? outcome.value.answer.findings : []));
+const primaryChart = computed(() => {
+    const charts = props.charts ?? [];
+    const firstFinding = findings.value.find((finding) => finding.kind !== 'hypothesis' && finding.evidence.length);
+    return charts.find((chart) => firstFinding?.evidence.some((ref) => ref.artifactId === chart.queryArtifactId)) ?? charts[0];
+});
+function chartFindingId(chart: MessageBlock) {
+    return findings.value.find((finding) => finding.evidence.some((ref) => ref.artifactId === chart.queryArtifactId))?.id;
+}
+function chartsForFinding(finding: { id: string }) {
+    return (props.charts ?? []).filter((chart) => chart !== primaryChart.value && chartFindingId(chart) === finding.id);
+}
+const extraCharts = computed(() => (props.charts ?? []).filter((chart) => chart !== primaryChart.value && !chartFindingId(chart)));
 interface Evidence {
     purpose: string;
     expectedGrain: string;
@@ -218,19 +298,205 @@ watch(
 </script>
 <style scoped>
 .analysis-result {
-    line-height: 1.7;
+    color: var(--da-text-main);
+    line-height: 1.6;
     overflow-wrap: anywhere;
+    max-width: 100%;
 }
-.status,
-small {
+.result-tables {
+    display: grid;
+    gap: 14px;
+}
+.composed-result {
+    display: grid;
+    gap: 16px;
+}
+.missing-chart {
+    margin: 0;
+    color: var(--da-text-muted);
+    font-size: 13px;
+}
+.table-note {
+    margin: 10px 0 0;
+    color: var(--da-text-muted);
+    font-size: 12px;
+}
+.status {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 0 14px;
+    padding: 4px 10px;
+    border: 1px solid rgba(14, 165, 233, 0.25);
+    border-radius: 999px;
+    background: rgba(14, 165, 233, 0.08);
     color: var(--da-primary);
+    font-size: 12px;
+    font-weight: 600;
 }
-article,
+.status.partial {
+    border-color: rgba(245, 158, 11, 0.3);
+    background: rgba(245, 158, 11, 0.09);
+    color: #fbbf24;
+}
+.report-header {
+    padding: 0 0 24px;
+    border-bottom: 1px solid var(--da-border);
+}
+h2,
+h3,
+h4 {
+    margin: 0;
+    color: var(--da-text-main);
+}
+h2 {
+    margin-bottom: 12px;
+    font-size: 18px;
+    letter-spacing: -0.02em;
+}
+h3 {
+    margin-bottom: 16px;
+    font-size: 15px;
+    font-weight: 700;
+}
+.report-summary {
+    font-size: 17px;
+    font-weight: 600;
+    line-height: 1.65;
+}
+.report-summary:deep(.markdown-block) {
+    font-size: 17px;
+    line-height: 1.65;
+}
+.key-points {
+    display: grid;
+    gap: 8px;
+    margin: 16px 0 0;
+    padding: 0;
+    list-style: none;
+}
+.key-points li {
+    position: relative;
+    padding-left: 18px;
+    color: var(--da-text-main);
+    font-size: 14px;
+}
+.key-points li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.72em;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--da-primary);
+}
+.partial-reason {
+    margin: 16px 0 0;
+    color: #fbbf24;
+    font-size: 13px;
+}
+.report-section {
+    padding: 24px 0;
+    border-bottom: 1px solid var(--da-border);
+}
+.metric-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 12px;
+}
+.metric-card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 0;
+    padding: 16px;
+    border: 1px solid var(--da-border);
+    border-radius: 12px;
+    background: rgba(148, 163, 184, 0.045);
+}
+.metric-label {
+    color: var(--da-text-muted);
+    font-size: 12px;
+}
+.metric-value {
+    color: var(--da-text-main);
+    font-size: clamp(19px, 2.4vw, 27px);
+    line-height: 1.25;
+    letter-spacing: -0.03em;
+    font-variant-numeric: tabular-nums;
+}
+.metric-detail {
+    color: var(--da-text-muted);
+    font-size: 12px;
+}
+.featured-chart,
+.finding-chart {
+    margin-top: 16px;
+    overflow: hidden;
+    border: 1px solid var(--da-border);
+    border-radius: 12px;
+    background: rgba(148, 163, 184, 0.035);
+}
+.finding-card {
+    padding: 17px 0;
+    border-top: 1px solid var(--da-border);
+}
+.finding-card:first-of-type {
+    padding-top: 0;
+    border-top: 0;
+}
+.finding-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.finding-index {
+    color: var(--da-text-muted);
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+}
+.finding-kind {
+    color: var(--da-primary);
+    font-size: 12px;
+    font-weight: 700;
+}
+.finding-kind.hypothesis {
+    color: #fbbf24;
+}
+.finding-text:deep(.markdown-block) {
+    font-size: 14px;
+    line-height: 1.7;
+}
+.report-notes {
+    padding: 20px 0 0;
+}
+.report-notes h3 {
+    margin-bottom: 8px;
+}
+.report-notes ul {
+    margin: 0;
+    padding-left: 20px;
+    color: var(--da-text-muted);
+    font-size: 13px;
+}
+.report-notes li + li {
+    margin-top: 5px;
+}
 details {
     border: 1px solid var(--da-border);
     border-radius: 8px;
-    padding: 12px;
-    margin: 10px 0;
+    padding: 10px 12px;
+    margin: 12px 0 0;
+    color: var(--da-text-muted);
+    font-size: 12px;
+}
+details[open] {
+    color: var(--da-text-main);
+}
+details summary {
+    color: var(--da-text-muted);
+    font-weight: 600;
 }
 summary,
 button {
@@ -241,7 +507,7 @@ button {
     color: var(--da-text-main);
     border: 1px solid var(--da-border);
     padding: 8px 12px;
-    margin: 5px;
+    margin: 5px 5px 5px 0;
     border-radius: 6px;
 }
 button:disabled {
@@ -259,6 +525,10 @@ pre {
 dl {
     margin: 10px 0;
 }
+dt {
+    color: var(--da-text-muted);
+    font-size: 12px;
+}
 dd {
     margin: 0 0 8px;
 }
@@ -275,5 +545,16 @@ th {
     padding: 8px;
     border: 1px solid var(--da-border);
     text-align: left;
+}
+@media (max-width: 620px) {
+    .metric-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .metric-card {
+        padding: 12px;
+    }
+    .metric-value {
+        font-size: 20px;
+    }
 }
 </style>

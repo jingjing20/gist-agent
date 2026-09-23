@@ -12,10 +12,14 @@
             </template>
             <template v-else>
                 <div class="assistant-content">
+                    <AnalysisProcessBlock v-if="hasAnalysisProcess" :blocks="msg.blocks" :is-streaming="isStreaming" :terminal-status="processTerminalStatus" />
                     <template v-for="(block, i) in visibleBlocks" :key="i">
                         <component :is="block.analysis ? AnalysisBlock : blockComponent(block.type)" v-bind="blockProps(block)" />
                     </template>
                     <p v-if="terminalStatus" role="status">{{ terminalStatus }}</p>
+                    <div v-if="canResume" class="terminal-actions">
+                        <button type="button" :disabled="actionBusy" @click="restartAnalysis">重试原问题</button>
+                    </div>
                     <div v-if="isStreaming" class="streaming-indicator">
                         <span class="dot"></span>
                         <span class="dot"></span>
@@ -29,8 +33,9 @@
 
 <script setup lang="ts">
 import { useChatStore } from '../stores/chat';
-import { computed, type Component } from 'vue';
+import { computed, ref, type Component } from 'vue';
 import AnalysisBlock from './blocks/AnalysisBlock.vue';
+import AnalysisProcessBlock from './blocks/AnalysisProcessBlock.vue';
 import SqlBlock from './blocks/SqlBlock.vue';
 import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
@@ -44,13 +49,35 @@ const props = defineProps<{
 }>();
 
 const chat = useChatStore();
+const generationStatus = computed(() => Object.values(chat.generations).find((g) => g.messageId === props.msg.id)?.status);
+const processTerminalStatus = computed(() => {
+    const status = generationStatus.value;
+    return status === 'failed' || status === 'cancelled' || status === 'completed' ? status : undefined;
+});
+const actionBusy = ref(false);
+const generationId = computed(() => Object.values(chat.generations).find((g) => g.messageId === props.msg.id)?.id);
+const canResume = computed(() => !!generationId.value && (generationStatus.value === 'failed' || generationStatus.value === 'cancelled'));
 const terminalStatus = computed(() => {
-    const status = Object.values(chat.generations).find((g) => g.messageId === props.msg.id)?.status;
-    return status === 'cancelled' ? '分析已取消；已有内容不代表完整结论。' : status === 'failed' ? '分析未完成，请查看错误说明后重试。' : '';
+    const status = generationStatus.value;
+    return status === 'cancelled' ? '分析已取消；已有内容不代表完整结论。' : status === 'failed' ? '分析未完成。上方显示失败原因，可重试原问题。' : '';
 });
 
 // Raw model reasoning is not a product-facing protocol.
-const visibleBlocks = computed(() => props.msg.blocks.filter((block) => block.type !== 'thinking' && block.type !== 'reasoning_chunk'));
+const analysisWorkflow = computed(() =>
+    props.msg.blocks.some((block) => (block.type === 'analysis_activity' && !!block.activity) || (block.type === 'log' && /^分析步骤 \d+$/.test(block.title || '')))
+);
+const hasAnalysisProcess = computed(() => props.msg.blocks.some((block) => block.type === 'analysis_activity' && !!block.activity));
+const hasAnalysisResult = computed(() => props.msg.blocks.some((block) => !!block.analysis));
+const reportCharts = computed(() => props.msg.blocks.filter((block) => block.type === 'chart' && !!block.chartData));
+const visibleBlocks = computed(() =>
+    props.msg.blocks.filter((block) => {
+        if (block.type === 'thinking' || block.type === 'reasoning_chunk') return false;
+        if (analysisWorkflow.value && ['analysis_activity', 'log', 'sql', 'table'].includes(block.type)) return false;
+        if (hasAnalysisResult.value && block.type === 'table') return false;
+        if (hasAnalysisResult.value && block.type === 'chart' && block.chartData) return false;
+        return true;
+    })
+);
 
 const blockMap: Record<string, Component> = {
     sql: SqlBlock,
@@ -66,7 +93,7 @@ function blockComponent(type: string): Component {
 }
 
 function blockProps(block: MessageBlock): Record<string, unknown> {
-    if (block.analysis) return { analysis: block.analysis, messageId: props.msg.id, isStreaming: props.isStreaming };
+    if (block.analysis) return { analysis: block.analysis, charts: reportCharts.value, messageId: props.msg.id, isStreaming: props.isStreaming };
     if (block.type === 'log') {
         return {
             title: block.title,
@@ -86,6 +113,16 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
         rowCount: block.rowCount,
         isLimited: block.isLimited,
     };
+}
+
+async function restartAnalysis() {
+    if (!generationId.value) return;
+    actionBusy.value = true;
+    try {
+        await chat.retryGeneration(generationId.value);
+    } finally {
+        actionBusy.value = false;
+    }
 }
 </script>
 
@@ -159,6 +196,29 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
     display: flex;
     flex-direction: column;
     gap: 16px;
+}
+
+.terminal-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.terminal-actions button {
+    border: 1px solid var(--da-border);
+    border-radius: 7px;
+    padding: 7px 11px;
+    background: rgba(148, 163, 184, 0.08);
+    color: var(--da-text-main);
+    cursor: pointer;
+}
+
+.terminal-actions button:hover:not(:disabled) {
+    border-color: var(--da-primary);
+}
+
+.terminal-actions button:disabled {
+    opacity: 0.5;
+    cursor: default;
 }
 
 .streaming-indicator {

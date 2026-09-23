@@ -16,13 +16,23 @@ export interface AnalysisFinding {
 
 export interface AnalysisAnswer {
     summary: string;
+    keyPoints?: string[];
+    metrics?: Array<{ label: string; value: string; detail?: string; findingId: string }>;
     findings: AnalysisFinding[];
     limitations: string[];
     unresolvedQuestions: string[];
 }
 
+export type AnalysisContentBlock =
+    | { type: 'markdown'; content: string; evidence: string[] }
+    | { type: 'table'; artifactId: string; title?: string }
+    | { type: 'chart'; chartArtifactId: string };
+
 export type AnalysisOutcome =
+    | { kind: 'response'; status: 'complete' | 'partial'; blocks: AnalysisContentBlock[]; reason?: string }
     | { kind: 'answer' | 'partial'; answer: AnalysisAnswer; reason?: string }
+    | { kind: 'table'; tables: Array<{ artifactId: string; title?: string }>; note?: string }
+    | { kind: 'direct'; content: string; evidence: string[] }
     | { kind: 'clarification'; question: string }
     | { kind: 'refusal'; explanation: string };
 

@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { cloneAnalysisActivity } from '../apps/web/src/utils/analysis-activity.js';
 const require = createRequire(import.meta.url);
 const { AnalysisAgent } = require('../apps/worker/dist/analysis/analysis-agent.js');
 const { validateSubmission } = require('../apps/worker/dist/analysis/submission.js');
-const { AnalysisRuntimeAdapter } = require('../apps/worker/dist/analysis/analysis-runtime-adapter.js');
+const { AnalysisRuntimeAdapter, requestedPresentation, assertRequestedPresentation } = require('../apps/worker/dist/analysis/analysis-runtime-adapter.js');
+const { startActivity, completeActivity } = require('../apps/worker/dist/analysis/analysis-activity.js');
+const { assessResultQuality } = require('../apps/worker/dist/chat/result-quality.js');
 const { SqlExecutorAgent } = require('../apps/worker/dist/chat/agents/sql-executor.js');
 const { SqlQueryTool } = require('../apps/worker/dist/chat/tools/sql-query.tool.js');
 const { ArtifactRepository } = require('../apps/worker/dist/chat/artifact.repository.js');
@@ -72,6 +75,107 @@ function harness(responses, extras = {}) {
     return { options, sql, controller, executions, seen, events, messages, turnMessages, reports, run: () => new AnalysisAgent().run(options) };
 }
 
+await check('structured activities snapshot mechanical execution facts', async () => {
+    const started = startActivity(
+        'activity-1',
+        'execute_sql_query',
+        { title: '核对账单范围', sql: 'SELECT status FROM billing_records', plan: { purpose: '确认账单状态分布', expectedGrain: '每种状态一行' } },
+        new Date('2026-09-22T00:00:00.000Z')
+    );
+    assert.equal(started.kind, 'query_data');
+    assert.equal(started.status, 'running');
+    const completed = completeActivity(
+        started,
+        'execute_sql_query',
+        { sql: 'SELECT status FROM billing_records' },
+        { queryArtifactId: 'artifact-1', returnedRowCount: 3, columns: [{ name: 'status' }], isLimited: false },
+        { executedSql: 'SELECT status FROM billing_records LIMIT 1000', sourceTables: ['billing_records'], sourceFields: ['status'] },
+        new Date('2026-09-22T00:00:01.200Z')
+    );
+    assert.equal(completed.status, 'completed');
+    assert.equal(completed.durationMs, 1200);
+    assert.equal(completed.query.artifactId, 'artifact-1');
+    assert.equal(completed.query.adjusted, true);
+    assert.deepEqual(completed.details.find((item) => item.label === '数据来源').value, ['billing_records']);
+    assert.deepEqual(completed.details.find((item) => item.label === '使用字段').value, ['status']);
+});
+
+await check('informational quality notices do not turn completed analysis yellow', async () => {
+    const quality = assessResultQuality({
+        plan: { purpose: '核对注册时间', expectedGrain: '单行汇总', expectedShape: 'scalar' },
+        sql: 'SELECT MIN(signup_at) AS min_signup FROM product_users',
+        columns: [{ name: 'signup_at', type: 'date' }],
+        rows: [{ signup_at: '2026-09-15T11:45:17.000Z' }],
+        isLimited: false,
+    });
+    assert.equal(quality.warnings[0].severity, 'info');
+    assert.equal(quality.warnings[0].message, '时间范围按 UTC 解释：2026-09-15 11:45:17 至 2026-09-15 11:45:17');
+
+    const started = startActivity(
+        'activity-timezone-info',
+        'execute_sql_query',
+        {
+            title: '核对注册时间',
+            sql: 'SELECT MIN(signup_at) AS min_signup FROM product_users',
+            plan: { purpose: '核对注册时间', expectedGrain: '单行汇总', expectedShape: 'scalar' },
+        },
+        new Date('2026-09-22T00:00:00.000Z')
+    );
+    const completed = completeActivity(
+        started,
+        'execute_sql_query',
+        { sql: 'SELECT MIN(signup_at) AS min_signup FROM product_users' },
+        { returnedRowCount: 1, columns: [{ name: 'min_signup' }], resultQuality: quality },
+        undefined,
+        new Date('2026-09-22T00:00:00.065Z')
+    );
+    assert.equal(completed.status, 'completed');
+    assert.equal(completed.warning, undefined);
+    assert.deepEqual(completed.qualityMessages, [
+        {
+            severity: 'info',
+            message: quality.warnings[0].message,
+            action: quality.warnings[0].action,
+        },
+    ]);
+});
+
+await check('activity snapshots can be copied from reactive proxy inputs', async () => {
+    const activity = new Proxy(
+        {
+            version: 1,
+            id: 'activity-proxy',
+            groupId: 'group-1',
+            kind: 'inspect_schema',
+            status: 'completed',
+            label: '读取表结构',
+            details: [{ label: '数据表', value: ['invoices'] }],
+            startedAt: '2026-09-22T00:00:00.000Z',
+        },
+        {}
+    );
+    assert.throws(() => structuredClone(activity), /could not be cloned/);
+    const copied = cloneAnalysisActivity(activity);
+    assert.deepEqual(copied.details[0].value, ['invoices']);
+    assert.notEqual(copied, activity);
+    assert.notEqual(copied.details, activity.details);
+});
+
+await check('activity snapshots tolerate malformed in-flight details', async () => {
+    for (const details of [undefined, { label: '错误形状', value: 'x' }]) {
+        const copied = cloneAnalysisActivity({ id: 'activity-in-flight', details });
+        assert.deepEqual(copied.details, []);
+    }
+});
+
+await check('submission can correct a chart id mistaken for query evidence', async () => {
+    const invalid = answer('partial', [observation('chart-id')]);
+    const valid = answer('partial', [observation('a1')]);
+    const h = harness([[query()], [call('submit_analysis', invalid)], [call('submit_analysis', valid)]]);
+    assert.equal((await h.run()).kind, 'partial');
+    assert.match(h.turnMessages.find((message) => message.role === 'tool' && String(message.content).includes('INVALID_TOOL_ARGUMENTS')).content, /查询证据/);
+});
+
 await check('direct answer and clarification without SQL', async () => {
     for (const outcome of [answer(), { kind: 'clarification', question: '使用哪个观察截止日期？' }]) {
         const h = harness([[call('submit_analysis', outcome)]]);
@@ -94,6 +198,12 @@ await check('query, independent verification, structured evidence answer', async
     assert.equal((await h.run()).kind, 'answer');
     assert.deepEqual(h.executions, ['SELECT 1', 'SELECT 2']);
     assert.equal(h.reports.length, 3);
+    const activities = h.events.filter((event) => event.type === 'analysis_activity');
+    assert.equal(activities.length, 4);
+    assert.deepEqual(
+        activities.map((event) => event.activity.status),
+        ['running', 'completed', 'running', 'completed']
+    );
     assert.deepEqual(
         h.turnMessages.map((m) => m.role),
         ['assistant', 'tool', 'assistant', 'tool', 'assistant', 'tool']
@@ -104,6 +214,46 @@ await check('fabricated and blocked evidence cannot support findings', async () 
     assert.throws(() => validateSubmission(answer('answer', [observation('a')]), new Map([['a', { blocked: true, sql: 'SELECT 1' }]]), false), /质量/);
     const f = { ...observation('a'), kind: 'supported_explanation' };
     assert.throws(() => validateSubmission(answer('answer', [f]), new Map([['a', { blocked: false, sql: 'SELECT 1' }]]), false), /验证/);
+});
+await check('key metrics must point to an evidenced finding', async () => {
+    const evidence = new Map([['a1', { blocked: false, sql: 'SELECT 1' }]]);
+    const valid = { ...answer('answer', [observation('a1')]), answer: { ...answer('answer', [observation('a1')]).answer,
+        summary: '收入上升。', keyPoints: ['期末高于期初'], metrics: [{ label: '期末收入', value: '59.6 万元', findingId: 'f1' }] } };
+    assert.equal(validateSubmission(valid, evidence).answer.metrics[0].value, '59.6 万元');
+    assert.throws(() => validateSubmission({ ...valid, answer: { ...valid.answer, metrics: [{ label: '收入', value: '59.6 万元', findingId: 'missing' }] } }, evidence), /已证实/);
+    assert.throws(() => validateSubmission({ ...valid, answer: { ...valid.answer, keyPoints: ['重复', '重复'] } }, evidence), /不能重复/);
+});
+await check('table-only answer references observed query rows without report fields', async () => {
+    const h = harness([[query('SELECT region, amount FROM revenue')], [call('submit_analysis', { kind: 'table', tables: [{ artifactId: 'a1', title: '地区明细' }] })]]);
+    const outcome = await h.run();
+    assert.deepEqual(outcome, { kind: 'table', tables: [{ artifactId: 'a1', title: '地区明细' }] });
+    assert.throws(() => validateSubmission({ kind: 'table', tables: [{ artifactId: 'unknown' }] }, new Map()), /不是本轮已观察/);
+    assert.throws(() => validateSubmission({ kind: 'table', tables: [{ artifactId: 'a1' }] }, new Map([['a1', { blocked: true, sql: 'SELECT 1' }]])), /质量受限/);
+});
+await check('explicit user output preference wins over the default report', async () => {
+    assert.equal(requestedPresentation('帮我查下北区详细的数据，以表格给我就行'), 'table');
+    assert.equal(requestedPresentation('只要一句话告诉我结果'), 'direct');
+    assert.equal(requestedPresentation('不要表格，给我解释原因'), null);
+    assert.equal(requestedPresentation('用表格展示数据并解释原因'), null);
+    const tableResponse = { kind: 'response', status: 'complete', blocks: [{ type: 'table', artifactId: 'a1' }] };
+    assert.throws(() => assertRequestedPresentation('以表格给我就行', answer()), /只用表格/);
+    assert.doesNotThrow(() => assertRequestedPresentation('以表格给我就行', tableResponse));
+    assert.throws(() => assertRequestedPresentation('以表格给我就行', { ...tableResponse, blocks: [...tableResponse.blocks, { type: 'markdown', content: '总结', evidence: [] }] }), /只用表格/);
+    const h = harness([[query()], [call('submit_analysis', { kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '北区收入为 8 万元。', evidence: ['a1'] }] })]]);
+    assert.equal((await h.run()).kind, 'response');
+});
+await check('ordered response blocks validate table and chart references', async () => {
+    const evidence = new Map([['a1', { blocked: false, sql: 'SELECT 1' }]]);
+    const charts = new Map([['c1', 'a1']]);
+    const response = { kind: 'response', status: 'complete', blocks: [
+        { type: 'markdown', content: '北区明细如下。', evidence: ['a1'] },
+        { type: 'table', artifactId: 'a1' },
+        { type: 'chart', chartArtifactId: 'c1' },
+    ] };
+    assert.deepEqual(validateSubmission(response, evidence, charts).blocks.map((block) => block.type), ['markdown', 'table', 'chart']);
+    assert.throws(() => validateSubmission(response, evidence), /不是本轮已生成/);
+    assert.throws(() => validateSubmission({ ...response, blocks: [{ type: 'table', artifactId: 'missing' }] }, evidence, charts), /不是本轮已观察/);
+    assert.throws(() => validateSubmission({ ...response, blocks: [{ type: 'markdown', content: '收入增长。', evidence: [] }] }, evidence, charts), /至少需要引用/);
 });
 await check('malformed arguments return paired feedback, no side effect', async () => {
     const bad = query();
@@ -122,22 +272,29 @@ await check('SQL failure is repaired by the main loop', async () => {
     assert.deepEqual(h.executions, ['SELECT 1']);
     assert.equal(h.options.metrics.sqlCallCount, 2);
     assert.match(h.seen[1].history.at(-1).content, /42703/);
+    assert.equal(h.events.filter((event) => event.type === 'analysis_activity_remove').length, 1);
+    assert.deepEqual(
+        h.events.filter((event) => event.type === 'analysis_activity').map((event) => event.activity.status),
+        ['running', 'running', 'completed']
+    );
 });
-await check('repeated failing query is blocked, modified query remains possible', async () => {
-    const h = harness([[query()], [query()], [query()], [call('submit_analysis', answer('partial'))]]);
+await check('repeated failing query stops without executing a third time', async () => {
+    const h = harness([[query()], [query()], [query()]]);
     let attempts = 0;
     h.sql.execute = async () => {
         attempts++;
         return { succeeded: false, toolResult: '{"errorCode":"42703"}', blocks: [] };
     };
-    assert.equal((await h.run()).kind, 'partial');
+    await assert.rejects(h.run(), { code: 'ANALYSIS_NO_PROGRESS' });
     assert.equal(attempts, 2);
 });
-await check('SQL budget exposes only partial submission; no excess execution', async () => {
-    const h = harness([[query()], [query('SELECT 2')], [call('submit_analysis', answer('partial', [observation('a1')]))]], { limits: { sqlCalls: 1 } });
-    assert.equal((await h.run()).kind, 'partial');
-    assert.deepEqual(h.seen[1].names, ['submit_analysis']);
-    assert.equal(h.executions.length, 1);
+await check('analysis can continue past the former SQL budget and finish', async () => {
+    const responses = Array.from({ length: 9 }, (_, i) => [query(`SELECT ${i + 1}`)]);
+    responses.push([call('submit_analysis', answer('answer', [observation('a9')]))]);
+    const h = harness(responses);
+    assert.equal((await h.run()).kind, 'answer');
+    assert.equal(h.executions.length, 9);
+    assert.ok(h.seen.every((turn) => turn.names.includes('execute_sql_query')));
 });
 await check('mixed final submission batch executes no tools', async () => {
     const h = harness([[query(), call('submit_analysis', answer())], [call('submit_analysis', answer())]]);
@@ -170,13 +327,13 @@ await check('pre-cancel and mid-tool cancel prevent further model calls', async 
     await assert.rejects(m.run(), { code: 'CANCELLED' });
     assert.equal(m.seen.length, 1);
 });
-await check('empty output, hard model limit and context overflow fail explicitly', async () => {
+await check('empty output, repeated unstructured text and context overflow fail explicitly', async () => {
     await assert.rejects(harness([[]]).run(), { code: 'EMPTY_LLM_RESPONSE' });
     const textOnly = () =>
         (async function* () {
             yield { choices: [{ delta: { content: 'unsubmitted' } }] };
         })();
-    await assert.rejects(harness([textOnly, textOnly], { limits: { modelCalls: 2 } }).run(), { code: 'MAX_AGENT_ITERATIONS_EXCEEDED' });
+    await assert.rejects(harness([textOnly, textOnly, textOnly]).run(), { code: 'ANALYSIS_NO_PROGRESS' });
     const h = harness([], { capability: { contextWindow: 10, responseReserve: 5 } });
     await assert.rejects(h.run(), { code: 'CONTEXT_BUDGET_EXCEEDED' });
     assert.equal(h.seen.length, 0);

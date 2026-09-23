@@ -15,7 +15,9 @@ export interface SSEEvent {
         | 'chart'
         | 'chart_loading'
         | 'log_update'
-        | 'log_remove';
+        | 'log_remove'
+        | 'analysis_activity'
+        | 'analysis_activity_remove';
     [key: string]: unknown;
 }
 
@@ -40,6 +42,7 @@ export interface ToolExecutionResult {
     toolResult: string;
     blocks: SSEEvent[];
     succeeded?: boolean;
+    activityData?: import('../../analysis/analysis-activity').ToolActivityData;
 }
 
 export interface Tool {

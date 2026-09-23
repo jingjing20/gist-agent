@@ -63,6 +63,18 @@ export const useChatStore = defineStore('chat', () => {
         const data = await res.json();
         const conv = conversations.value.find((c) => c.id === conversationId);
         if (!conv) return;
+        for (const message of data) {
+            if (!message.generation_id) continue;
+            const rawStatus = String(message.generation_status || 'completed');
+            const status: GenerationStatus = rawStatus === 'cancel_requested' || rawStatus === 'starting' ? 'running' : (rawStatus as GenerationStatus);
+            generations.value[message.generation_id] = {
+                id: message.generation_id,
+                conversationId,
+                messageId: message.id,
+                status,
+                sequence: Number(message.generation_sequence) || 0,
+            };
+        }
         const live = new Map(
             conv.messages.filter((m) => Object.values(generations.value).some((g) => g.messageId === m.id && ['pending', 'running'].includes(g.status))).map((m) => [m.id, m])
         );
@@ -186,6 +198,18 @@ export const useChatStore = defineStore('chat', () => {
 
     function applyBlock(message: ChatMessage, event: SSEEvent) {
         if (event.type === 'done') return;
+        if (event.type === 'analysis_activity' && event.activity) {
+            const index = message.blocks.findIndex((block) => block.type === 'analysis_activity' && block.activity?.id === event.activity?.id);
+            const block: MessageBlock = { type: 'analysis_activity', activity: event.activity };
+            if (index >= 0) message.blocks[index] = block;
+            else message.blocks.push(block);
+            return;
+        }
+        if (event.type === 'analysis_activity_remove') {
+            const index = message.blocks.findIndex((block) => block.type === 'analysis_activity' && block.activity?.id === event.activityId);
+            if (index >= 0) message.blocks.splice(index, 1);
+            return;
+        }
         if (event.type === 'text_chunk') {
             const last = message.blocks.at(-1);
             last?.type === 'text' ? (last.content = (last.content || '') + (event.content || '')) : message.blocks.push({ type: 'text', content: event.content || '' });
@@ -200,7 +224,11 @@ export const useChatStore = defineStore('chat', () => {
         }
         if (event.type === 'log_update') {
             const item = [...message.blocks].reverse().find((b) => b.type === 'log' && b.title === event.title && String(b.content || '').startsWith('正在'));
-            if (item) item.content = event.content;
+            if (item) {
+                item.content = event.content;
+                item.rowCount = event.rowCount;
+                item.durationMs = event.durationMs;
+            }
             return;
         }
         if (event.type === 'log_remove') {
@@ -244,7 +272,9 @@ export const useChatStore = defineStore('chat', () => {
             chartArtifactId: event.chartArtifactId,
             resultContentHash: event.resultContentHash,
             title: event.title,
+            durationMs: event.durationMs,
             chartData: event.chartData,
+            activity: event.activity,
         };
         message.blocks.push(block);
     }
@@ -314,6 +344,28 @@ export const useChatStore = defineStore('chat', () => {
     async function cancelGeneration(id: string) {
         await apiFetch(`/chat/generations/${id}/cancel`, { method: 'POST' });
     }
+    async function retryGeneration(id: string): Promise<boolean> {
+        try {
+            const response = await apiFetch(`/chat/generations/${id}/retry`, { method: 'POST' });
+            if (!response.ok) {
+                const problem = await response.json().catch(() => null);
+                throw new Error(problem?.message || `请求失败: ${response.status}`);
+            }
+            const data = await response.json();
+            generations.value[data.generationId] = {
+                id: data.generationId,
+                conversationId: data.conversationId,
+                messageId: data.responseMessageId,
+                status: 'pending',
+                sequence: 0,
+            };
+            await fetchMessages(data.conversationId);
+            return true;
+        } catch (error) {
+            toast.error('重新分析失败: ' + (error instanceof Error ? error.message : '未知错误'));
+            return false;
+        }
+    }
     function abortStream() {
         if (activeGeneration.value) void cancelGeneration(activeGeneration.value.id);
     }
@@ -343,6 +395,7 @@ export const useChatStore = defineStore('chat', () => {
         startNewChat,
         sendMessage,
         abortStream,
+        retryGeneration,
         clear,
     };
 });

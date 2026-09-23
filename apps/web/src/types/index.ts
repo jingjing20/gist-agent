@@ -1,4 +1,4 @@
-import type { AnalysisOutcome, AnalysisState } from '@gist/contracts';
+import type { AnalysisActivityV1, AnalysisOutcome, AnalysisState } from '@gist/contracts';
 export interface AnalysisPresentation {
     outcome: AnalysisOutcome;
     state: AnalysisState;
@@ -23,7 +23,22 @@ export interface ArtifactColumn {
 
 export interface SSEEvent {
     analysis?: AnalysisPresentation;
-    type: 'sql' | 'table' | 'text' | 'text_chunk' | 'reasoning_chunk' | 'thinking' | 'error' | 'done' | 'log' | 'chart' | 'chart_loading' | 'log_update' | 'log_remove';
+    type:
+        | 'sql'
+        | 'table'
+        | 'text'
+        | 'text_chunk'
+        | 'reasoning_chunk'
+        | 'thinking'
+        | 'error'
+        | 'done'
+        | 'log'
+        | 'chart'
+        | 'chart_loading'
+        | 'log_update'
+        | 'log_remove'
+        | 'analysis_activity'
+        | 'analysis_activity_remove';
     content?: string;
     columns?: string[];
     columnTypes?: ArtifactColumn[];
@@ -34,7 +49,10 @@ export interface SSEEvent {
     chartArtifactId?: string;
     resultContentHash?: string;
     title?: string;
+    durationMs?: number;
     chartData?: ChartData;
+    activity?: AnalysisActivityV1;
+    activityId?: string;
 }
 
 export interface MessageBlock {
@@ -50,7 +68,9 @@ export interface MessageBlock {
     chartArtifactId?: string;
     resultContentHash?: string;
     title?: string;
+    durationMs?: number;
     chartData?: ChartData;
+    activity?: AnalysisActivityV1;
 }
 
 export interface ChatMessage {
