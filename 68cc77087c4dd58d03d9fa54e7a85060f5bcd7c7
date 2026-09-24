@@ -1,0 +1,248 @@
+apps/web/src/components/ChatDetail.vue
+  ab744b98150441bc 139,156,177
+apps/web/src/components/ui/dropdown-menu/DropdownMenuCheckboxItem.vue
+  72faeafb3e510982 1-43
+apps/web/src/components/ui/field/index.ts
+  72faeafb3e510982 1-31
+apps/web/src/components/ui/skeleton/index.ts
+  72faeafb3e510982 1
+apps/web/src/App.vue
+  72faeafb3e510982 3-5,10-13,15-17
+apps/web/src/components/ui/label/index.ts
+  72faeafb3e510982 1
+apps/web/src/components/ui/card/CardFooter.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/dropdown-menu/DropdownMenuSeparator.vue
+  72faeafb3e510982 1-23
+apps/web/src/views/MainLayout.vue
+  72faeafb3e510982 5,8-11,14-43,46-67,72-73,75-81,91,93,99-102,123-124,141-152
+apps/web/src/components/ui/checkbox/index.ts
+  72faeafb3e510982 1
+apps/web/src/components/ui/dropdown-menu/DropdownMenu.vue
+  72faeafb3e510982 1-19
+apps/web/src/style.css
+  72faeafb3e510982 10,12-53,55-91,96,108-109,120,147,150,197-203,205-224
+apps/web/src/components/ui/separator/index.ts
+  72faeafb3e510982 1
+apps/web/src/components/ui/skeleton/Skeleton.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/dropdown-menu/DropdownMenuTrigger.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/field/FieldDescription.vue
+  72faeafb3e510982 1-22
+apps/web/scripts/check-theme-styles.mjs
+  ab744b98150441bc 1-60
+apps/web/src/components/ui/dropdown-menu/DropdownMenuItem.vue
+  72faeafb3e510982 1-31
+apps/web/src/components/ui/card/CardContent.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/dropdown-menu/index.ts
+  72faeafb3e510982 1-16
+apps/web/src/components/ui/avatar/index.ts
+  72faeafb3e510982 1-27
+apps/web/src/components/ui/avatar/AvatarFallback.vue
+  72faeafb3e510982 1-21
+apps/web/src/components/ui/card/CardHeader.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/datasource/DataSourceCard.vue
+  72faeafb3e510982 2-19,24-27
+apps/web/src/views/DataSourceView.vue
+  72faeafb3e510982 8,12,65-67,300
+apps/web/src/components/ui/field/FieldSeparator.vue
+  72faeafb3e510982 1-29
+apps/web/src/components/ui/dropdown-menu/DropdownMenuSub.vue
+  72faeafb3e510982 1-18
+apps/web/src/views/ForgotPasswordPage.vue
+  72faeafb3e510982 27-29,41,44,55-57
+apps/worker/src/analysis/analysis-agent.ts
+  497442477c41aa15 184
+apps/web/src/components/ui/field/FieldGroup.vue
+  72faeafb3e510982 1-20
+apps/web/src/components/ui/dropdown-menu/DropdownMenuSubContent.vue
+  72faeafb3e510982 1-27
+apps/web/src/components/ui/field/FieldError.vue
+  72faeafb3e510982 1-53
+apps/web/src/components/ui/avatar/AvatarBadge.vue
+  72faeafb3e510982 1-23
+apps/web/src/components/datasource/EditSourceModal.vue
+  72faeafb3e510982 2-12,17-21
+apps/worker/src/analysis/submission.ts
+  497442477c41aa15 78-79
+apps/web/src/components/DataSourceDrawer.vue
+  ab744b98150441bc 147,159,165-166,245,249
+apps/web/src/components/ui/dropdown-menu/DropdownMenuSubTrigger.vue
+  72faeafb3e510982 1-32
+apps/web/src/components/ui/avatar/Avatar.vue
+  72faeafb3e510982 1-22
+apps/web/src/components/datasource/UploadTableModal.vue
+  72faeafb3e510982 2-8,10-20,22-24,29-34
+apps/web/src/components/ui/card/index.ts
+  72faeafb3e510982 1-7
+apps/web/src/components/ui/card/CardTitle.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/separator/Separator.vue
+  72faeafb3e510982 1-29
+apps/web/src/components/datasource/GrantPermissionModal.vue
+  72faeafb3e510982 2-12,14-18,21-22,27-31
+apps/web/src/components/ui/avatar/AvatarGroupCount.vue
+  72faeafb3e510982 1-20
+apps/web/src/components/ui/label/Label.vue
+  72faeafb3e510982 1-26
+apps/web/src/components/ui/field/FieldSet.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/field/FieldTitle.vue
+  72faeafb3e510982 1-20
+apps/web/src/views/RegisterPage.vue
+  72faeafb3e510982 27-31,38,41,52-54
+apps/web/src/components/ui/field/FieldLabel.vue
+  72faeafb3e510982 1-22
+apps/web/package.json
+  ab744b98150441bc 9
+  497442477c41aa15 21,31
+apps/web/src/components/ui/card/CardDescription.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/datasource/CreateSourceModal.vue
+  72faeafb3e510982 2-12,16-21
+apps/web/src/views/LoginPage.vue
+  72faeafb3e510982 27-31,38,41,52-54
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  497442477c41aa15 36,223
+apps/web/src/components/ui/avatar/AvatarImage.vue
+  72faeafb3e510982 1-16
+apps/web/src/components/ui/dropdown-menu/DropdownMenuRadioGroup.vue
+  72faeafb3e510982 1-21
+packages/contracts/src/analysis.ts
+  497442477c41aa15 27
+apps/web/src/components/blocks/MarkdownBlock.vue
+  497442477c41aa15 7-9,15,24-25,47,51-89
+apps/web/src/views/MemoriesView.vue
+  72faeafb3e510982 2,6,18-19,40,98,120,138,150,160,188
+  c434f96ddb6c6b94 57,79,88,90,143,176
+apps/web/src/components/ui/card/Card.vue
+  72faeafb3e510982 1-21
+apps/web/src/components/ui/card/CardAction.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/dropdown-menu/DropdownMenuRadioItem.vue
+  72faeafb3e510982 1-44
+apps/web/src/components/ui/field/Field.vue
+  72faeafb3e510982 1-27
+apps/web/src/components/ui/field/FieldContent.vue
+  72faeafb3e510982 1-20
+apps/web/src/components/ui/dropdown-menu/DropdownMenuContent.vue
+  72faeafb3e510982 1-40
+apps/web/src/components/ui/dropdown-menu/DropdownMenuShortcut.vue
+  72faeafb3e510982 1-17
+apps/web/src/components/ui/field/FieldLegend.vue
+  72faeafb3e510982 1-21
+apps/web/src/components/datasource/TableListModal.vue
+  72faeafb3e510982 2-18,20-21,25-27
+scripts/analysis-core-regression.mjs
+  497442477c41aa15 241-242,249,256-257
+apps/web/src/components/ui/avatar/AvatarGroup.vue
+  72faeafb3e510982 1-20
+apps/web/src/components/ui/dropdown-menu/DropdownMenuLabel.vue
+  72faeafb3e510982 1-23
+apps/web/src/components/ui/checkbox/Checkbox.vue
+  72faeafb3e510982 1-34
+apps/web/src/views/ResetPasswordPage.vue
+  72faeafb3e510982 28-31,38,41,52-54
+apps/web/src/components/ui/dropdown-menu/DropdownMenuGroup.vue
+  72faeafb3e510982 1-15
+apps/web/src/components/ChatSidebar.vue
+  ab744b98150441bc 225,273
+apps/web/src/components/ConfirmModal.vue
+  72faeafb3e510982 2-13,17-20,40-41,43
+apps/web/src/components/ChatEmptyState.vue
+  72faeafb3e510982 20-25,33,48-50,177
+  ab744b98150441bc 135
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "68cc77087c4dd58d03d9fa54e7a85060f5bcd7c7",
+  "prompts": {
+    "0e7e6acb8ee683c1": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cd5a-7ff9-7312-9470-110c9951ed38",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/23/rollout-2026-09-23T16-20-55-01a0cd5a-7ff9-7312-9470-110c9951ed38.jsonl",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "497442477c41aa15": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d129-f4cb-7c00-ace6-83c792b7aaab",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/24/rollout-2026-09-24T10-06-23-01a0d129-f4cb-7c00-ace6-83c792b7aaab.jsonl",
+      "total_additions": 59,
+      "total_deletions": 25,
+      "accepted_lines": 59,
+      "overriden_lines": 0
+    },
+    "72faeafb3e510982": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0cdae-49b6-7b40-9671-872eecd42291",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/23/rollout-2026-09-23T17-52-26-01a0cdae-49b6-7b40-9671-872eecd42291.jsonl",
+      "total_additions": 1634,
+      "total_deletions": 2272,
+      "accepted_lines": 1477,
+      "overriden_lines": 0
+    },
+    "ab744b98150441bc": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d15f-afc4-7300-820a-b41b4616a244",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/24/rollout-2026-09-24T11-05-04-01a0d15f-afc4-7300-820a-b41b4616a244.jsonl",
+      "total_additions": 75,
+      "total_deletions": 14,
+      "accepted_lines": 73,
+      "overriden_lines": 0
+    },
+    "c4154ae33f8753c5": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0c82f-10a7-70c0-9c52-cdc1e0dfa050",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    },
+    "c434f96ddb6c6b94": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d11f-d404-7f71-b154-d360dd55adb7",
+        "model": "gpt-5.6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/24/rollout-2026-09-24T09-55-19-01a0d11f-d404-7f71-b154-d360dd55adb7.jsonl",
+      "total_additions": 6,
+      "total_deletions": 7,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
