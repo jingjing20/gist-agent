@@ -238,22 +238,23 @@ await check('explicit user output preference wins over the default report', asyn
     const tableResponse = { kind: 'response', status: 'complete', blocks: [{ type: 'table', artifactId: 'a1' }] };
     assert.throws(() => assertRequestedPresentation('以表格给我就行', answer()), /只用表格/);
     assert.doesNotThrow(() => assertRequestedPresentation('以表格给我就行', tableResponse));
-    assert.throws(() => assertRequestedPresentation('以表格给我就行', { ...tableResponse, blocks: [...tableResponse.blocks, { type: 'markdown', content: '总结', evidence: [] }] }), /只用表格/);
-    const h = harness([[query()], [call('submit_analysis', { kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '北区收入为 8 万元。', evidence: ['a1'] }] })]]);
+    assert.throws(() => assertRequestedPresentation('以表格给我就行', { ...tableResponse, blocks: [...tableResponse.blocks, { type: 'markdown', content: '总结' }] }), /只用表格/);
+    const h = harness([[query()], [call('submit_analysis', { kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '北区收入为 8 万元。' }] })]]);
     assert.equal((await h.run()).kind, 'response');
 });
 await check('ordered response blocks validate table and chart references', async () => {
     const evidence = new Map([['a1', { blocked: false, sql: 'SELECT 1' }]]);
     const charts = new Map([['c1', 'a1']]);
     const response = { kind: 'response', status: 'complete', blocks: [
-        { type: 'markdown', content: '北区明细如下。', evidence: ['a1'] },
+        { type: 'markdown', content: '北区明细如下。' },
         { type: 'table', artifactId: 'a1' },
         { type: 'chart', chartArtifactId: 'c1' },
     ] };
     assert.deepEqual(validateSubmission(response, evidence, charts).blocks.map((block) => block.type), ['markdown', 'table', 'chart']);
     assert.throws(() => validateSubmission(response, evidence), /不是本轮已生成/);
     assert.throws(() => validateSubmission({ ...response, blocks: [{ type: 'table', artifactId: 'missing' }] }, evidence, charts), /不是本轮已观察/);
-    assert.throws(() => validateSubmission({ ...response, blocks: [{ type: 'markdown', content: '收入增长。', evidence: [] }] }, evidence, charts), /至少需要引用/);
+    assert.deepEqual(validateSubmission({ kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '当前数据源有 10 张表。' }] }, new Map()).blocks, [{ type: 'markdown', content: '当前数据源有 10 张表。' }]);
+    assert.throws(() => validateSubmission({ kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '旧格式', evidence: [] }] }, evidence, charts), /不允许的字段/);
 });
 await check('malformed arguments return paired feedback, no side effect', async () => {
     const bad = query();

@@ -17,32 +17,12 @@
             <!-- 数据源选择区域 -->
             <div class="ds-selection-box">
                 <div class="section-label">选择数据源</div>
-                <div class="custom-ds-select" :class="{ open: dsOpen }" tabindex="0" @blur="dsOpen = false">
-                    <div class="ds-trigger" @click="dsOpen = !dsOpen">
-                        <div class="ds-info">
-                            <i v-if="activeDs?.is_local" class="fas fa-database ds-type-icon"></i>
-                            <i v-else class="fas fa-file-csv ds-type-icon"></i>
-                            <span class="ds-value">{{ activeDatasourceName }}</span>
-                        </div>
-                        <i class="fas fa-chevron-down chevron"></i>
-                    </div>
-
-                    <div v-if="dsOpen" class="ds-dropdown">
-                        <div
-                            v-for="ds in dsStore.list"
-                            :key="ds.id"
-                            class="ds-option"
-                            :class="{ selected: ds.id === chatStore.activeDatasourceId }"
-                            @mousedown.prevent="selectDs(ds.id)"
-                        >
-                            <div class="ds-option-label">
-                                <i :class="ds.is_local ? 'fas fa-database' : 'fas fa-file-csv'"></i>
-                                <span>{{ ds.name }}</span>
-                            </div>
-                            <span v-if="ds.is_local" class="local-badge">公共库</span>
-                        </div>
-                    </div>
-                </div>
+                <Select :model-value="chatStore.activeDatasourceId ? String(chatStore.activeDatasourceId) : undefined" @update:model-value="(value) => value && selectDs(Number(value))">
+                    <SelectTrigger class="w-full"><SelectValue placeholder="选择数据源" /></SelectTrigger>
+                    <SelectContent><SelectGroup>
+                        <SelectItem v-for="ds in dsStore.list" :key="ds.id" :value="String(ds.id)">{{ ds.name }}{{ ds.is_local ? ' · 公共库' : '' }}</SelectItem>
+                    </SelectGroup></SelectContent>
+                </Select>
             </div>
 
             <!-- 推荐查询区域 -->
@@ -50,7 +30,7 @@
                 <div class="section-label">您可能想问</div>
                 <div class="suggestions-grid">
                     <template v-if="suggestionsLoading">
-                        <div v-for="i in 3" :key="i" class="suggestion-card skeleton" />
+                        <Skeleton v-for="i in 3" :key="i" class="h-24 rounded-xl" />
                     </template>
                     <template v-else>
                         <button v-for="q in exampleQueries" :key="q" class="suggestion-card" @click="emit('select', q)">
@@ -65,7 +45,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { computed, watch, onMounted } from 'vue';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useChatStore } from '../stores/chat';
 import { useDataSourceStore } from '../stores/datasource';
 
@@ -86,17 +68,7 @@ const emit = defineEmits<{
 const chatStore = useChatStore();
 const dsStore = useDataSourceStore();
 
-const dsOpen = ref(false);
-
 const DEFAULT_QUERIES = ['帮我分析下近一月平台的日活趋势', '对比不同平台最近一周的新增用户数', '近 7 天用户行为类型分布是怎样的'];
-
-const activeDs = computed(() => {
-    return dsStore.list.find((d) => d.id === chatStore.activeDatasourceId);
-});
-
-const activeDatasourceName = computed(() => {
-    return activeDs.value?.name || '选择数据源';
-});
 
 const suggestionsLoading = computed(() => {
     const id = chatStore.activeDatasourceId;
@@ -113,7 +85,6 @@ const exampleQueries = computed(() => {
 
 function selectDs(id: number) {
     chatStore.activeDatasourceId = id;
-    dsOpen.value = false;
 }
 
 onMounted(async () => {
@@ -161,7 +132,7 @@ watch(
 }
 
 .expand-sidebar-btn:hover {
-    color: #fff;
+    color: var(--da-text-main);
 }
 
 .empty-state-content {
@@ -203,7 +174,7 @@ watch(
 .hero-title {
     font-size: 32px;
     font-weight: 850;
-    color: #fff;
+    color: var(--da-text-main);
     margin: 0;
     letter-spacing: -0.03em;
 }
@@ -234,115 +205,6 @@ watch(
     padding: 16px 20px; /* Reduced from 24px */
     display: flex;
     flex-direction: column;
-}
-
-.custom-ds-select {
-    position: relative;
-    outline: none;
-}
-
-.ds-trigger {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 16px;
-    background: var(--da-card);
-    border: 1px solid var(--da-border);
-    border-radius: 10px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.ds-trigger:hover {
-    border-color: var(--da-primary);
-    background: rgba(255, 255, 255, 0.03);
-}
-
-.ds-info {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.ds-type-icon {
-    color: var(--da-primary);
-    font-size: 16px;
-}
-
-.ds-value {
-    font-size: 15px;
-    font-weight: 500;
-    color: var(--da-text-main);
-}
-
-.chevron {
-    font-size: 12px;
-    color: var(--da-text-muted);
-    transition: transform 0.2s;
-}
-
-.custom-ds-select.open .chevron {
-    transform: rotate(180deg);
-}
-
-.ds-dropdown {
-    position: absolute;
-    top: calc(100% + 8px);
-    left: 0;
-    right: 0;
-    background: var(--da-card);
-    border: 1px solid var(--da-border);
-    border-radius: 10px;
-    padding: 8px;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-    z-index: 100;
-    animation: slideDown 0.2s cubic-bezier(0, 0, 0.2, 1);
-}
-
-@keyframes slideDown {
-    from {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.ds-option {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 12px;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-
-.ds-option:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.ds-option.selected {
-    background: rgba(14, 165, 233, 0.1);
-    color: var(--da-primary);
-}
-
-.ds-option-label {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 14px;
-    font-weight: 500;
-}
-
-.local-badge {
-    font-size: 11px;
-    padding: 2px 6px;
-    background: rgba(14, 165, 233, 0.15);
-    color: var(--da-primary);
-    border-radius: 4px;
 }
 
 /* Suggestions Section */
@@ -398,23 +260,6 @@ watch(
 .suggestion-card:hover .query-icon {
     transform: translateX(4px);
     color: var(--da-primary);
-}
-
-/* Skeleton */
-.skeleton {
-    background: linear-gradient(90deg, var(--da-card) 25%, var(--da-border) 50%, var(--da-card) 75%);
-    background-size: 200% 100%;
-    animation: shimmer 1.5s infinite;
-    border-color: transparent !important;
-}
-
-@keyframes shimmer {
-    0% {
-        background-position: 200% 0;
-    }
-    100% {
-        background-position: -200% 0;
-    }
 }
 
 .no-scrollbar::-webkit-scrollbar {

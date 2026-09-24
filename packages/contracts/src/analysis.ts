@@ -24,7 +24,7 @@ export interface AnalysisAnswer {
 }
 
 export type AnalysisContentBlock =
-    | { type: 'markdown'; content: string; evidence: string[] }
+    | { type: 'markdown'; content: string }
     | { type: 'table'; artifactId: string; title?: string }
     | { type: 'chart'; chartArtifactId: string };
 

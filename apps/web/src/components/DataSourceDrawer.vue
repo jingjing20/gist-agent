@@ -144,7 +144,7 @@ onMounted(() => {
 .drawer-title {
     font-size: 14px;
     font-weight: 600;
-    color: #fff;
+    color: var(--da-text-main);
     letter-spacing: 0.025em;
 }
 
@@ -156,14 +156,14 @@ onMounted(() => {
     transition: color 0.2s;
 }
 .drawer-toggle:hover {
-    color: #fff;
+    color: var(--da-text-main);
 }
 
 .ds-card {
     border-radius: 12px;
     padding: 16px;
-    border: 1px solid rgba(51, 58, 77, 0.5); /* da-border/50 */
-    background: linear-gradient(to bottom, #2a3142, #1c212e);
+    border: 1px solid var(--da-border);
+    background: var(--da-card);
     position: relative;
     overflow: hidden;
     box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
@@ -242,11 +242,11 @@ onMounted(() => {
     flex-shrink: 0;
 }
 .table-item:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--da-border);
 }
 .table-item.active {
     background: rgba(14, 165, 233, 0.1); /* da-primary/10 */
-    color: #fff;
+    color: var(--da-text-main);
 }
 
 .table-item i {

@@ -1,37 +1,30 @@
 <template>
-    <Teleport to="body">
-        <div v-if="modelValue" class="modal-overlay">
-            <div class="modal da-modal table-modal">
-                <button class="modal-close" @click="emit('update:modelValue', null)">
-                    <i class="fas fa-times"></i>
-                </button>
-                <div class="modal-header">
-                    <h3>数据表列表: {{ modelValue.name }}</h3>
-                </div>
-                <div class="modal-scroll-content no-scrollbar">
-                    <div v-if="loading" class="loading-box"><i class="fas fa-circle-notch fa-spin"></i> 加载中...</div>
-                    <div v-else-if="!tables.length" class="empty-box">暂无数据表</div>
-                    <div v-else class="table-grid">
-                        <div v-for="t in tables" :key="t.id" class="table-list-item">
-                            <div class="t-info">
-                                <div class="t-name">
-                                    {{ t.display_name }}
-                                    <span class="t-uploader" v-if="t.creator_name">· 上传者: {{ t.creator_name }}</span>
-                                </div>
-                                <div class="t-code">{{ t.table_name }}</div>
-                            </div>
-                            <button v-if="!modelValue.is_local && canDelete(modelValue, t)" class="t-delete-btn" @click="emit('delete-table', modelValue.id, t.id)">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+    <Dialog :open="!!modelValue" @update:open="(open) => !open && emit('update:modelValue', null)">
+        <DialogContent class="sm:max-w-2xl">
+            <DialogHeader><DialogTitle>数据表列表：{{ modelValue?.name }}</DialogTitle><DialogDescription>查看当前数据源中的表。</DialogDescription></DialogHeader>
+            <p v-if="loading" class="text-sm text-muted-foreground">加载中...</p>
+            <p v-else-if="!tables.length" class="py-8 text-center text-sm text-muted-foreground">暂无数据表</p>
+            <div v-else class="max-h-[60vh] overflow-auto">
+                <Table>
+                    <TableHeader><TableRow><TableHead>展示名</TableHead><TableHead>表名</TableHead><TableHead>上传者</TableHead><TableHead class="text-right">操作</TableHead></TableRow></TableHeader>
+                    <TableBody>
+                        <TableRow v-for="table in tables" :key="table.id">
+                            <TableCell class="font-medium">{{ table.display_name }}</TableCell>
+                            <TableCell class="text-muted-foreground">{{ table.table_name }}</TableCell>
+                            <TableCell>{{ table.creator_name || '—' }}</TableCell>
+                            <TableCell class="text-right"><Button v-if="modelValue && !modelValue.is_local && canDelete(modelValue, table)" variant="ghost" size="sm" @click="emit('delete-table', modelValue.id, table.id)">删除</Button></TableCell>
+                        </TableRow>
+                    </TableBody>
+                </Table>
             </div>
-        </div>
-    </Teleport>
+        </DialogContent>
+    </Dialog>
 </template>
 
 <script setup lang="ts">
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import type { DataSource, DataSourceTable } from '../../stores/datasource';
 import { useAuthStore } from '../../stores/auth';
 
@@ -54,127 +47,3 @@ const emit = defineEmits<{
     (e: 'delete-table', dsId: number, tableId: number): void;
 }>();
 </script>
-
-<style scoped>
-/* modal-overlay is now global in style.css */
-
-.modal {
-    background: var(--da-panel);
-    border: 1px solid var(--da-border);
-    border-radius: 20px;
-    padding: 32px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-    animation: modal-pop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-@keyframes modal-pop {
-    from {
-        opacity: 0;
-        transform: scale(0.95);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-.table-modal {
-    width: 600px;
-    max-height: 80vh;
-    display: flex;
-    flex-direction: column;
-}
-
-.modal-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 24px;
-}
-
-.modal-header h3 {
-    margin: 0;
-    font-size: 20px;
-    color: #fff;
-}
-
-.close-btn {
-    background: none;
-    border: none;
-    color: var(--da-text-muted);
-    font-size: 24px;
-    cursor: pointer;
-}
-
-.modal-scroll-content {
-    flex: 1;
-    overflow-y: auto;
-}
-
-.loading-box,
-.empty-box {
-    padding: 40px;
-    text-align: center;
-    color: var(--da-text-muted);
-}
-
-.table-grid {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.table-list-item {
-    background: var(--da-card);
-    border: 1px solid var(--da-border);
-    border-radius: 12px;
-    padding: 12px 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.t-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.t-name {
-    font-weight: 600;
-    color: #fff;
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-}
-.t-uploader {
-    font-size: 11px;
-    font-weight: 400;
-    color: var(--da-text-muted);
-    margin-left: 8px;
-}
-.t-code {
-    font-size: 12px;
-    color: var(--da-text-muted);
-    font-family: monospace;
-}
-
-.t-delete-btn {
-    background: none;
-    border: none;
-    color: var(--da-text-muted);
-    cursor: pointer;
-    transition: color 0.2s;
-}
-.t-delete-btn:hover {
-    color: #ef4444;
-}
-
-.no-scrollbar::-webkit-scrollbar {
-    display: none;
-}
-.no-scrollbar {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-}
-</style>

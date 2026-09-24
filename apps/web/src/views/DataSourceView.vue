@@ -5,11 +5,11 @@
                 <h2 class="page-title">数据源管理</h2>
                 <p class="page-subtitle">连接并管理你的数据分析资产</p>
             </div>
-            <button class="add-ds-btn" @click="showCreateModal = true"><i class="fas fa-plus"></i> 新建数据源</button>
+            <Button @click="showCreateModal = true"><Plus data-icon="inline-start" />新建数据源</Button>
         </div>
 
         <div class="ds-grid">
-            <div v-if="dsStore.loading" v-for="i in 3" :key="'skeleton' + i" class="skeleton-card"></div>
+            <Skeleton v-if="dsStore.loading" v-for="i in 3" :key="'skeleton' + i" class="h-64 rounded-xl" />
 
             <div v-else-if="!dsStore.list.length" class="empty-state">
                 <i class="fas fa-database empty-icon"></i>
@@ -62,6 +62,9 @@
 
 <script setup lang="ts">
 import { ref, onMounted, reactive } from 'vue';
+import { Plus } from '@lucide/vue';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
@@ -294,33 +297,13 @@ async function executeDelete() {
 .page-title {
     font-size: 28px;
     font-weight: 800;
-    color: #fff;
+    color: var(--da-text-main);
     margin-bottom: 8px;
 }
 
 .page-subtitle {
     font-size: 14px;
     color: var(--da-text-muted);
-}
-
-.add-ds-btn {
-    background: var(--da-primary);
-    color: #fff;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.3);
-    transition: all 0.2s;
-}
-
-.add-ds-btn:hover {
-    background: var(--da-primary-hover);
-    transform: translateY(-2px);
 }
 
 .ds-grid {
@@ -340,31 +323,6 @@ async function executeDelete() {
     font-size: 64px;
     margin-bottom: 24px;
     opacity: 0.2;
-}
-
-.skeleton-card {
-    height: 260px;
-    background: var(--da-panel);
-    border-radius: 20px;
-    position: relative;
-    overflow: hidden;
-}
-
-.skeleton-card::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.03), transparent);
-    animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-    0% {
-        transform: translateX(-100%);
-    }
-    100% {
-        transform: translateX(100%);
-    }
 }
 
 .no-scrollbar::-webkit-scrollbar {

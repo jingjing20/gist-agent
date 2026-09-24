@@ -51,7 +51,6 @@ export const SUBMIT_TOOL: OpenAI.Chat.Completions.ChatCompletionTool = {
                         properties: {
                             type: { type: 'string', enum: ['markdown', 'table', 'chart'] },
                             content: { type: 'string', description: 'markdown 内容；可用标题、列表、段落，按用户要求组织。' },
-                            evidence: { type: 'array', items: { type: 'string' }, description: 'markdown 中数据结论的查询证据 ID。' },
                             artifactId: { type: 'string', description: 'table 对应的查询证据 ID。' },
                             title: { type: 'string', description: 'table 可选标题。' },
                             chartArtifactId: { type: 'string', description: 'chart 对应的图表 ID。' },
@@ -76,16 +75,8 @@ export function validateSubmission(value: unknown, observed: Map<string, Observe
         const blocks = args.blocks.map((value: unknown) => {
             const block = record(value);
             if (block.type === 'markdown') {
-                exactKeys(block, ['type', 'content', 'evidence']);
-                if (!Array.isArray(block.evidence) || block.evidence.length > 20) throw new Error('文字块证据无效');
-                const evidence = block.evidence.map((value: unknown) => {
-                    const id = text(value);
-                    const source = observed.get(id);
-                    if (!source) throw new Error(`证据 ${id} 不是本轮已观察的查询结果`);
-                    if (source.blocked) throw new Error('质量受限证据不能支持确定结论');
-                    return id;
-                });
-                return { type: 'markdown' as const, content: text(block.content), evidence: [...new Set(evidence)] };
+                exactKeys(block, ['type', 'content']);
+                return { type: 'markdown' as const, content: text(block.content) };
             }
             if (block.type === 'table') {
                 exactKeys(block, ['type', 'artifactId', 'title']);
@@ -106,8 +97,6 @@ export function validateSubmission(value: unknown, observed: Map<string, Observe
             }
             throw new Error('内容块类型不合法');
         });
-        if (observed.size && !blocks.some((block) => block.type !== 'markdown' || block.evidence.length))
-            throw new Error('数据回答至少需要引用一项本轮查询证据');
         return { kind: 'response', status: args.status, blocks, ...(args.reason === undefined ? {} : { reason: text(args.reason) }) };
     }
     if (args.kind === 'clarification') {

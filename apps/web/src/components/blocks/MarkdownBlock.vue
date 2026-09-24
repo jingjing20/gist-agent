@@ -4,13 +4,15 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { marked } from 'marked';
+import MarkdownIt from 'markdown-it';
+
+const markdown = new MarkdownIt({ html: false, linkify: true });
 
 const props = defineProps<{ content?: string }>();
 
 const renderedHTML = computed(() => {
     if (!props.content) return '';
-    return marked.parse(props.content, { async: false }) as string;
+    return markdown.render(props.content);
 });
 </script>
 
@@ -19,6 +21,8 @@ const renderedHTML = computed(() => {
     line-height: 1.7;
     color: var(--da-text-main);
     font-size: 14px;
+    min-width: 0;
+    overflow-x: auto;
 }
 
 .markdown-block :deep(p) {
@@ -40,8 +44,47 @@ const renderedHTML = computed(() => {
 }
 
 .markdown-block :deep(strong) {
-    color: #fff;
+    color: var(--da-text-main);
     font-weight: 700;
+}
+
+.markdown-block :deep(table) {
+    width: 100%;
+    min-width: 520px;
+    margin: 12px 0;
+    border: 1px solid var(--da-border);
+    border-collapse: separate;
+    border-spacing: 0;
+    border-radius: 8px;
+    background: var(--da-panel);
+    font-size: 13px;
+}
+
+.markdown-block :deep(th),
+.markdown-block :deep(td) {
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--da-border);
+    text-align: left;
+    vertical-align: top;
+}
+
+.markdown-block :deep(th) {
+    background: var(--da-card);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.markdown-block :deep(tr:last-child td) {
+    border-bottom: 0;
+}
+
+.markdown-block :deep(th + th),
+.markdown-block :deep(td + td) {
+    border-left: 1px solid var(--da-border);
+}
+
+.markdown-block :deep(tr:hover td) {
+    background: var(--da-card);
 }
 
 .markdown-block :deep(code) {

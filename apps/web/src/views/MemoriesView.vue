@@ -1,9 +1,9 @@
 <template>
-    <main class="memories-page dark h-full w-full overflow-auto bg-background px-6 py-10 text-foreground lg:px-14">
+    <main class="memories-page h-full w-full overflow-auto bg-background px-6 py-10 text-foreground lg:px-14">
         <div class="mx-auto max-w-6xl">
             <header class="mb-8 flex flex-wrap items-start justify-between gap-6">
                 <div>
-                    <p class="mb-2 text-xs font-semibold tracking-widest text-blue-400">WORKSPACE / MEMORY</p>
+                    <p class="mb-2 text-xs font-semibold tracking-widest text-primary">WORKSPACE / MEMORY</p>
                     <h1 class="mb-2 text-3xl font-semibold tracking-tight">记忆</h1>
                     <p class="text-sm leading-6 text-muted-foreground">按数据源管理已保存记忆。修改在下一轮分析生效，历史版本会保留。</p>
                 </div>
@@ -15,8 +15,8 @@
                     <label id="source-label" class="text-sm font-medium">数据源</label>
                     <Select :model-value="datasourceId ? String(datasourceId) : undefined" :disabled="busy" @update:model-value="selectSource">
                         <SelectTrigger class="w-full" aria-labelledby="source-label"><SelectValue placeholder="请选择数据源" /></SelectTrigger>
-                        <SelectContent class="memory-ui dark"
-                            ><SelectItem v-for="ds in sources.list" :key="ds.id" :value="String(ds.id)">{{ ds.name }}</SelectItem></SelectContent
+                        <SelectContent class="memory-ui"
+                            ><SelectGroup><SelectItem v-for="ds in sources.list" :key="ds.id" :value="String(ds.id)">{{ ds.name }}</SelectItem></SelectGroup></SelectContent
                         >
                     </Select>
                 </div>
@@ -37,7 +37,7 @@
             <p v-if="datasourceId && !canWrite" class="mb-6 rounded-lg border border-border p-3 text-sm text-muted-foreground">
                 当前为只读；只有数据源所有者可以修改记忆和确认候选。
             </p>
-            <p v-if="error" role="alert" class="mb-6 rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm text-red-300">{{ error }}</p>
+            <p v-if="error" role="alert" class="mb-6 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{{ error }}</p>
 
             <section v-if="candidates.length" class="mb-10">
                 <div class="mb-4">
@@ -54,7 +54,7 @@
                     >
                         <div class="min-w-0 flex-1">
                             <h3 class="font-medium">{{ candidate.content.name }}</h3>
-                            <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-muted-foreground">{{ candidate.content.description }}</p>
+                            <p class="mt-2 whitespace-pre-wrap wrap-break-word text-sm leading-6 text-muted-foreground">{{ candidate.content.description }}</p>
                             <p v-if="candidate.memoryId" class="mt-2 text-xs text-muted-foreground">修改现有记忆 · 目标版本 {{ candidate.expectedVersion }}</p>
                         </div>
                         <div class="flex gap-2">
@@ -76,7 +76,7 @@
                     <span v-if="loading" class="text-sm text-muted-foreground">正在读取…</span>
                 </div>
                 <div class="overflow-hidden rounded-xl border border-border bg-card">
-                    <Table class="min-w-[760px] table-fixed"
+                    <Table class="min-w-190 table-fixed"
                         ><TableHeader
                             ><TableRow class="bg-muted/50"
                                 ><TableHead class="w-[19%] pl-5">标题</TableHead><TableHead class="w-[45%]">内容</TableHead><TableHead class="w-[9%]">版本</TableHead
@@ -85,9 +85,9 @@
                         >
                         <TableBody
                             ><TableRow v-for="item in items" :key="item.id"
-                                ><TableCell class="break-words pl-5 font-medium whitespace-normal">{{ item.name }}</TableCell
+                                ><TableCell class="wrap-break-word pl-5 font-medium whitespace-normal">{{ item.name }}</TableCell
                                 ><TableCell class="text-muted-foreground whitespace-normal"
-                                    ><span class="line-clamp-2 whitespace-pre-wrap break-words">{{ item.description }}</span></TableCell
+                                    ><span class="line-clamp-2 whitespace-pre-wrap wrap-break-word">{{ item.description }}</span></TableCell
                                 ><TableCell
                                     ><Badge variant="outline">v{{ item.version }}</Badge></TableCell
                                 ><TableCell class="pr-5"
@@ -95,7 +95,7 @@
                                         <Button variant="ghost" size="sm" @click="viewing = item">查看</Button
                                         ><Button variant="ghost" size="sm" :disabled="!canWrite || busy" @click="startEdit(item)">修改</Button
                                         ><Button variant="ghost" size="sm" :disabled="busy" @click="openHistory(item)">历史</Button
-                                        ><Button variant="ghost" size="sm" class="text-red-400 hover:text-red-300" :disabled="!canWrite || busy" @click="deleting = item"
+                                        ><Button variant="ghost" size="sm" class="text-destructive" :disabled="!canWrite || busy" @click="deleting = item"
                                             >删除</Button
                                         >
                                     </div></TableCell
@@ -117,7 +117,7 @@
         </div>
 
         <Dialog :open="!!editing" @update:open="closeEditing"
-            ><DialogContent class="memory-ui dark sm:max-w-xl"
+            ><DialogContent class="memory-ui sm:max-w-xl"
                 ><DialogHeader
                     ><DialogTitle>{{ editing?.id ? '修改记忆' : '新增记忆' }}</DialogTitle
                     ><DialogDescription>保存即确认这条记忆，用于此数据源后续分析。</DialogDescription></DialogHeader
@@ -135,19 +135,19 @@
             ></Dialog
         >
         <Dialog :open="!!viewing" @update:open="closeViewing"
-            ><DialogContent class="memory-ui dark sm:max-w-xl"
+            ><DialogContent class="memory-ui sm:max-w-xl"
                 ><DialogHeader
                     ><DialogTitle>{{ viewing?.name }}</DialogTitle
                     ><DialogDescription>当前版本 v{{ viewing?.version }}</DialogDescription></DialogHeader
                 >
-                <div class="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words text-sm leading-7">{{ viewing?.description }}</div>
+                <div class="max-h-[50vh] overflow-auto whitespace-pre-wrap wrap-break-word text-sm leading-7">{{ viewing?.description }}</div>
                 <DialogFooter
                     ><Button variant="outline" @click="viewing = null">关闭</Button><Button :disabled="!canWrite || busy" @click="editViewed">修改记忆</Button></DialogFooter
                 ></DialogContent
             ></Dialog
         >
         <AlertDialog :open="!!deleting" @update:open="closeDeleting"
-            ><AlertDialogContent class="memory-ui dark"
+            ><AlertDialogContent class="memory-ui"
                 ><AlertDialogHeader
                     ><AlertDialogTitle>删除记忆？</AlertDialogTitle
                     ><AlertDialogDescription>删除“{{ deleting?.name }}”后，后续分析不再默认使用；历史版本仍保留。</AlertDialogDescription></AlertDialogHeader
@@ -157,7 +157,7 @@
             ></AlertDialog
         >
         <Dialog :open="!!history" @update:open="closeHistory"
-            ><DialogContent class="memory-ui dark sm:max-w-xl"
+            ><DialogContent class="memory-ui sm:max-w-xl"
                 ><DialogHeader
                     ><DialogTitle>{{ history?.name }} · 历史版本</DialogTitle><DialogDescription>选择版本查看当时保存的内容。</DialogDescription></DialogHeader
                 >
@@ -173,7 +173,7 @@
                         <Badge variant="outline">v{{ history?.version }}</Badge
                         ><span class="text-sm text-muted-foreground">{{ history?.status === 'deleted' ? '已删除' : '有效记录' }}</span>
                     </div>
-                    <div class="max-h-[50vh] overflow-auto whitespace-pre-wrap break-words text-sm leading-7">{{ history?.description }}</div>
+                    <div class="max-h-[50vh] overflow-auto whitespace-pre-wrap wrap-break-word text-sm leading-7">{{ history?.description }}</div>
                 </div>
                 <DialogFooter><Button variant="outline" @click="history = null">关闭</Button></DialogFooter></DialogContent
             ></Dialog
@@ -185,7 +185,7 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

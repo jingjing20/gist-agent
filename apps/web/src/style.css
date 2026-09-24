@@ -7,34 +7,93 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-    --bg-primary: #0f0f13;
-    --bg-secondary: #1a1a23;
-    --bg-sidebar: #13131a;
-    --bg-hover: #22222e;
-    --bg-active: #2a2a3a;
-    --bg-code: #1e1e2e;
-    --bg-code-header: #16161f;
-    --border: #2a2a3a;
-    --border-light: #1f1f2e;
-    --text-primary: #e4e4e7;
-    --text-secondary: #71717a;
-    --accent: #0ea5e9;
-    --accent-hover: #0284c7;
+    color-scheme: light;
     --font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius: 0.625rem;
+    --background: #ffffff;
+    --foreground: #18181b;
+    --card: #ffffff;
+    --card-foreground: #18181b;
+    --popover: #ffffff;
+    --popover-foreground: #18181b;
+    --primary: #18181b;
+    --primary-foreground: #fafafa;
+    --secondary: #f4f4f5;
+    --secondary-foreground: #27272a;
+    --muted: #f4f4f5;
+    --muted-foreground: #71717a;
+    --accent: #f4f4f5;
+    --accent-foreground: #18181b;
+    --destructive: #dc2626;
+    --border: #e4e4e7;
+    --input: #e4e4e7;
+    --ring: #a1a1aa;
+    --bg-primary: #ffffff;
+    --bg-secondary: #fafafa;
+    --bg-sidebar: #f8f8fa;
+    --bg-hover: #f4f4f5;
+    --bg-active: #e4e4e7;
+    --bg-code: #f7f7f8;
+    --bg-code-header: #eeeeef;
+    --border-light: #eeeeef;
+    --text-primary: #18181b;
+    --text-secondary: #71717a;
+    --accent-hover: #d4d4d8;
+    --da-bg: #fafafa;
+    --da-panel: #ffffff;
+    --da-card: #f4f4f5;
+    --da-border: #e4e4e7;
+    --da-text-main: #18181b;
+    --da-text-muted: #71717a;
+    --da-primary: #18181b;
+    --da-primary-hover: #3f3f46;
+    --da-gradient-start: #6d28d9;
+    --da-gradient-end: #2563eb;
+    --da-chart-bg: #ffffff;
+}
 
-    /* Gist Agent Theme Variables */
-    --da-bg: #171a25;
-    --da-panel: #1e2330;
-    --da-card: #252b3b;
-    --da-border: #333a4d;
-    --da-text-main: #e2e8f0;
-    --da-text-muted: #94a3b8;
+.dark {
+    color-scheme: dark;
+    --background: #09090b;
+    --foreground: #fafafa;
+    --card: #18181b;
+    --card-foreground: #fafafa;
+    --popover: #18181b;
+    --popover-foreground: #fafafa;
+    --primary: #3b82f6;
+    --primary-foreground: #fff;
+    --secondary: #27272a;
+    --secondary-foreground: #fafafa;
+    --muted: #27272a;
+    --muted-foreground: #a1a1aa;
+    --accent: #27272a;
+    --accent-foreground: #fafafa;
+    --destructive: #dc2626;
+    --border: #27272a;
+    --input: #3f3f46;
+    --ring: #a1a1aa;
+    --bg-primary: #09090b;
+    --bg-secondary: #18181b;
+    --bg-sidebar: #111113;
+    --bg-hover: #27272a;
+    --bg-active: #3f3f46;
+    --bg-code: #18181b;
+    --bg-code-header: #111113;
+    --border-light: #27272a;
+    --text-primary: #fafafa;
+    --text-secondary: #a1a1aa;
+    --accent-hover: #0284c7;
+    --da-bg: #09090b;
+    --da-panel: #18181b;
+    --da-card: #18181b;
+    --da-border: #27272a;
+    --da-text-main: #fafafa;
+    --da-text-muted: #a1a1aa;
     --da-primary: #0ea5e9;
     --da-primary-hover: #0284c7;
     --da-gradient-start: #8b5cf6;
     --da-gradient-end: #3b82f6;
-    --da-chart-bg: #1a1f2e;
-    --radius: 0.625rem;
+    --da-chart-bg: #111113;
 }
 
 @layer base {
@@ -46,9 +105,8 @@
         padding: 0;
     }
 
-    /* shadcn-vue controls need the form resets supplied by Tailwind preflight.
-       Scope them to the memory UI so other pages keep their existing styles. */
-    :where(.memories-page, .memory-ui) :where(button, input, textarea) {
+    /* Keep native form defaults from leaking through generated components. */
+    :where(button, input, textarea) {
         font: inherit;
         color: inherit;
         background: transparent;
@@ -59,7 +117,7 @@ html,
 body {
     height: 100%;
     font-family: var(--font-family);
-    background: var(--bg-primary); /* Keeps old default, ChatView will force its own bg */
+    background: var(--bg-primary);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -86,10 +144,10 @@ body {
     background: var(--text-secondary);
 }
 
-/* highlight.js theme overrides for dark mode */
+/* Syntax colors follow the active theme. */
 .hljs {
     background: transparent !important;
-    color: #e4e4e7;
+    color: var(--text-primary);
 }
 .hljs-keyword {
     color: #c792ea;
@@ -108,46 +166,6 @@ body {
 }
 .hljs-comment {
     color: #546e7a;
-}
-
-/* Global Modal Styles */
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.7);
-    backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-}
-
-.modal-close {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    border: none;
-    background: transparent;
-    color: var(--da-text-muted);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    transition: all 0.2s;
-    z-index: 10;
-}
-
-.modal-close:hover {
-    background: rgba(255, 255, 255, 0.05);
-    color: #fff;
-}
-
-.da-modal {
-    position: relative;
 }
 
 @theme inline {
@@ -176,23 +194,31 @@ body {
     --radius-xl: calc(var(--radius) + 4px);
 }
 
-.dark {
-    --background: #171a25;
-    --foreground: #e2e8f0;
-    --card: #1e2330;
-    --card-foreground: #e2e8f0;
-    --popover: #252b3b;
-    --popover-foreground: #e2e8f0;
-    --primary: #3b82f6;
-    --primary-foreground: #fff;
-    --secondary: #30394b;
-    --secondary-foreground: #e2e8f0;
-    --muted: #2a3343;
-    --muted-foreground: #94a3b8;
-    --accent: #37465f;
-    --accent-foreground: #e2e8f0;
-    --destructive: #dc2626;
-    --border: #333a4d;
-    --input: #3b4559;
-    --ring: #60a5fa;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-background text-foreground;
+    }
 }
+
+.auth-theme-toggle {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 20;
+}
+
+/* The legacy auth pages share one layout; these tokens let it follow the app theme. */
+html:not(.dark) .auth-page .glass-card {
+    background: rgba(255, 255, 255, 0.92);
+    border-color: var(--border);
+    box-shadow: 0 24px 70px rgba(24, 24, 27, 0.18);
+}
+html:not(.dark) .auth-page .form-panel { background: rgba(250, 250, 250, 0.75); }
+html:not(.dark) .auth-page .branding::after { background: linear-gradient(to bottom, transparent, var(--border), transparent); }
+html:not(.dark) .auth-page :is(.logo-name, .logo-text, .form-header h3, .hero-title) { color: var(--foreground); }
+html:not(.dark) .auth-page .hero-title { background: none; -webkit-text-fill-color: currentColor; }
+html:not(.dark) .auth-page :is(.hero-desc, .form-header p, .form-footer, .input-wrapper i) { color: var(--muted-foreground); }
+html:not(.dark) .auth-page .form-error { color: var(--destructive); }

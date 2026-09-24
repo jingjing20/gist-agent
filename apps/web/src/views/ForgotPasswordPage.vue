@@ -24,12 +24,9 @@
                     </div>
 
                     <form @submit.prevent="handleSubmit" class="auth-form">
-                        <div class="input-group">
-                            <div class="input-wrapper">
-                                <i class="far fa-envelope"></i>
-                                <input v-model="email" type="email" placeholder="输入注册邮箱" required />
-                            </div>
-                        </div>
+                        <FieldGroup>
+                            <Field><FieldLabel for="auth-email">邮箱</FieldLabel><Input id="auth-email" v-model="email" type="email" placeholder="输入注册邮箱" required /></Field>
+                        </FieldGroup>
 
                         <div v-if="error" class="form-error">
                             <i class="fas fa-exclamation-circle"></i>
@@ -41,10 +38,10 @@
                             重置链接已发送到邮箱
                         </div>
 
-                        <button type="submit" class="btn-primary" :disabled="loading || success">
+                        <Button type="submit" class="w-full" :disabled="loading || success">
                             <span v-if="!loading">发送重置链接</span>
                             <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 发送中...</span>
-                        </button>
+                        </Button>
                     </form>
 
                     <div class="form-footer">想起密码了？<router-link to="/login">返回登录</router-link></div>
@@ -55,6 +52,9 @@
 </template>
 
 <script setup lang="ts">
+import { Button } from '@/components/ui/button';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { ref } from 'vue';
 import { apiFetch } from '../api';
 import { useToastStore } from '../stores/toast';
@@ -229,35 +229,6 @@ async function handleSubmit() {
     gap: 24px;
 }
 
-.input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.input-wrapper i {
-    position: absolute;
-    left: 16px;
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 16px;
-}
-
-.input-wrapper input {
-    width: 100%;
-    padding: 14px 16px 14px 48px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 14px;
-    color: #fff;
-    font-size: 14px;
-}
-
 .form-error {
     padding: 12px;
     background: rgba(239, 68, 68, 0.15);
@@ -272,18 +243,6 @@ async function handleSubmit() {
     border-radius: 12px;
     color: #86efac;
     font-size: 13px;
-}
-
-.btn-primary {
-    width: 100%;
-    padding: 16px;
-    background: linear-gradient(90deg, #0ea5e9, #2563eb);
-    color: #fff;
-    border: none;
-    border-radius: 14px;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
 }
 
 .form-footer {

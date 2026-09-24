@@ -2,80 +2,83 @@
     <div class="app-root">
         <header class="app-header">
             <div class="header-brand">
-                <div class="logo-icon">
-                    <i class="fas fa-chart-line"></i>
-                </div>
+                <div class="logo-icon"><ChartNoAxesCombined /></div>
                 <span class="brand-text">Gist Agent</span>
             </div>
-
-            <nav class="header-tabs">
-                <button class="tab-btn" :class="{ active: activeTab === 'chat' }" @click="router.push('/chat')">开始分析</button>
-                <button class="tab-btn" :class="{ active: activeTab === 'datasource' }" @click="goToDataSource">数据源</button>
-                <button class="tab-btn" :class="{ active: activeTab === 'memories' }" @click="router.push('/memories')">记忆</button>
+            <nav class="header-tabs" aria-label="主导航">
+                <Button :variant="activeTab === 'chat' ? 'secondary' : 'ghost'" size="sm" @click="router.push('/chat')">开始分析</Button>
+                <Button :variant="activeTab === 'datasource' ? 'secondary' : 'ghost'" size="sm" @click="goToDataSource">数据源</Button>
+                <Button :variant="activeTab === 'memories' ? 'secondary' : 'ghost'" size="sm" @click="router.push('/memories')">记忆</Button>
             </nav>
-
             <div class="header-user">
-                <div class="user-dropdown" ref="dropdownRef" @click="toggleDropdown">
-                    <img class="user-avatar" src="https://api.dicebear.com/7.x/notionists/svg?seed=GistAgent" alt="avatar" />
-                    <span class="user-name">{{ authStore.user?.name || authStore.user?.email }}</span>
-
-                    <div v-show="showDropdown" class="dropdown-menu">
-                        <div class="dropdown-item" @click="openProfileModal">个人信息</div>
-                        <div class="dropdown-item" @click="openPasswordModal">修改密码</div>
-                        <a href="https://github.com/jingjing20/gist-agent" target="_blank" class="dropdown-item link-item">github 地址</a>
-                        <div class="dropdown-divider"></div>
-                        <div class="dropdown-item text-danger" @click="handleLogout">退出登录</div>
-                    </div>
-                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="ghost" size="icon" aria-label="切换主题"><Sun v-if="mode === 'dark'" /><Moon v-else /></Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" class="min-w-36">
+                        <DropdownMenuGroup>
+                            <DropdownMenuItem @select="mode = 'light'">浅色</DropdownMenuItem>
+                            <DropdownMenuItem @select="mode = 'dark'">深色</DropdownMenuItem>
+                            <DropdownMenuItem @select="mode = 'auto'">跟随系统</DropdownMenuItem>
+                        </DropdownMenuGroup>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+                <DropdownMenu>
+                    <DropdownMenuTrigger as-child>
+                        <Button variant="ghost" class="user-trigger">
+                            <Avatar class="size-7"><AvatarImage src="https://api.dicebear.com/7.x/notionists/svg?seed=GistAgent" alt="" /><AvatarFallback>{{ userInitial }}</AvatarFallback></Avatar>
+                            <span class="user-name">{{ authStore.user?.name || authStore.user?.email }}</span>
+                            <ChevronDown />
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" class="min-w-44">
+                        <DropdownMenuGroup>
+                            <DropdownMenuItem @select="openProfileModal">个人信息</DropdownMenuItem>
+                            <DropdownMenuItem @select="openPasswordModal">修改密码</DropdownMenuItem>
+                            <DropdownMenuItem as-child><a href="https://github.com/jingjing20/gist-agent" target="_blank" rel="noopener noreferrer">GitHub 地址</a></DropdownMenuItem>
+                        </DropdownMenuGroup>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuGroup><DropdownMenuItem @select="handleLogout">退出登录</DropdownMenuItem></DropdownMenuGroup>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </header>
-        <div class="app-body">
-            <router-view />
-        </div>
+        <div class="app-body"><router-view /></div>
 
-        <!-- 个人信息弹框 -->
-        <div v-if="profileModalVisible" class="modal-overlay" @click.self="profileModalVisible = false">
-            <div class="modal-content">
-                <h3>个人信息</h3>
-                <div class="form-item">
-                    <label>邮箱</label>
-                    <input type="text" :value="authStore.user?.email" disabled class="disabled-input" />
-                </div>
-                <div class="form-item">
-                    <label>用户名</label>
-                    <input type="text" v-model="profileForm.name" />
-                </div>
-                <div class="modal-actions">
-                    <button class="btn-cancel" @click="profileModalVisible = false">取消</button>
-                    <button class="btn-primary" @click="submitProfile">保存</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- 修改密码弹框 -->
-        <div v-if="passwordModalVisible" class="modal-overlay" @click.self="passwordModalVisible = false">
-            <div class="modal-content">
-                <h3>修改密码</h3>
-                <div class="form-item">
-                    <label>新密码</label>
-                    <input type="password" v-model="passwordForm.password" placeholder="请输入新密码" />
-                </div>
-                <div class="form-item">
-                    <label>确认新密码</label>
-                    <input type="password" v-model="passwordForm.confirmPassword" placeholder="请确认新密码" />
-                </div>
-                <div class="modal-actions">
-                    <button class="btn-cancel" @click="passwordModalVisible = false">取消</button>
-                    <button class="btn-primary" @click="submitPassword">提交</button>
-                </div>
-            </div>
-        </div>
+        <Dialog v-model:open="profileModalVisible">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader><DialogTitle>个人信息</DialogTitle><DialogDescription>查看邮箱并修改显示名称。</DialogDescription></DialogHeader>
+                <FieldGroup>
+                    <Field><FieldLabel for="profile-email">邮箱</FieldLabel><Input id="profile-email" :model-value="authStore.user?.email" disabled /></Field>
+                    <Field><FieldLabel for="profile-name">用户名</FieldLabel><Input id="profile-name" v-model="profileForm.name" /></Field>
+                </FieldGroup>
+                <DialogFooter><Button variant="outline" @click="profileModalVisible = false">取消</Button><Button @click="submitProfile">保存</Button></DialogFooter>
+            </DialogContent>
+        </Dialog>
+        <Dialog v-model:open="passwordModalVisible">
+            <DialogContent class="sm:max-w-md">
+                <DialogHeader><DialogTitle>修改密码</DialogTitle><DialogDescription>新密码至少需要 6 个字符。</DialogDescription></DialogHeader>
+                <FieldGroup>
+                    <Field><FieldLabel for="new-password">新密码</FieldLabel><Input id="new-password" v-model="passwordForm.password" type="password" placeholder="请输入新密码" /></Field>
+                    <Field><FieldLabel for="confirm-password">确认新密码</FieldLabel><Input id="confirm-password" v-model="passwordForm.confirmPassword" type="password" placeholder="请确认新密码" /></Field>
+                </FieldGroup>
+                <DialogFooter><Button variant="outline" @click="passwordModalVisible = false">取消</Button><Button @click="submitPassword">提交</Button></DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, reactive, onMounted, onUnmounted } from 'vue';
+import { computed, reactive, ref } from 'vue';
+import { useColorMode } from '@vueuse/core';
 import { useRouter, useRoute } from 'vue-router';
+import { ChartNoAxesCombined, ChevronDown, Moon, Sun } from '@lucide/vue';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
 import { useToastStore } from '../stores/toast';
@@ -85,54 +88,27 @@ const route = useRoute();
 const dsStore = useDataSourceStore();
 const authStore = useAuthStore();
 const toast = useToastStore();
-
+const mode = useColorMode();
 const activeTab = computed(() => (route.name === 'memories' ? 'memories' : route.name === 'datasource' ? 'datasource' : 'chat'));
+const userInitial = computed(() => (authStore.user?.name || authStore.user?.email || 'U').charAt(0).toUpperCase());
+const profileModalVisible = ref(false);
+const passwordModalVisible = ref(false);
+const profileForm = reactive({ name: '' });
+const passwordForm = reactive({ password: '', confirmPassword: '' });
 
 function goToDataSource() {
     router.push('/datasource');
     dsStore.fetchAll();
 }
-
-const showDropdown = ref(false);
-const dropdownRef = ref<HTMLElement | null>(null);
-
-const profileModalVisible = ref(false);
-const passwordModalVisible = ref(false);
-
-function toggleDropdown() {
-    showDropdown.value = !showDropdown.value;
-}
-
-function handleClickOutside(event: MouseEvent) {
-    if (dropdownRef.value && !dropdownRef.value.contains(event.target as Node)) {
-        showDropdown.value = false;
-    }
-}
-
-onMounted(() => {
-    document.addEventListener('click', handleClickOutside);
-});
-
-onUnmounted(() => {
-    document.removeEventListener('click', handleClickOutside);
-});
-
-const profileForm = reactive({ name: '' });
-const passwordForm = reactive({ password: '', confirmPassword: '' });
-
 function openProfileModal() {
-    showDropdown.value = false;
     profileForm.name = authStore.user?.name || '';
     profileModalVisible.value = true;
 }
-
 function openPasswordModal() {
-    showDropdown.value = false;
     passwordForm.password = '';
     passwordForm.confirmPassword = '';
     passwordModalVisible.value = true;
 }
-
 async function submitProfile() {
     if (!profileForm.name.trim()) return toast.error('用户名不能为空');
     try {
@@ -143,14 +119,9 @@ async function submitProfile() {
         toast.error(err.message || '更新失败');
     }
 }
-
 async function submitPassword() {
-    if (!passwordForm.password || passwordForm.password.length < 6) {
-        return toast.error('密码至少需要 6 个字符');
-    }
-    if (passwordForm.password !== passwordForm.confirmPassword) {
-        return toast.error('两次输入的密码不一致');
-    }
+    if (!passwordForm.password || passwordForm.password.length < 6) return toast.error('密码至少需要 6 个字符');
+    if (passwordForm.password !== passwordForm.confirmPassword) return toast.error('两次输入的密码不一致');
     try {
         await authStore.updatePassword(passwordForm.password);
         toast.success('密码修改成功');
@@ -159,9 +130,7 @@ async function submitPassword() {
         toast.error(err.message || '修改密码失败');
     }
 }
-
 function handleLogout() {
-    showDropdown.value = false;
     authStore.logout();
     toast.info('已退出登录');
     router.push('/login');
@@ -169,267 +138,16 @@ function handleLogout() {
 </script>
 
 <style scoped>
-.app-root {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-    background: var(--da-bg);
-    color: var(--da-text-main);
-}
-
-.app-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 24px;
-    height: 60px;
-    border-bottom: 1px solid var(--da-border);
-    background: rgba(30, 35, 48, 0.5); /* da-panel with alpha */
-    flex-shrink: 0;
-}
-
-.header-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 256px;
-}
-
-.logo-icon {
-    width: 32px;
-    height: 32px;
-    background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 15px;
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
-}
-
-.brand-text {
-    font-size: 20px;
-    font-weight: 600;
-    letter-spacing: 0.025em;
-    color: #fff;
-}
-
-.header-tabs {
-    display: flex;
-    align-items: center;
-    height: 100%;
-    gap: 32px;
-}
-
-.tab-btn {
-    position: relative;
-    height: 100%;
-    padding: 0 20px;
-    color: var(--da-text-muted);
-    font-size: 15px;
-    font-weight: 500;
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-family: inherit;
-}
-
-.tab-btn:hover {
-    color: var(--da-text-main);
-}
-
-.tab-btn.active {
-    color: #fff;
-    font-weight: 600;
-}
-
-.tab-btn::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 20px;
-    right: 20px;
-    height: 3px;
-    background: var(--da-primary);
-    border-radius: 3px 3px 0 0;
-    transform: scaleX(0);
-    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 -2px 10px var(--da-primary);
-}
-
-.tab-btn.active::after {
-    transform: scaleX(1);
-}
-
-.header-user {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 16px;
-    width: 256px;
-}
-
-.user-dropdown {
-    position: relative;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-    padding: 10px 0;
-}
-
-.user-name {
-    font-size: 14px;
-    font-weight: 500;
-    color: var(--da-text-main);
-}
-
-.user-avatar {
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    border: 1px solid var(--da-border);
-    background: #fff;
-}
-
-.dropdown-menu {
-    position: absolute;
-    top: 100%;
-    right: 0;
-    width: 160px;
-    background: var(--da-panel);
-    border: 1px solid var(--da-border);
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-    padding: 8px 0;
-    z-index: 100;
-    margin-top: -4px;
-}
-
-.dropdown-item {
-    padding: 8px 16px;
-    font-size: 14px;
-    color: var(--da-text-main);
-    cursor: pointer;
-    transition: all 0.2s;
-    display: block;
-}
-
-.dropdown-item:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.link-item {
-    text-decoration: none;
-}
-
-.text-danger {
-    color: #ef4444;
-}
-
-.dropdown-divider {
-    height: 1px;
-    background: var(--da-border);
-    margin: 4px 0;
-}
-
-.modal-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 999;
-}
-
-.modal-content {
-    background: var(--da-panel);
-    border: 1px solid var(--da-border);
-    border-radius: 12px;
-    padding: 24px;
-    width: 400px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
-}
-
-.modal-content h3 {
-    margin: 0 0 20px 0;
-    font-size: 18px;
-    font-weight: 600;
-}
-
-.form-item {
-    margin-bottom: 16px;
-}
-
-.form-item label {
-    display: block;
-    margin-bottom: 8px;
-    font-size: 14px;
-    color: var(--da-text-muted);
-}
-
-.form-item input {
-    width: 100%;
-    padding: 8px 12px;
-    background: var(--da-bg);
-    border: 1px solid var(--da-border);
-    border-radius: 6px;
-    color: var(--da-text-main);
-    outline: none;
-    font-size: 14px;
-}
-
-.form-item input:focus {
-    border-color: var(--da-primary);
-}
-
-.form-item input.disabled-input {
-    opacity: 0.6;
-    cursor: not-allowed;
-}
-
-.modal-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 12px;
-    margin-top: 24px;
-}
-
-.btn-cancel,
-.btn-primary {
-    padding: 8px 16px;
-    border-radius: 6px;
-    font-size: 14px;
-    cursor: pointer;
-    border: none;
-}
-
-.btn-cancel {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-}
-
-.btn-cancel:hover {
-    background: rgba(255, 255, 255, 0.2);
-}
-
-.btn-primary {
-    background: var(--da-primary);
-    color: #fff;
-}
-
-.btn-primary:hover {
-    opacity: 0.9;
-}
-
-.app-body {
-    flex: 1;
-    display: flex;
-    overflow: hidden;
-}
+.app-root { display: flex; flex-direction: column; height: 100vh; width: 100vw; overflow: hidden; background: var(--da-bg); color: var(--da-text-main); }
+.app-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 24px; height: 64px; border-bottom: 1px solid var(--da-border); background: var(--da-panel); flex-shrink: 0; }
+.header-brand, .header-tabs, .header-user { display: flex; align-items: center; gap: 12px; }
+.header-brand { min-width: 180px; }
+.header-tabs { gap: 4px; }
+.header-user { justify-content: flex-end; min-width: 180px; }
+.logo-icon { display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; color: var(--da-primary); }
+.brand-text { font-size: 18px; font-weight: 600; white-space: nowrap; }
+.user-trigger { gap: 8px; max-width: 220px; }
+.user-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-body { flex: 1; display: flex; overflow: hidden; }
+@media (max-width: 700px) { .app-header { padding: 0 12px; } .header-brand { min-width: 0; } .brand-text, .user-name, .user-trigger :deep(svg:last-child) { display: none; } .header-user { min-width: 0; } }
 </style>

@@ -222,7 +222,7 @@ onMounted(() => {
 }
 
 .conversation-item:hover {
-    background: rgba(255, 255, 255, 0.03);
+    background: var(--da-card);
     border-color: var(--da-border);
 }
 
@@ -270,7 +270,7 @@ onMounted(() => {
 }
 
 .active .conv-title {
-    color: #fff;
+    color: var(--da-text-main);
     font-weight: 500;
 }
 

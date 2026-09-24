@@ -181,7 +181,7 @@ export class AnalysisAgent {
                         const ids =
                             candidate.kind === 'response'
                                 ? candidate.blocks.flatMap((block) =>
-                                      block.type === 'table' ? [block.artifactId] : block.type === 'chart' ? [generatedCharts.get(block.chartArtifactId)!] : block.evidence
+                                      block.type === 'table' ? [block.artifactId] : block.type === 'chart' ? [generatedCharts.get(block.chartArtifactId)!] : []
                                   )
                                 : candidate.kind === 'table'
                                   ? candidate.tables.map((table) => table.artifactId)

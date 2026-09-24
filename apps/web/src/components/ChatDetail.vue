@@ -136,7 +136,7 @@ async function handleExample(query: string) {
 .chat-title {
     font-size: 16px;
     font-weight: 600;
-    color: #fff;
+    color: var(--da-text-main);
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -153,7 +153,7 @@ async function handleExample(query: string) {
     padding: 4px;
 }
 .toolbar-btn:hover {
-    color: #fff;
+    color: var(--da-text-main);
 }
 
 .message-list {
@@ -174,7 +174,7 @@ async function handleExample(query: string) {
     padding: 8px 12px;
     border-radius: 999px;
     border: 1px solid var(--da-border);
-    background: rgba(24, 30, 43, 0.94);
+    background: var(--da-panel);
     color: var(--da-text-main);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
     cursor: pointer;

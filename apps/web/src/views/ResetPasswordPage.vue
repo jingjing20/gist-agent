@@ -25,29 +25,20 @@
                     </div>
 
                     <form @submit.prevent="handleSubmit" class="auth-form">
-                        <div class="input-group">
-                            <div class="input-wrapper">
-                                <i class="fas fa-lock"></i>
-                                <input v-model="password" type="password" placeholder="输入新密码" required />
-                            </div>
-                        </div>
-
-                        <div class="input-group">
-                            <div class="input-wrapper">
-                                <i class="fas fa-check-circle"></i>
-                                <input v-model="confirmPassword" type="password" placeholder="再次输入确认" required />
-                            </div>
-                        </div>
+                        <FieldGroup>
+                            <Field><FieldLabel for="auth-password">新密码</FieldLabel><Input id="auth-password" v-model="password" type="password" placeholder="输入新密码" required /></Field>
+                            <Field><FieldLabel for="auth-confirmPassword">确认新密码</FieldLabel><Input id="auth-confirmPassword" v-model="confirmPassword" type="password" placeholder="再次输入确认" required /></Field>
+                        </FieldGroup>
 
                         <div v-if="error" class="form-error">
                             <i class="fas fa-exclamation-circle"></i>
                             {{ error }}
                         </div>
 
-                        <button type="submit" class="btn-primary" :disabled="loading">
+                        <Button type="submit" class="w-full" :disabled="loading">
                             <span v-if="!loading">确认修改密码</span>
                             <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 处理中...</span>
-                        </button>
+                        </Button>
                     </form>
 
                     <div class="form-footer">不打算改了？<router-link to="/login">返回登录</router-link></div>
@@ -58,6 +49,9 @@
 </template>
 
 <script setup lang="ts">
+import { Button } from '@/components/ui/button';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { apiFetch } from '../api';
@@ -230,38 +224,6 @@ async function handleSubmit() {
     display: flex;
     flex-direction: column;
     gap: 8px;
-}
-
-.input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.input-wrapper i {
-    position: absolute;
-    left: 16px;
-    color: rgba(255, 255, 255, 0.4);
-}
-
-.input-wrapper input {
-    width: 100%;
-    padding: 14px 16px 14px 48px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 14px;
-    color: #fff;
-}
-
-.btn-primary {
-    width: 100%;
-    padding: 16px;
-    background: linear-gradient(90deg, #0ea5e9, #2563eb);
-    color: #fff;
-    border: none;
-    border-radius: 14px;
-    font-weight: 700;
-    cursor: pointer;
 }
 
 .form-footer {

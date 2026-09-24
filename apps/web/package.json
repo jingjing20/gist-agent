@@ -6,6 +6,7 @@
     "scripts": {
         "dev": "vite",
         "build": "vue-tsc -b && vite build",
+        "test:theme-styles": "node scripts/check-theme-styles.mjs",
         "typecheck": "vue-tsc -b",
         "preview": "vite preview"
     },
@@ -17,7 +18,7 @@
         "clsx": "^2.1.1",
         "echarts": "^6.0.0",
         "highlight.js": "^11.11.1",
-        "marked": "^17.0.4",
+        "markdown-it": "^15.0.2",
         "pinia": "^3.0.4",
         "reka-ui": "^2.10.5",
         "tailwind-merge": "^3.7.0",
@@ -27,6 +28,7 @@
     },
     "devDependencies": {
         "@tailwindcss/vite": "^4.3.3",
+        "@types/markdown-it": "^14.2.0",
         "@types/node": "^22.0.0",
         "@vitejs/plugin-vue": "^5.1.4",
         "tailwindcss": "^4.3.3",

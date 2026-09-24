@@ -24,32 +24,21 @@
                     </div>
 
                     <form @submit.prevent="handleLogin" class="auth-form">
-                        <div class="input-group">
-                            <div class="input-wrapper">
-                                <i class="far fa-envelope"></i>
-                                <input v-model="email" type="email" placeholder="name@company.com" required />
-                            </div>
-                        </div>
-
-                        <div class="input-group">
-                            <div class="input-wrapper">
-                                <i class="fas fa-lock"></i>
-                                <input v-model="password" type="password" placeholder="••••••••" required />
-                            </div>
-                            <div class="forgot-box">
-                                <router-link to="/forgot-password" class="forgot-link">忘记密码？</router-link>
-                            </div>
-                        </div>
+                        <FieldGroup>
+                            <Field><FieldLabel for="auth-email">邮箱</FieldLabel><Input id="auth-email" v-model="email" type="email" placeholder="name@company.com" required /></Field>
+                            <Field><FieldLabel for="auth-password">密码</FieldLabel><Input id="auth-password" v-model="password" type="password" placeholder="••••••••" required /></Field>
+                            <div class="forgot-box"><router-link to="/forgot-password" class="forgot-link">忘记密码？</router-link></div>
+                        </FieldGroup>
 
                         <div v-if="error" class="form-error">
                             <i class="fas fa-exclamation-circle"></i>
                             {{ error }}
                         </div>
 
-                        <button type="submit" class="btn-primary" :disabled="loading">
+                        <Button type="submit" class="w-full" :disabled="loading">
                             <span v-if="!loading">立即登录</span>
                             <span v-else class="loading-spinner"><i class="fas fa-spinner fa-spin"></i> 处理中...</span>
-                        </button>
+                        </Button>
                     </form>
 
                     <div class="form-footer">还没有账号？<router-link to="/register">免费注册</router-link></div>
@@ -60,6 +49,9 @@
 </template>
 
 <script setup lang="ts">
+import { Button } from '@/components/ui/button';
+import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
@@ -232,43 +224,6 @@ async function handleLogin() {
     gap: 24px;
 }
 
-.input-group {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.input-wrapper {
-    position: relative;
-    display: flex;
-    align-items: center;
-}
-
-.input-wrapper i {
-    position: absolute;
-    left: 16px;
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 16px;
-}
-
-.input-wrapper input {
-    width: 100%;
-    padding: 14px 16px 14px 48px;
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 14px;
-    color: #fff;
-    font-size: 14px;
-    transition: all 0.2s;
-}
-
-.input-wrapper input:focus {
-    outline: none;
-    border-color: var(--da-primary);
-    background: rgba(14, 165, 233, 0.05);
-    box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.15);
-}
-
 .forgot-box {
     display: flex;
     justify-content: flex-end;
@@ -297,30 +252,6 @@ async function handleLogin() {
     display: flex;
     align-items: center;
     gap: 10px;
-}
-
-.btn-primary {
-    width: 100%;
-    padding: 16px;
-    background: linear-gradient(90deg, #0ea5e9, #2563eb);
-    color: #fff;
-    border: none;
-    border-radius: 14px;
-    font-size: 15px;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 10px 25px -5px rgba(14, 165, 233, 0.4);
-}
-
-.btn-primary:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 30px -5px rgba(14, 165, 233, 0.6);
-    filter: brightness(1.1);
-}
-
-.btn-primary:active {
-    transform: translateY(0);
 }
 
 .form-footer {
