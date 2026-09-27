@@ -36,7 +36,7 @@ AGENT_DB_PASSWORD: ${AGENT_DB_PASSWORD}
 AGENT_DB_POOL_MAX: ${AGENT_DB_POOL_MAX:-4}
 ```
 
-思考参数按需传入 api 和 worker；并发及上下文变量也需显式传给使用它的进程。本轮文档整理未修改 Compose 或应用行为。
+思考参数按需传入 api 和 worker；并发及上下文变量也需显式传给使用它的进程。
 
 ## 首次容器启动
 
@@ -113,8 +113,8 @@ ssh -N -L 5433:127.0.0.1:15432 user@prod-host
 
 1. 使用 Node.js 22 安装依赖，运行 typecheck 和 build。
 2. 成功后通过 SSH 进入服务器项目目录。
-3. 执行 git pull、docker compose build、docker compose up -d。
-4. 每次部署执行 init-db，不仅首次部署。
+3. 执行 git pull、docker compose build，启动 PostgreSQL 和 Redis，并停止旧版应用容器。
+4. 执行 init-db，成功后启动 API、Worker 和 Web。当前工作流每次部署都会执行 init-db。
 
 | Secret | 用途 / 默认值 |
 | --- | --- |

@@ -59,8 +59,10 @@ jobs:
             echo "🐳 Build docker images"
             docker compose build
 
-            echo "🚀 Start services"
-            docker compose up -d
-
             echo "🧩 Run init job"
+            docker compose up -d postgres redis
+            docker compose stop api worker web
             docker compose --profile tools run --rm --build init-db
+
+            echo "🚀 Start services"
+            docker compose up -d api worker web
