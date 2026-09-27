@@ -1,0 +1,34 @@
+package.json
+  afbc0f86b0c38bb3 15-21,24-30
+DEPLOY.md
+  afbc0f86b0c38bb3 39,116-117
+README.en.md
+  afbc0f86b0c38bb3 11,13
+docs/agent-refactor/01-product-and-decisions.md
+  afbc0f86b0c38bb3 3,43-44
+docs/agent-refactor/05-delivery-and-validation.md
+  afbc0f86b0c38bb3 36,38,52,69
+.github/workflows/deploy.yml
+  afbc0f86b0c38bb3 63-64,66-68
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "86272a6cd508f3bb048976305a3df717260fda6f",
+  "prompts": {
+    "afbc0f86b0c38bb3": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0e308-b317-7682-9475-8f9bffba431f",
+        "model": "gpt-6-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/27/rollout-2026-09-27T21-23-13-01a0e308-b317-7682-9475-8f9bffba431f.jsonl",
+      "total_additions": 36,
+      "total_deletions": 88,
+      "accepted_lines": 31,
+      "overriden_lines": 0
+    }
+  }
+}
