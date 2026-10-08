@@ -1,0 +1,66 @@
+apps/worker/src/analysis/response-text-stream.ts
+  490e08226022b5bb 1-50
+scripts/event-json-regression.mjs
+  490e08226022b5bb 1-43
+apps/web/src/components/ChatMessageItem.vue
+  490e08226022b5bb 73
+  e4391cd47bf3c7a4 17-20,81-87
+scripts/analysis-core-regression.mjs
+  490e08226022b5bb 356,368,403,433,568
+  e4391cd47bf3c7a4 220-228,255-267,270-276,358-367,369-378,388-402,404,409-414,422-432,434,560-562,574-634
+apps/worker/src/chat/generation.service.ts
+  490e08226022b5bb 36-38,40-41,318
+scripts/analysis-text-channel-regression.mjs
+  490e08226022b5bb 1-121
+apps/worker/src/analysis/analysis-agent.ts
+  e4391cd47bf3c7a4 69-70
+  490e08226022b5bb 11,16-21,54-55,94,106-107,149-157
+apps/web/scripts/check-analysis-process.mjs
+  490e08226022b5bb 1-128
+apps/api/src/chat/outbox-relay.service.ts
+  490e08226022b5bb 12-15,87
+packages/contracts/src/index.ts
+  490e08226022b5bb 10
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  490e08226022b5bb 27,38
+  e4391cd47bf3c7a4 233-254,262,416-417
+apps/web/src/components/blocks/AnalysisProcessBlock.vue
+  490e08226022b5bb 16,22-26,29,373-378
+apps/web/src/stores/chat.ts
+  e4391cd47bf3c7a4 204-206
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "0c4050d1aaf2b859553f7bfd8406a697ad2d37fe",
+  "prompts": {
+    "490e08226022b5bb": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11aba-66a5-7c71-b8ed-8eadc8cf482f",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/08/rollout-2026-10-08T16-56-26-01a11aba-66a5-7c71-b8ed-8eadc8cf482f.jsonl",
+      "total_additions": 476,
+      "total_deletions": 97,
+      "accepted_lines": 396,
+      "overriden_lines": 0
+    },
+    "e4391cd47bf3c7a4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11a7c-8045-75e2-83cb-6107368c874a",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/08/rollout-2026-10-08T16-36-25-01a11a7c-8045-75e2-83cb-6107368c874a_01a11aa8-143c-7613-bc95-f6732458e780.jsonl",
+      "total_additions": 191,
+      "total_deletions": 58,
+      "accepted_lines": 188,
+      "overriden_lines": 0
+    }
+  }
+}
