@@ -154,15 +154,15 @@ watch(
 .brand-icon {
     width: 72px;
     height: 72px;
-    background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
+    background: linear-gradient(135deg, var(--da-primary), var(--da-gradient-start));
     border-radius: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 32px;
-    color: #fff;
+    color: var(--primary-foreground);
     flex-shrink: 0;
-    box-shadow: 0 12px 32px rgba(14, 165, 233, 0.3);
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--status-info) 30%, transparent);
 }
 
 .hero-text-content {
@@ -232,7 +232,7 @@ watch(
 
 .suggestion-card:hover {
     border-color: var(--da-primary);
-    background: rgba(14, 165, 233, 0.05);
+    background: color-mix(in srgb, var(--status-info) 5%, transparent);
     transform: translateY(-2px);
 }
 

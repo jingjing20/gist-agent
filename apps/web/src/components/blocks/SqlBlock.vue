@@ -52,7 +52,7 @@ function copySQL() {
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid var(--da-border);
-    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 6px -1px color-mix(in srgb, var(--shadow-color) 10%, transparent);
 }
 
 .sql-header {
@@ -60,14 +60,14 @@ function copySQL() {
     justify-content: space-between;
     align-items: center;
     padding: 10px 16px;
-    background: rgba(255, 255, 255, 0.02);
+    background: color-mix(in srgb, var(--foreground) 2%, transparent);
     cursor: pointer;
     user-select: none;
     transition: background 0.2s;
 }
 
 .sql-header:hover {
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--foreground) 5%, transparent);
 }
 
 .sql-title {
@@ -84,7 +84,7 @@ function copySQL() {
 .sql-label {
     font-size: 13px;
     font-weight: 600;
-    color: #fff;
+    color: var(--da-text-main);
 }
 
 .sql-hint {
@@ -115,7 +115,7 @@ function copySQL() {
 
 .action-btn:hover {
     background: var(--da-border);
-    color: #fff;
+    color: var(--da-text-main);
 }
 
 .toggle-icon {
@@ -130,7 +130,7 @@ function copySQL() {
 
 .sql-content {
     border-top: 1px solid var(--da-border);
-    background: #0f172a; /* Slate-900 like standard code bg */
+    background: var(--bg-code); /* Slate-900 like standard code bg */
 }
 
 .sql-code {
@@ -140,7 +140,7 @@ function copySQL() {
     font-size: 13px;
     line-height: 1.6;
     font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-    color: #e2e8f0;
+    color: var(--da-text-main);
 }
 
 .no-scrollbar::-webkit-scrollbar {

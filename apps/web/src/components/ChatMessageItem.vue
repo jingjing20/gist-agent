@@ -93,7 +93,7 @@ function blockComponent(type: string): Component {
 }
 
 function blockProps(block: MessageBlock): Record<string, unknown> {
-    if (block.analysis) return { analysis: block.analysis, charts: reportCharts.value, messageId: props.msg.id, isStreaming: props.isStreaming };
+    if (block.analysis) return { analysis: block.analysis, charts: reportCharts.value, messageId: props.msg.id, isStreaming: props.isStreaming || !!props.msg.animateText };
     if (block.type === 'log') {
         return {
             title: block.title,
@@ -106,6 +106,7 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
         return { chartData: block.chartData };
     }
     return {
+        isStreaming: block.type === 'text' && (props.isStreaming || !!props.msg.animateText),
         title: block.title,
         content: block.type === 'error' ? `**错误:** ${block.content}` : block.content,
         columns: block.columns,
@@ -158,15 +159,15 @@ async function restartAnalysis() {
 .ai-avatar {
     width: 32px;
     height: 32px;
-    background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
+    background: linear-gradient(135deg, var(--da-primary), var(--da-gradient-start));
     border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 12px;
     font-weight: 800;
-    color: #fff;
-    box-shadow: 0 4px 12px rgba(14, 165, 233, 0.2);
+    color: var(--primary-foreground);
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--status-info) 20%, transparent);
 }
 
 .message-body {
@@ -186,7 +187,7 @@ async function restartAnalysis() {
     border-top-right-radius: 4px;
     font-size: 14px;
     line-height: 1.6;
-    color: #fff;
+    color: var(--primary-foreground);
     border: none;
     max-width: 85%;
     text-align: left;
@@ -207,7 +208,7 @@ async function restartAnalysis() {
     border: 1px solid var(--da-border);
     border-radius: 7px;
     padding: 7px 11px;
-    background: rgba(148, 163, 184, 0.08);
+    background: color-mix(in srgb, var(--da-text-muted) 8%, transparent);
     color: var(--da-text-main);
     cursor: pointer;
 }

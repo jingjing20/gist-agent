@@ -110,13 +110,13 @@ async function handleSubmit() {
     width: 100%;
     max-width: 1100px;
     min-height: 580px;
-    background: rgba(15, 17, 26, 0.4);
+    background: color-mix(in srgb, var(--da-panel) 40%, transparent);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
     border-radius: 40px;
     overflow: hidden;
-    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 40px 100px color-mix(in srgb, var(--shadow-color) 60%, transparent);
 }
 
 .branding {
@@ -136,7 +136,7 @@ async function handleSubmit() {
     right: 0;
     bottom: 10%;
     width: 1px;
-    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--foreground) 10%, transparent), transparent);
 }
 
 .branding-content {
@@ -154,21 +154,21 @@ async function handleSubmit() {
 .logo-icon {
     width: 72px;
     height: 72px;
-    background: linear-gradient(135deg, var(--da-primary), #8b5cf6);
+    background: linear-gradient(135deg, var(--da-primary), var(--da-gradient-start));
     border-radius: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 32px;
-    color: #fff;
+    color: var(--primary-foreground);
     flex-shrink: 0;
-    box-shadow: 0 12px 32px rgba(14, 165, 233, 0.3);
+    box-shadow: 0 12px 32px color-mix(in srgb, var(--status-info) 30%, transparent);
 }
 
 .logo-name {
     font-size: 32px;
     font-weight: 850;
-    color: #fff;
+    color: var(--primary-foreground);
     margin: 0;
     letter-spacing: -0.03em;
 }
@@ -176,11 +176,11 @@ async function handleSubmit() {
 .hero-title {
     font-size: 52px;
     font-weight: 800;
-    color: #fff;
+    color: var(--primary-foreground);
     line-height: 1.15;
     margin-bottom: 28px;
     letter-spacing: -0.02em;
-    background: linear-gradient(135deg, #fff 0%, rgba(255, 255, 255, 0.7) 100%);
+    background: linear-gradient(135deg, var(--primary-foreground) 0%, color-mix(in srgb, var(--foreground) 70%, transparent) 100%);
     background-clip: text;
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
@@ -188,14 +188,14 @@ async function handleSubmit() {
 
 .hero-desc {
     font-size: 16px;
-    color: rgba(255, 255, 255, 0.5);
+    color: color-mix(in srgb, var(--foreground) 50%, transparent);
     line-height: 1.8;
     letter-spacing: 0.02em;
 }
 
 .form-panel {
     flex: 0 0 440px;
-    background: rgba(0, 0, 0, 0.15);
+    background: color-mix(in srgb, var(--shadow-color) 15%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -214,13 +214,13 @@ async function handleSubmit() {
 .form-header h3 {
     font-size: 24px;
     font-weight: 700;
-    color: #fff;
+    color: var(--primary-foreground);
     margin-bottom: 8px;
 }
 
 .form-header p {
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
+    color: color-mix(in srgb, var(--foreground) 50%, transparent);
 }
 
 .auth-form {
@@ -231,17 +231,17 @@ async function handleSubmit() {
 
 .form-error {
     padding: 12px;
-    background: rgba(239, 68, 68, 0.15);
+    background: color-mix(in srgb, var(--destructive) 15%, transparent);
     border-radius: 12px;
-    color: #fca5a5;
+    color: var(--destructive);
     font-size: 13px;
 }
 
 .form-success {
     padding: 12px;
-    background: rgba(34, 197, 94, 0.15);
+    background: color-mix(in srgb, var(--status-success) 15%, transparent);
     border-radius: 12px;
-    color: #86efac;
+    color: var(--status-success);
     font-size: 13px;
 }
 
@@ -249,7 +249,7 @@ async function handleSubmit() {
     margin-top: 32px;
     text-align: center;
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
+    color: color-mix(in srgb, var(--foreground) 50%, transparent);
 }
 
 .form-footer a {

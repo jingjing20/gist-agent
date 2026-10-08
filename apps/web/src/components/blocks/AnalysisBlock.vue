@@ -9,7 +9,7 @@
             <p v-if="outcome.status === 'partial'" class="partial-reason">部分结果：{{ outcome.reason }}</p>
             <div class="composed-result">
                 <template v-for="(block, index) in outcome.blocks" :key="index">
-                    <MarkdownBlock v-if="block.type === 'markdown'" :content="block.content" />
+                    <MarkdownBlock :is-streaming="isStreaming" v-if="block.type === 'markdown'" :content="block.content" />
                     <AnalysisArtifactTable
                         v-else-if="block.type === 'table'"
                         :artifact-id="block.artifactId"
@@ -33,11 +33,11 @@
             </div>
             <p v-if="outcome.note" class="table-note">{{ outcome.note }}</p>
         </template>
-        <MarkdownBlock v-if="outcome.kind === 'direct'" :content="outcome.content" />
+        <MarkdownBlock :is-streaming="isStreaming" v-if="outcome.kind === 'direct'" :content="outcome.content" />
         <template v-if="outcome.kind === 'answer' || outcome.kind === 'partial'">
             <header class="report-header">
                 <h2>核心结论</h2>
-                <MarkdownBlock class="report-summary" :content="outcome.answer.summary" />
+                <MarkdownBlock :is-streaming="isStreaming" class="report-summary" :content="outcome.answer.summary" />
                 <ul v-if="outcome.answer.keyPoints?.length" class="key-points">
                     <li v-for="point in outcome.answer.keyPoints" :key="point">{{ point }}</li>
                 </ul>
@@ -61,7 +61,7 @@
                         <span class="finding-index">{{ String(index + 1).padStart(2, '0') }}</span
                         ><span class="finding-kind" :class="finding.kind">{{ kinds[finding.kind] }}</span>
                     </div>
-                    <MarkdownBlock class="finding-text" :content="finding.text" />
+                    <MarkdownBlock :is-streaming="isStreaming" class="finding-text" :content="finding.text" />
                     <div v-for="chart in chartsForFinding(finding)" :key="chart.chartArtifactId || chart.title" class="finding-chart">
                         <ChartBlock :chart-data="chart.chartData" />
                     </div>
@@ -137,6 +137,7 @@
             </div>
         </template>
         <MarkdownBlock
+            :is-streaming="isStreaming"
             v-else-if="outcome.kind === 'clarification' || outcome.kind === 'refusal'"
             :content="outcome.kind === 'clarification' ? outcome.question : outcome.explanation"
         />
@@ -326,17 +327,17 @@ watch(
     align-items: center;
     margin: 0 0 14px;
     padding: 4px 10px;
-    border: 1px solid rgba(14, 165, 233, 0.25);
+    border: 1px solid color-mix(in srgb, var(--status-info) 25%, transparent);
     border-radius: 999px;
-    background: rgba(14, 165, 233, 0.08);
+    background: color-mix(in srgb, var(--status-info) 8%, transparent);
     color: var(--da-primary);
     font-size: 12px;
     font-weight: 600;
 }
 .status.partial {
-    border-color: rgba(245, 158, 11, 0.3);
-    background: rgba(245, 158, 11, 0.09);
-    color: #fbbf24;
+    border-color: color-mix(in srgb, var(--status-warning) 30%, transparent);
+    background: color-mix(in srgb, var(--status-warning) 9%, transparent);
+    color: var(--status-warning);
 }
 .report-header {
     padding: 0 0 24px;
@@ -392,7 +393,7 @@ h3 {
 }
 .partial-reason {
     margin: 16px 0 0;
-    color: #fbbf24;
+    color: var(--status-warning);
     font-size: 13px;
 }
 .report-section {
@@ -412,7 +413,7 @@ h3 {
     padding: 16px;
     border: 1px solid var(--da-border);
     border-radius: 12px;
-    background: rgba(148, 163, 184, 0.045);
+    background: color-mix(in srgb, var(--da-text-muted) 4.5%, transparent);
 }
 .metric-label {
     color: var(--da-text-muted);
@@ -435,7 +436,7 @@ h3 {
     overflow: hidden;
     border: 1px solid var(--da-border);
     border-radius: 12px;
-    background: rgba(148, 163, 184, 0.035);
+    background: color-mix(in srgb, var(--da-text-muted) 3.5000000000000004%, transparent);
 }
 .finding-card {
     padding: 17px 0;
@@ -462,7 +463,7 @@ h3 {
     font-weight: 700;
 }
 .finding-kind.hypothesis {
-    color: #fbbf24;
+    color: var(--status-warning);
 }
 .finding-text:deep(.markdown-block) {
     font-size: 14px;
@@ -520,7 +521,7 @@ pre {
 }
 .warning,
 [role='alert'] {
-    color: #d97706;
+    color: var(--status-warning);
 }
 dl {
     margin: 10px 0;

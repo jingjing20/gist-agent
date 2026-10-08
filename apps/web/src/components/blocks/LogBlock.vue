@@ -34,13 +34,13 @@ const collapsed = ref(!/^分析步骤 \d+$/.test(props.title || ''));
 .log-block {
     border-radius: 10px;
     overflow: hidden;
-    background: rgba(255, 255, 255, 0.02);
+    background: color-mix(in srgb, var(--foreground) 2%, transparent);
     border: 1px solid var(--da-border);
     transition: all 0.2s;
 }
 
 .log-block.is-loading {
-    border-color: rgba(14, 165, 233, 0.3);
+    border-color: color-mix(in srgb, var(--status-info) 30%, transparent);
 }
 
 .log-header {
@@ -53,7 +53,7 @@ const collapsed = ref(!/^分析步骤 \d+$/.test(props.title || ''));
 }
 
 .log-header:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: color-mix(in srgb, var(--foreground) 4%, transparent);
 }
 
 .status-indicator {
@@ -69,11 +69,11 @@ const collapsed = ref(!/^分析步骤 \d+$/.test(props.title || ''));
 }
 
 .warning {
-    color: #f59e0b;
+    color: var(--status-warning);
 }
 
 .success {
-    color: #10b981; /* emerald-500 */
+    color: var(--status-success); /* emerald-500 */
     font-size: 14px;
 }
 
@@ -120,9 +120,9 @@ const collapsed = ref(!/^分析步骤 \d+$/.test(props.title || ''));
 .log-content {
     padding: 12px 16px;
     border-top: 1px solid var(--da-border);
-    background: #0f172a;
+    background: var(--bg-code);
     font-size: 12px;
-    color: #94a3b8;
+    color: var(--da-text-muted);
     overflow-x: auto;
 }
 

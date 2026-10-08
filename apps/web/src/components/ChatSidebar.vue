@@ -227,8 +227,8 @@ onMounted(() => {
 }
 
 .conversation-item.active {
-    background: rgba(14, 165, 233, 0.1);
-    border-color: rgba(14, 165, 233, 0.2);
+    background: color-mix(in srgb, var(--status-info) 10%, transparent);
+    border-color: color-mix(in srgb, var(--status-info) 20%, transparent);
 }
 
 .active-indicator {
@@ -296,8 +296,8 @@ onMounted(() => {
 }
 
 .delete-btn:hover {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
+    background: color-mix(in srgb, var(--destructive) 15%, transparent);
+    color: var(--destructive);
 }
 
 .empty-hint {

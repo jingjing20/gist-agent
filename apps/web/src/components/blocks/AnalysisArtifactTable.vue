@@ -125,7 +125,7 @@ watch(
 .table-warning {
     margin: 0;
     padding: 8px 16px;
-    color: #fbbf24;
+    color: var(--status-warning);
     font-size: 12px;
 }
 .table-scroll {
@@ -152,7 +152,7 @@ th {
     font-weight: 600;
 }
 tbody tr:hover {
-    background: rgba(148, 163, 184, 0.06);
+    background: color-mix(in srgb, var(--da-text-muted) 6%, transparent);
 }
 .table-footer {
     display: flex;

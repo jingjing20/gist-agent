@@ -166,7 +166,7 @@ onMounted(() => {
     background: var(--da-card);
     position: relative;
     overflow: hidden;
-    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 2px 0 color-mix(in srgb, var(--shadow-color) 5%, transparent);
     transition: border-color 0.2s;
     flex-shrink: 0;
 }
@@ -196,13 +196,13 @@ onMounted(() => {
     height: 100%;
 }
 .accent-purple {
-    background: rgba(148, 163, 184, 0.3);
+    background: color-mix(in srgb, var(--da-text-muted) 30%, transparent);
 }
 .accent-blue {
-    background: rgba(139, 92, 246, 0.5);
+    background: color-mix(in srgb, var(--da-gradient-start) 50%, transparent);
 }
 .accent-cyan {
-    background: rgba(14, 165, 233, 0.5);
+    background: color-mix(in srgb, var(--status-info) 50%, transparent);
 }
 
 .card-subtitle {
@@ -245,7 +245,7 @@ onMounted(() => {
     background: var(--da-border);
 }
 .table-item.active {
-    background: rgba(14, 165, 233, 0.1); /* da-primary/10 */
+    background: color-mix(in srgb, var(--status-info) 10%, transparent); /* da-primary/10 */
     color: var(--da-text-main);
 }
 

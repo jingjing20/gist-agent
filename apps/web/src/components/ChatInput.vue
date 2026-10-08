@@ -75,7 +75,7 @@ async function handleSubmit(e?: Event) {
 <style scoped>
 .chat-input-wrapper {
     padding: 16px 24px;
-    border-top: 1px solid rgba(51, 58, 77, 0.5); /* da-border/50 */
+    border-top: 1px solid color-mix(in srgb, var(--da-border) 50%, transparent); /* da-border/50 */
     background: var(--da-bg);
     flex-shrink: 0;
 }
@@ -107,7 +107,7 @@ async function handleSubmit(e?: Event) {
 
 .mode-toggle.active {
     border-color: var(--da-primary);
-    background: rgba(14, 165, 233, 0.12);
+    background: color-mix(in srgb, var(--status-info) 12%, transparent);
     color: var(--da-primary);
 }
 
@@ -148,13 +148,13 @@ async function handleSubmit(e?: Event) {
 }
 
 .input-field::placeholder {
-    color: rgba(148, 163, 184, 0.6); /* da-text-muted/60 */
+    color: color-mix(in srgb, var(--da-text-muted) 60%, transparent); /* da-text-muted/60 */
 }
 
 .send-btn {
     background: var(--da-primary);
     border: none;
-    color: #fff;
+    color: var(--primary-foreground);
     padding: 8px 16px;
     border-radius: 8px;
     cursor: pointer;
@@ -166,7 +166,7 @@ async function handleSubmit(e?: Event) {
     font-size: 14px;
     font-weight: 500;
     gap: 8px;
-    box-shadow: 0 4px 14px 0 rgba(14, 165, 233, 0.2);
+    box-shadow: 0 4px 14px 0 color-mix(in srgb, var(--status-info) 20%, transparent);
 }
 
 .send-btn:hover:not(:disabled) {
@@ -180,11 +180,11 @@ async function handleSubmit(e?: Event) {
 }
 
 .stop-btn {
-    background: #ef4444;
-    box-shadow: 0 4px 14px 0 rgba(239, 68, 68, 0.2);
+    background: var(--destructive);
+    box-shadow: 0 4px 14px 0 color-mix(in srgb, var(--destructive) 20%, transparent);
 }
 
 .stop-btn:hover {
-    background: #dc2626;
+    background: var(--destructive-hover);
 }
 </style>

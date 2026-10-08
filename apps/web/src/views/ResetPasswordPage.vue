@@ -116,13 +116,13 @@ async function handleSubmit() {
     width: 100%;
     max-width: 1100px;
     min-height: 580px;
-    background: rgba(15, 17, 26, 0.4);
+    background: color-mix(in srgb, var(--da-panel) 40%, transparent);
     backdrop-filter: blur(40px);
     -webkit-backdrop-filter: blur(40px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
     border-radius: 40px;
     overflow: hidden;
-    box-shadow: 0 40px 100px rgba(0, 0, 0, 0.6);
+    box-shadow: 0 40px 100px color-mix(in srgb, var(--shadow-color) 60%, transparent);
 }
 
 .branding {
@@ -140,7 +140,7 @@ async function handleSubmit() {
     right: 0;
     bottom: 10%;
     width: 1px;
-    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.1), transparent);
+    background: linear-gradient(to bottom, transparent, color-mix(in srgb, var(--foreground) 10%, transparent), transparent);
 }
 
 .branding-content {
@@ -150,7 +150,7 @@ async function handleSubmit() {
 .logo-text {
     font-size: 32px;
     font-weight: 800;
-    color: #fff;
+    color: var(--primary-foreground);
     margin-bottom: 60px;
     letter-spacing: -0.02em;
 }
@@ -158,7 +158,7 @@ async function handleSubmit() {
 .hero-title {
     font-size: 48px;
     font-weight: 800;
-    color: #fff;
+    color: var(--primary-foreground);
     line-height: 1.2;
     margin-bottom: 32px;
     letter-spacing: -0.01em;
@@ -166,13 +166,13 @@ async function handleSubmit() {
 
 .hero-desc {
     font-size: 16px;
-    color: rgba(255, 255, 255, 0.6);
+    color: color-mix(in srgb, var(--foreground) 60%, transparent);
     line-height: 1.6;
 }
 
 .form-panel {
     flex: 0 0 440px;
-    background: rgba(0, 0, 0, 0.15);
+    background: color-mix(in srgb, var(--shadow-color) 15%, transparent);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -198,8 +198,8 @@ async function handleSubmit() {
 .logo-icon {
     width: 40px;
     height: 40px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: color-mix(in srgb, var(--foreground) 5%, transparent);
+    border: 1px solid color-mix(in srgb, var(--foreground) 10%, transparent);
     border-radius: 10px;
     display: flex;
     align-items: center;
@@ -211,7 +211,7 @@ async function handleSubmit() {
 .logo-name {
     font-size: 20px;
     font-weight: 700;
-    color: #fff;
+    color: var(--primary-foreground);
 }
 
 .auth-form {
@@ -230,7 +230,7 @@ async function handleSubmit() {
     margin-top: 32px;
     text-align: center;
     font-size: 14px;
-    color: rgba(255, 255, 255, 0.5);
+    color: color-mix(in srgb, var(--foreground) 50%, transparent);
 }
 
 .form-footer a {

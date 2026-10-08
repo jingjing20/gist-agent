@@ -297,8 +297,8 @@ const summaryIcon = computed(() => {
 .process-summary,
 .activity-pill {
     appearance: none;
-    border: 1px solid rgba(148, 163, 184, 0.14);
-    background: rgba(148, 163, 184, 0.09);
+    border: 1px solid color-mix(in srgb, var(--da-text-muted) 14.000000000000002%, transparent);
+    background: color-mix(in srgb, var(--da-text-muted) 9%, transparent);
     color: var(--da-text-main);
     border-radius: 8px;
     min-height: 32px;
@@ -314,8 +314,8 @@ const summaryIcon = computed(() => {
 }
 .process-summary:hover,
 .activity-pill:hover {
-    background: rgba(148, 163, 184, 0.14);
-    border-color: rgba(148, 163, 184, 0.25);
+    background: color-mix(in srgb, var(--da-text-muted) 14.000000000000002%, transparent);
+    border-color: color-mix(in srgb, var(--da-text-muted) 25%, transparent);
 }
 .process-summary {
     font-size: 13px;
@@ -325,7 +325,7 @@ const summaryIcon = computed(() => {
     width: 16px;
     display: inline-flex;
     justify-content: center;
-    color: #10b981;
+    color: var(--status-success);
 }
 .summary-icon.running,
 .activity-pill.is-running .activity-icon {
@@ -335,7 +335,7 @@ const summaryIcon = computed(() => {
 .activity-pill.is-warning .activity-icon,
 .warning,
 [role='alert'] {
-    color: #f59e0b;
+    color: var(--status-warning);
 }
 .quality-messages {
     margin-top: 8px;
@@ -351,7 +351,7 @@ const summaryIcon = computed(() => {
 }
 .quality-message.is-warning,
 .quality-message.is-blocking {
-    color: #f59e0b;
+    color: var(--status-warning);
 }
 .summary-label,
 .activity-label {
@@ -366,7 +366,7 @@ const summaryIcon = computed(() => {
 }
 .activity-subject {
     padding-left: 8px;
-    border-left: 1px solid rgba(148, 163, 184, 0.24);
+    border-left: 1px solid color-mix(in srgb, var(--da-text-muted) 24%, transparent);
     max-width: min(440px, 55vw);
     overflow: hidden;
     text-overflow: ellipsis;
@@ -420,7 +420,7 @@ const summaryIcon = computed(() => {
     margin: 0 6px 4px 0;
     padding: 1px 7px;
     border-radius: 5px;
-    background: rgba(148, 163, 184, 0.09);
+    background: color-mix(in srgb, var(--da-text-muted) 9%, transparent);
 }
 .detail-grid summary {
     cursor: pointer;
@@ -440,7 +440,7 @@ const summaryIcon = computed(() => {
     border: 1px solid var(--da-border);
     border-radius: 6px;
     padding: 6px 9px;
-    background: rgba(148, 163, 184, 0.07);
+    background: color-mix(in srgb, var(--da-text-muted) 7.000000000000001%, transparent);
     color: var(--da-text-main);
     cursor: pointer;
 }
@@ -466,7 +466,7 @@ const summaryIcon = computed(() => {
     color: var(--da-text-muted);
 }
 .adjusted {
-    color: #fbbf24;
+    color: var(--status-warning);
 }
 @media (max-width: 640px) {
     .summary-meta {

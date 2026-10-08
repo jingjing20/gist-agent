@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, ref, nextTick } from 'vue';
 import { defineStore } from 'pinia';
 import { useRouter } from 'vue-router';
 import type { ChatMessage, Conversation, MessageBlock, SSEEvent } from '../types';
@@ -198,6 +198,11 @@ export const useChatStore = defineStore('chat', () => {
 
     function applyBlock(message: ChatMessage, event: SSEEvent) {
         if (event.type === 'done') return;
+        if (event.type === 'text' || event.type === 'text_chunk') {
+            // Result and done can arrive in the same read, before Vue renders.
+            message.animateText = true;
+            void nextTick(() => { message.animateText = false; });
+        }
         if (event.type === 'analysis_activity' && event.activity) {
             const index = message.blocks.findIndex((block) => block.type === 'analysis_activity' && block.activity?.id === event.activity?.id);
             const block: MessageBlock = { type: 'analysis_activity', activity: event.activity };

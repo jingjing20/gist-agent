@@ -32,7 +32,7 @@ const expanded = ref(initialThinkingExpanded(Boolean(props.isStreaming)));
 
 <style scoped>
 .thinking-block {
-    border-left: 2px solid rgba(14, 165, 233, 0.24);
+    border-left: 2px solid color-mix(in srgb, var(--status-info) 24%, transparent);
     color: var(--da-text-muted);
     font-size: 13px;
 }
@@ -51,7 +51,7 @@ const expanded = ref(initialThinkingExpanded(Boolean(props.isStreaming)));
 }
 
 .thinking-trigger:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: color-mix(in srgb, var(--foreground) 4%, transparent);
     color: var(--da-text-main);
 }
 

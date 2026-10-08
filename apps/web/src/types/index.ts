@@ -74,6 +74,8 @@ export interface MessageBlock {
 }
 
 export interface ChatMessage {
+    /** Transient render hint for text received in the current SSE batch. */
+    animateText?: boolean;
     id: string;
     role: 'user' | 'assistant';
     content: string;

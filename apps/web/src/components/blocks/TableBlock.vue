@@ -110,7 +110,7 @@ function exportToExcel() {
     border: 1px solid var(--da-border);
     overflow: hidden;
     background: var(--da-panel);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 20px color-mix(in srgb, var(--shadow-color) 20%, transparent);
 }
 
 .table-header {
@@ -118,7 +118,7 @@ function exportToExcel() {
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
-    background: rgba(255, 255, 255, 0.02);
+    background: color-mix(in srgb, var(--foreground) 2%, transparent);
     border-bottom: 1px solid var(--da-border);
 }
 
@@ -131,7 +131,7 @@ function exportToExcel() {
 .table-label {
     font-size: 13px;
     font-weight: 600;
-    color: #fff;
+    color: var(--da-text-main);
 }
 
 .header-right {
@@ -141,9 +141,9 @@ function exportToExcel() {
 }
 
 .export-btn {
-    background: rgba(14, 165, 233, 0.1);
-    color: #38bdf8;
-    border: 1px solid rgba(14, 165, 233, 0.2);
+    background: color-mix(in srgb, var(--status-info) 10%, transparent);
+    color: var(--status-info);
+    border: 1px solid color-mix(in srgb, var(--status-info) 20%, transparent);
     padding: 4px 10px;
     border-radius: 6px;
     font-size: 12px;
@@ -155,14 +155,14 @@ function exportToExcel() {
 }
 
 .export-btn:hover {
-    background: rgba(14, 165, 233, 0.2);
-    border-color: rgba(14, 165, 233, 0.4);
+    background: color-mix(in srgb, var(--status-info) 20%, transparent);
+    border-color: color-mix(in srgb, var(--status-info) 40%, transparent);
 }
 
 .row-count {
     font-size: 11px;
     color: var(--da-text-muted);
-    background: rgba(255, 255, 255, 0.05);
+    background: color-mix(in srgb, var(--foreground) 5%, transparent);
     padding: 2px 8px;
     border-radius: 10px;
 }
@@ -188,7 +188,7 @@ thead {
 }
 
 th {
-    background: #1e293b; /* Slate-800 like header */
+    background: var(--bg-code-header); /* Slate-800 like header */
     padding: 10px 16px;
     text-align: left;
     font-weight: 600;
@@ -199,7 +199,7 @@ th {
 
 td {
     padding: 10px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid color-mix(in srgb, var(--foreground) 3%, transparent);
     white-space: nowrap;
     color: var(--da-text-main);
     max-width: 300px;
@@ -212,7 +212,7 @@ tbody tr {
 }
 
 tbody tr:hover {
-    background: rgba(14, 165, 233, 0.05);
+    background: color-mix(in srgb, var(--status-info) 5%, transparent);
 }
 
 tbody tr:last-child td {
@@ -225,7 +225,7 @@ tbody tr:last-child td {
     color: var(--da-text-muted);
     text-align: center;
     border-top: 1px solid var(--da-border);
-    background: rgba(255, 255, 255, 0.01);
+    background: color-mix(in srgb, var(--foreground) 1%, transparent);
 }
 
 .no-scrollbar::-webkit-scrollbar {

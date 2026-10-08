@@ -3,16 +3,54 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch, onBeforeUnmount } from 'vue';
 import MarkdownIt from 'markdown-it';
 
 const markdown = new MarkdownIt({ html: false, linkify: true });
 
-const props = defineProps<{ content?: string }>();
+const props = defineProps<{ content?: string; isStreaming?: boolean }>();
+
+const displayedContent = ref('');
+let timer: ReturnType<typeof setTimeout> | undefined;
+let playing = false;
+
+function stop() {
+    clearTimeout(timer);
+    timer = undefined;
+}
+
+function advance() {
+    timer = undefined;
+    const target = props.content || '';
+    // Bound the backlog so large validated reports finish in a few seconds.
+    const remaining = Array.from(target.slice(displayedContent.value.length));
+    const count = Math.max(1, Math.ceil(remaining.length / 80));
+    displayedContent.value += remaining.slice(0, count).join('');
+    if (displayedContent.value !== target) timer = setTimeout(advance, 16);
+    else playing = false;
+}
+
+watch(
+    () => props.content || '',
+    (content) => {
+        if (!props.isStreaming && !playing) {
+            stop();
+            displayedContent.value = content;
+            return;
+        }
+        if (!content.startsWith(displayedContent.value)) displayedContent.value = '';
+        playing = displayedContent.value !== content;
+        if (playing && timer === undefined) timer = setTimeout(advance, 16);
+    },
+    { immediate: true }
+);
+// A done event often arrives immediately after the result. Drain the pending
+// text independently of generation status; history mounts without animation.
+onBeforeUnmount(stop);
 
 const renderedHTML = computed(() => {
-    if (!props.content) return '';
-    return markdown.render(props.content);
+    if (!displayedContent.value) return '';
+    return markdown.render(displayedContent.value);
 });
 </script>
 
@@ -88,7 +126,7 @@ const renderedHTML = computed(() => {
 }
 
 .markdown-block :deep(code) {
-    background: rgba(255, 255, 255, 0.08);
+    background: color-mix(in srgb, var(--foreground) 8%, transparent);
     padding: 2px 6px;
     border-radius: 4px;
     font-size: 13px;

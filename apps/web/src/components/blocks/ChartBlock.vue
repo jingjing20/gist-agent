@@ -21,16 +21,10 @@ import type { ChartData } from '../../types';
 
 echarts.use([BarChart, LineChart, PieChart, ScatterChart, RadarChart, FunnelChart, TitleComponent, TooltipComponent, GridComponent, LegendComponent, CanvasRenderer]);
 
-// Updated to match Gist Agent New Theme (Sky/Blue/Violet)
-const COLORS = [
-    '#0ea5e9', // da-primary (Sky-500)
-    '#8b5cf6', // da-gradient-start (Violet-500)
-    '#3b82f6', // da-gradient-end (Blue-500)
-    '#10b981', // Emerald-500
-    '#f59e0b', // Amber-500
-    '#ec4899', // Pink-500
-    '#ef4444', // Red-500
-];
+function themeColor(name: string, alpha = 1): string {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return alpha === 1 ? value : echarts.color.modifyAlpha(value, alpha);
+}
 
 const props = defineProps<{
     chartData?: ChartData;
@@ -39,8 +33,10 @@ const props = defineProps<{
 const chartRef = ref<HTMLElement>();
 const barHeights = ['60%', '85%', '45%', '70%', '55%'];
 let chart: echarts.ECharts | null = null;
+let themeObserver: MutationObserver | null = null;
 
 function buildOption(data: ChartData): Record<string, unknown> {
+    const COLORS = ['--status-info', '--da-gradient-start', '--da-gradient-end', '--status-success', '--status-warning', '--chart-pink', '--destructive'].map((name) => themeColor(name));
     const isPie = data.chartType === 'pie';
     const isFunnel = data.chartType === 'funnel';
     const isRadar = data.chartType === 'radar';
@@ -51,21 +47,21 @@ function buildOption(data: ChartData): Record<string, unknown> {
             left: 'center',
             top: 10,
             textStyle: {
-                color: '#e2e8f0', // da-text-main
+                color: themeColor('--da-text-main'), // da-text-main
                 fontSize: 15,
                 fontWeight: 600,
             },
         },
         tooltip: {
             trigger: isPie ? 'item' : 'axis',
-            backgroundColor: 'rgba(26, 31, 46, 0.95)', // da-chart-bg / panel based
-            borderColor: 'rgba(14, 165, 233, 0.4)', // da-primary-alpha
+            backgroundColor: themeColor('--da-panel'), // da-chart-bg / panel based
+            borderColor: themeColor('--status-info'), // da-primary-alpha
             borderWidth: 1,
-            textStyle: { color: '#e2e8f0', fontSize: 12 },
+            textStyle: { color: themeColor('--da-text-main'), fontSize: 12 },
             padding: [10, 14],
             borderRadius: 8,
             shadowBlur: 10,
-            shadowColor: 'rgba(0, 0, 0, 0.3)',
+            shadowColor: themeColor('--shadow-color', 0.3),
         },
         color: COLORS,
     };
@@ -85,15 +81,15 @@ function buildOption(data: ChartData): Record<string, unknown> {
                     center: ['50%', '55%'],
                     itemStyle: {
                         borderRadius: 8,
-                        borderColor: '#1a1f2e', // da-chart-bg
+                        borderColor: themeColor('--da-chart-bg'), // da-chart-bg
                         borderWidth: 2,
                     },
-                    label: { color: '#94a3b8', fontSize: 12 },
+                    label: { color: themeColor('--da-text-muted'), fontSize: 12 },
                     emphasis: {
                         label: { fontSize: 14, fontWeight: 'bold' },
                         itemStyle: {
                             shadowBlur: 15,
-                            shadowColor: 'rgba(14, 165, 233, 0.4)', // da-primary shadow
+                            shadowColor: themeColor('--status-info'), // da-primary shadow
                         },
                     },
                     data: chartData,
@@ -105,9 +101,9 @@ function buildOption(data: ChartData): Record<string, unknown> {
                     type: 'funnel',
                     left: '10%',
                     width: '80%',
-                    label: { color: '#94a3b8', fontSize: 12 },
+                    label: { color: themeColor('--da-text-muted'), fontSize: 12 },
                     itemStyle: {
-                        borderColor: '#1a1f2e',
+                        borderColor: themeColor('--da-chart-bg'),
                         borderWidth: 2,
                     },
                     data: chartData,
@@ -121,10 +117,10 @@ function buildOption(data: ChartData): Record<string, unknown> {
         const indicators = (data.xAxis ?? []).map((name) => ({ name }));
         base.radar = {
             indicator: indicators,
-            axisName: { color: '#94a3b8', padding: [3, 5] },
-            splitLine: { lineStyle: { color: 'rgba(51, 58, 77, 0.4)' } },
+            axisName: { color: themeColor('--da-text-muted'), padding: [3, 5] },
+            splitLine: { lineStyle: { color: themeColor('--da-border') } },
             splitArea: { show: false },
-            axisLine: { lineStyle: { color: 'rgba(51, 58, 77, 0.4)' } },
+            axisLine: { lineStyle: { color: themeColor('--da-border') } },
         };
 
         base.series = [
@@ -144,7 +140,7 @@ function buildOption(data: ChartData): Record<string, unknown> {
         if (data.series.length > 1) {
             base.legend = {
                 top: 40,
-                textStyle: { color: '#94a3b8', fontSize: 12 },
+                textStyle: { color: themeColor('--da-text-muted'), fontSize: 12 },
             };
         }
         return base;
@@ -161,18 +157,18 @@ function buildOption(data: ChartData): Record<string, unknown> {
     base.xAxis = {
         type: 'category',
         data: data.xAxis ?? [],
-        axisLabel: { color: '#94a3b8', fontSize: 11, margin: 12 },
-        axisLine: { lineStyle: { color: '#333a4d' } }, // da-border
+        axisLabel: { color: themeColor('--da-text-muted'), fontSize: 11, margin: 12 },
+        axisLine: { lineStyle: { color: themeColor('--da-border') } }, // da-border
         axisTick: { show: false },
         splitLine: { show: false },
     };
 
     base.yAxis = {
         type: 'value',
-        axisLabel: { color: '#94a3b8', fontSize: 11 },
+        axisLabel: { color: themeColor('--da-text-muted'), fontSize: 11 },
         splitLine: {
             lineStyle: {
-                color: 'rgba(51, 58, 77, 0.4)', // da-border light alpha
+                color: themeColor('--da-border'), // da-border light alpha
                 type: 'dashed',
             },
         },
@@ -185,7 +181,7 @@ function buildOption(data: ChartData): Record<string, unknown> {
             itemWidth: 10,
             itemHeight: 10,
             icon: 'circle',
-            textStyle: { color: '#94a3b8', fontSize: 12 },
+            textStyle: { color: themeColor('--da-text-muted'), fontSize: 12 },
         };
     }
 
@@ -203,8 +199,8 @@ function buildOption(data: ChartData): Record<string, unknown> {
             seriesBase.lineStyle = { width: 3 };
             seriesBase.areaStyle = {
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                    { offset: 0, color: COLORS[i % COLORS.length] + '33' },
-                    { offset: 1, color: COLORS[i % COLORS.length] + '00' },
+                    { offset: 0, color: echarts.color.modifyAlpha(COLORS[i % COLORS.length]!, 0.2) },
+                    { offset: 1, color: echarts.color.modifyAlpha(COLORS[i % COLORS.length]!, 0) },
                 ]),
             };
         }
@@ -216,7 +212,7 @@ function buildOption(data: ChartData): Record<string, unknown> {
                 // Gradient for bars
                 color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
                     { offset: 0, color: COLORS[i % COLORS.length] },
-                    { offset: 1, color: COLORS[i % COLORS.length] + 'aa' },
+                    { offset: 1, color: echarts.color.modifyAlpha(COLORS[i % COLORS.length]!, 0.67) },
                 ]),
             };
         }
@@ -240,6 +236,8 @@ function handleResize() {
 }
 
 onMounted(() => {
+    themeObserver = new MutationObserver(renderChart);
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     renderChart();
     window.addEventListener('resize', handleResize);
 });
@@ -253,6 +251,7 @@ watch(
 );
 
 onUnmounted(() => {
+    themeObserver?.disconnect();
     window.removeEventListener('resize', handleResize);
     chart?.dispose();
     chart = null;
@@ -265,7 +264,7 @@ onUnmounted(() => {
     border-radius: 12px;
     overflow: hidden;
     background: var(--da-chart-bg);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 8px 32px color-mix(in srgb, var(--shadow-color) 20%, transparent);
 }
 
 .chart-container {
@@ -289,7 +288,7 @@ onUnmounted(() => {
     width: 160px;
     height: 16px;
     border-radius: 4px;
-    background: rgba(14, 165, 233, 0.12); /* da-primary alpha */
+    background: color-mix(in srgb, var(--status-info) 12%, transparent); /* da-primary alpha */
     animation: shimmer 1.8s infinite ease-in-out;
     margin-bottom: 32px;
 }
@@ -307,25 +306,25 @@ onUnmounted(() => {
 .skeleton-bar {
     width: 36px;
     border-radius: 6px 6px 0 0;
-    background: rgba(14, 165, 233, 0.08); /* da-primary alpha */
+    background: color-mix(in srgb, var(--status-info) 8%, transparent); /* da-primary alpha */
     animation: shimmer 1.8s infinite ease-in-out;
 }
 
 .skeleton-bar:nth-child(2) {
     animation-delay: 0.15s;
-    background: rgba(139, 92, 246, 0.08);
+    background: color-mix(in srgb, var(--da-gradient-start) 8%, transparent);
 }
 .skeleton-bar:nth-child(3) {
     animation-delay: 0.3s;
-    background: rgba(59, 130, 246, 0.08);
+    background: color-mix(in srgb, var(--da-gradient-end) 8%, transparent);
 }
 .skeleton-bar:nth-child(4) {
     animation-delay: 0.45s;
-    background: rgba(14, 165, 233, 0.08);
+    background: color-mix(in srgb, var(--status-info) 8%, transparent);
 }
 .skeleton-bar:nth-child(5) {
     animation-delay: 0.6s;
-    background: rgba(139, 92, 246, 0.08);
+    background: color-mix(in srgb, var(--da-gradient-start) 8%, transparent);
 }
 
 .skeleton-axis {

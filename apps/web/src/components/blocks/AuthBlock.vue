@@ -44,7 +44,7 @@ function handleApply() {
     display: flex;
     gap: 16px;
     background: var(--bg-code);
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    border: 1px solid color-mix(in srgb, var(--destructive) 30%, transparent);
     padding: 16px;
     border-radius: 8px;
     margin: 12px 0;
@@ -53,14 +53,14 @@ function handleApply() {
 .auth-icon {
     width: 24px;
     height: 24px;
-    color: #ef4444;
+    color: var(--destructive);
     flex-shrink: 0;
 }
 
 .title {
     margin: 0 0 8px;
     font-size: 15px;
-    color: #ef4444;
+    color: var(--destructive);
 }
 
 .desc {
@@ -94,7 +94,7 @@ function handleApply() {
 
 .apply-btn {
     background: var(--da-primary);
-    color: white;
+    color: var(--primary-foreground);
     border: none;
     padding: 8px 16px;
     border-radius: 6px;
