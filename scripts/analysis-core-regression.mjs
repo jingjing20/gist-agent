@@ -217,8 +217,15 @@ await check('fabricated and blocked evidence cannot support findings', async () 
 });
 await check('key metrics must point to an evidenced finding', async () => {
     const evidence = new Map([['a1', { blocked: false, sql: 'SELECT 1' }]]);
-    const valid = { ...answer('answer', [observation('a1')]), answer: { ...answer('answer', [observation('a1')]).answer,
-        summary: '收入上升。', keyPoints: ['期末高于期初'], metrics: [{ label: '期末收入', value: '59.6 万元', findingId: 'f1' }] } };
+    const valid = {
+        ...answer('answer', [observation('a1')]),
+        answer: {
+            ...answer('answer', [observation('a1')]).answer,
+            summary: '收入上升。',
+            keyPoints: ['期末高于期初'],
+            metrics: [{ label: '期末收入', value: '59.6 万元', findingId: 'f1' }],
+        },
+    };
     assert.equal(validateSubmission(valid, evidence).answer.metrics[0].value, '59.6 万元');
     assert.throws(() => validateSubmission({ ...valid, answer: { ...valid.answer, metrics: [{ label: '收入', value: '59.6 万元', findingId: 'missing' }] } }, evidence), /已证实/);
     assert.throws(() => validateSubmission({ ...valid, answer: { ...valid.answer, keyPoints: ['重复', '重复'] } }, evidence), /不能重复/);
@@ -245,16 +252,28 @@ await check('explicit user output preference wins over the default report', asyn
 await check('ordered response blocks validate table and chart references', async () => {
     const evidence = new Map([['a1', { blocked: false, sql: 'SELECT 1' }]]);
     const charts = new Map([['c1', 'a1']]);
-    const response = { kind: 'response', status: 'complete', blocks: [
-        { type: 'markdown', content: '北区明细如下。' },
-        { type: 'table', artifactId: 'a1' },
-        { type: 'chart', chartArtifactId: 'c1' },
-    ] };
-    assert.deepEqual(validateSubmission(response, evidence, charts).blocks.map((block) => block.type), ['markdown', 'table', 'chart']);
+    const response = {
+        kind: 'response',
+        status: 'complete',
+        blocks: [
+            { type: 'markdown', content: '北区明细如下。' },
+            { type: 'table', artifactId: 'a1' },
+            { type: 'chart', chartArtifactId: 'c1' },
+        ],
+    };
+    assert.deepEqual(
+        validateSubmission(response, evidence, charts).blocks.map((block) => block.type),
+        ['markdown', 'table', 'chart']
+    );
     assert.throws(() => validateSubmission(response, evidence), /不是本轮已生成/);
     assert.throws(() => validateSubmission({ ...response, blocks: [{ type: 'table', artifactId: 'missing' }] }, evidence, charts), /不是本轮已观察/);
-    assert.deepEqual(validateSubmission({ kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '当前数据源有 10 张表。' }] }, new Map()).blocks, [{ type: 'markdown', content: '当前数据源有 10 张表。' }]);
-    assert.throws(() => validateSubmission({ kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '旧格式', evidence: [] }] }, evidence, charts), /不允许的字段/);
+    assert.deepEqual(validateSubmission({ kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '当前数据源有 10 张表。' }] }, new Map()).blocks, [
+        { type: 'markdown', content: '当前数据源有 10 张表。' },
+    ]);
+    assert.throws(
+        () => validateSubmission({ kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '旧格式', evidence: [] }] }, evidence, charts),
+        /不允许的字段/
+    );
 });
 await check('malformed arguments return paired feedback, no side effect', async () => {
     const bad = query();
@@ -328,16 +347,91 @@ await check('pre-cancel and mid-tool cancel prevent further model calls', async 
     await assert.rejects(m.run(), { code: 'CANCELLED' });
     assert.equal(m.seen.length, 1);
 });
-await check('empty output, repeated unstructured text and context overflow fail explicitly', async () => {
+await check('empty output and context overflow fail explicitly', async () => {
     await assert.rejects(harness([[]]).run(), { code: 'EMPTY_LLM_RESPONSE' });
-    const textOnly = () =>
-        (async function* () {
-            yield { choices: [{ delta: { content: 'unsubmitted' } }] };
-        })();
-    await assert.rejects(harness([textOnly, textOnly, textOnly]).run(), { code: 'ANALYSIS_NO_PROGRESS' });
     const h = harness([], { capability: { contextWindow: 10, responseReserve: 5 } });
     await assert.rejects(h.run(), { code: 'CONTEXT_BUDGET_EXCEEDED' });
     assert.equal(h.seen.length, 0);
+});
+await check('plain text streams before model completion without structured submission', async () => {
+    let h;
+    h = harness(
+        [
+            () =>
+                (async function* () {
+                    yield { choices: [{ delta: { content: '直接回答', reasoning_content: 'private thoughts' } }] };
+                    assert.equal(
+                        h.events
+                            .filter((e) => e.type === 'text_chunk')
+                            .map((e) => e.content)
+                            .join(''),
+                        '直接回答'
+                    );
+                    yield { choices: [{ delta: { content: '，无需固定格式。' } }] };
+                })(),
+        ],
+        {
+            validateOutcome: async () => {
+                throw new Error('free text must not require outcome validation');
+            },
+        }
+    );
+    const outcome = await h.run();
+    assert.equal(outcome.blocks[0].content, '直接回答，无需固定格式。');
+    assert.equal(h.seen.length, 1);
+    assert.ok(!h.seen[0].names.includes('submit_analysis'));
+    assert.ok(!h.events.some((e) => e.type === 'reasoning_chunk'));
+    assert.equal(h.turnMessages.at(-1).content, outcome.blocks[0].content);
+});
+await check('model can explain, query and answer in natural language', async () => {
+    let h;
+    h = harness([
+        () =>
+            (async function* () {
+                yield { choices: [{ delta: { content: '我先核对数据。' } }] };
+                yield* stream([query()]);
+            })(),
+        () =>
+            (async function* () {
+                yield { choices: [{ delta: { content: '查询返回 1。' } }] };
+            })(),
+    ]);
+    await h.run();
+    assert.equal(h.executions.length, 1);
+    assert.deepEqual(
+        h.events.filter((e) => e.type === 'text_chunk').map((e) => e.content),
+        ['我先核对数据。', '查询返回 1。']
+    );
+    assert.ok(h.seen[1].history.some((m) => m.role === 'tool'));
+});
+await check('tools-only delivery may finish without forced prose', async () => {
+    const h = harness([[call('display_query_table', { queryArtifactId: 'a1' })], []]);
+    h.options.tools.push({
+        name: 'display_query_table',
+        definition: { type: 'function', function: { name: 'display_query_table', parameters: { properties: { queryArtifactId: {} } } } },
+        parseArguments: (v) => v,
+        execute: async () => ({ succeeded: true, blocks: [], toolResult: '{"displayed":true}' }),
+    });
+    const outcome = await h.run();
+    assert.deepEqual(outcome.blocks, []);
+    assert.equal(h.seen.length, 2);
+    assert.ok(!h.events.some((e) => e.type === 'text_chunk'));
+});
+await check('cancelled text stream stops publishing additional chunks', async () => {
+    let h;
+    h = harness([
+        () =>
+            (async function* () {
+                yield { choices: [{ delta: { content: '已收到' } }] };
+                h.controller.abort(new GenerationExecutionError('CANCELLED', '已取消'));
+                yield { choices: [{ delta: { content: '不可继续发布' } }] };
+            })(),
+    ]);
+    await assert.rejects(h.run(), { code: 'CANCELLED' });
+    assert.deepEqual(
+        h.events.filter((e) => e.type === 'text_chunk').map((e) => e.content),
+        ['已收到']
+    );
 });
 await check('tool dependency failures are not exposed as model argument errors', async () => {
     const h = harness([[query()]]);
@@ -463,6 +557,81 @@ await check('runtime adapter persists snapshot and structured result in existing
     assert.match(blocks[0].content, /^已完成/);
     assert.ok(events.some((e) => e.type === 'log'));
     assert.equal(events.at(-1).content, blocks.at(-1).content);
+    events.length = 0;
+    blocks.length = 0;
+    turnMessages.length = 0;
+    adapter.llm.streamWithTools = async (_messages, definitions) => {
+        assert.ok(!definitions.some((tool) => tool.function.name === 'submit_analysis'));
+        assert.ok(definitions.some((tool) => tool.function.name === 'display_query_table'));
+        return (async function* () {
+            yield { choices: [{ delta: { content: '普通问题' } }] };
+            assert.ok(events.some((event) => event.type === 'text_chunk'));
+            yield { choices: [{ delta: { content: '直接回答。' } }] };
+        })();
+    };
+    await adapter.run({
+        generation: { id: 'g', datasourceId: 1, userId: 1, requestMessageId: 'r', conversationId: 'c', contextUpperBound: '2026-09-15T00:00:00Z', writerToken: 'w' },
+        message: '你好',
+        signal: new AbortController().signal,
+        emitter: { send: (event) => events.push(event) },
+        blocks,
+        turnMessages,
+        metrics: { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 },
+        assertWritable: async () => {},
+        checkpoint: async () => {},
+        onFirstDelta: async () => {},
+    });
+    assert.deepEqual(
+        blocks.filter((block) => block.type === 'text').map((block) => block.content),
+        ['普通问题直接回答。', '']
+    );
+    assert.deepEqual(blocks.at(-1).analysis.outcome.blocks, []);
+    assert.equal(blocks.at(-1).analysis.state.status, 'answered');
+    events.length = 0;
+    blocks.length = 0;
+    turnMessages.length = 0;
+    let artifact,
+        round = 0;
+    adapter.schema.getAllowedTableNames = async () => [];
+    adapter.schema.getColumnPolicies = async () => [];
+    adapter.artifacts.readQueryArtifact = async () => ({ artifact, rows: [] });
+    adapter.artifacts.assertUsableInGeneration = async () => {};
+    adapter.sql.definition.function.parameters = { properties: { title: {}, sql: {}, plan: {} } };
+    adapter.sql.parseArguments = (value) => value;
+    adapter.sql.execute = async (_args, context) => {
+        artifact = { id: 'a-table', datasourceId: 1, generationId: 'g', executedSql: 'SELECT 1', isLimited: true, analysisContext: structuredClone(context.analysisContext) };
+        context.emitter.send({ type: 'table', queryArtifactId: artifact.id, rows: [{ n: 1 }] });
+        return { succeeded: true, blocks: [], toolResult: JSON.stringify({ queryArtifactId: artifact.id, isLimited: true }) };
+    };
+    adapter.llm.streamWithTools = async (messages) => {
+        if (round++ === 0) {
+            const state = JSON.parse(messages[0].content.match(/<untrusted-analysis-data>(.*?)<\/untrusted-analysis-data>/s)[1]).state;
+            return stream([call('update_analysis_state', { expectedRevision: state.revision, mode: 'patch', reason: '确认查询条件', patch: {} })]);
+        }
+        if (round === 2) return stream([query()]);
+        if (round === 3) return stream([call('display_query_table', { queryArtifactId: artifact.id, title: '样例数据' })]);
+        return stream([]);
+    };
+    await adapter.run({
+        generation: { id: 'g', datasourceId: 1, userId: 1, requestMessageId: 'r', conversationId: 'c', contextUpperBound: '2026-09-15T00:00:00Z', writerToken: 'w' },
+        message: '只要表格',
+        signal: new AbortController().signal,
+        emitter: { send: (event) => events.push(event) },
+        blocks,
+        turnMessages,
+        metrics: { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 },
+        assertWritable: async () => {},
+        checkpoint: async () => {},
+        onFirstDelta: async () => {},
+    });
+    const tables = events.filter((event) => event.type === 'table');
+    assert.equal(tables.length, 1, 'query previews must not be automatically delivered');
+    assert.equal(tables[0].display, true);
+    assert.equal(tables[0].conversationId, 'c');
+    assert.equal(tables[0].queryArtifactId, 'a-table');
+    assert.equal(round, 4);
+    assert.equal(blocks.at(-1).content, '');
+    assert.deepEqual(blocks.at(-1).analysis.outcome.blocks, []);
 });
 await check('generation selects persisted core and does not call legacy prompt or distiller', async () => {
     let ran = 0,

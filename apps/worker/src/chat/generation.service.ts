@@ -33,11 +33,12 @@ export interface GenerationExecutionMetrics {
 
 const PUBLISH_SCRIPT = `
 local sequence = redis.call('INCR', KEYS[1])
-local event = cjson.decode(ARGV[1])
-event.sequence = sequence
+-- Preserve the JSON body: Lua cjson converts empty arrays into objects.
+-- ARGV[1] is a JSON.stringify object with sequence omitted by the caller.
+local event = string.sub(ARGV[1], 1, -2) .. ',"sequence":' .. tostring(sequence) .. '}'
 local generation_id = tostring(sequence) .. '-0'
-redis.call('XADD', KEYS[2], generation_id, 'event', cjson.encode(event))
-local user_id = redis.call('XADD', KEYS[3], '*', 'event', cjson.encode(event))
+redis.call('XADD', KEYS[2], generation_id, 'event', event)
+local user_id = redis.call('XADD', KEYS[3], '*', 'event', event)
 redis.call('PEXPIRE', KEYS[1], ARGV[2])
 redis.call('PEXPIRE', KEYS[2], ARGV[2])
 redis.call('PEXPIRE', KEYS[3], ARGV[2])
@@ -314,7 +315,7 @@ export class GenerationService implements OnModuleDestroy {
                 generationId: identity.id,
                 conversationId: identity.conversationId,
                 messageId: identity.messageId,
-                sequence: 0,
+                sequence: undefined, // Assigned atomically by Lua without re-encoding the body.
                 occurredAt: new Date().toISOString(),
             };
             const result = (await this.redis.eval(PUBLISH_SCRIPT, 3, keys.sequence, keys.generation, keys.user, JSON.stringify(payload), String(this.retentionMs))) as [

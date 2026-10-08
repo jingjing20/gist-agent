@@ -8,9 +8,16 @@ import type { ModelCapability } from '../chat/model-capabilities';
 import type { Tool, ToolContext, SSEEvent } from '../chat/tools/base-tool';
 import type { GenerationExecutionMetrics } from '../chat/generation.service';
 import { exactKeys, record, SUBMIT_TOOL, validateSubmission, type ObservedEvidence } from './submission';
+import { predominantlyEnglish, ResponseTextStream } from './response-text-stream';
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 type Call = OpenAI.Chat.Completions.ChatCompletionMessageToolCall;
+
+function expectsChinese(messages: Message[]): boolean {
+    const question = messages.find((message) => message.role === 'user')?.content;
+    if (typeof question !== 'string') return false;
+    return /[\u4e00-\u9fff]/.test(question) && !/(?:用|使用|以|改成|切换到|请)(?:\s*)(?:英文|英语)|\b(?:in English|use English|answer in English)\b/i.test(question);
+}
 
 export interface AnalysisRunOptions {
     messages: Message[];
@@ -43,7 +50,9 @@ export class AnalysisAgent {
         let modelCalls = 0;
         let repeatedAction = '';
         let repeatedActionCount = 0;
-        let textOnlyCount = 0;
+        let delivered = false;
+        const chineseResponse = expectsChinese(messages);
+        let languageRetries = 0;
         let firstDelta = false;
         let contextRetried = false;
         const check = async () => {
@@ -57,7 +66,9 @@ export class AnalysisAgent {
         };
         while (true) {
             await check();
-            const definitions = [...options.tools.map((t) => t.definition), SUBMIT_TOOL];
+            // Natural language is the answer channel; no terminal submission tool.
+            // The legacy handler below remains for older in-flight tool calls.
+            const definitions = options.tools.map((t) => t.definition);
             let input: Message[] = [...messages];
             const budget = Math.floor(
                 (options.capability.contextWindow - options.capability.responseReserve - Math.ceil(options.capability.contextWindow * 0.1)) * (contextRetried ? 0.75 : 1)
@@ -80,6 +91,7 @@ export class AnalysisAgent {
             options.onEvent({ type: 'log', title: progressTitle, content: '正在评估下一步行动...' });
             const calls = new Map<number, Call>();
             let content = '';
+            const textStream = new ResponseTextStream(chineseResponse);
             let reasoning = '';
             let outputChars = 0;
             try {
@@ -91,6 +103,8 @@ export class AnalysisAgent {
                     const fragment = delta.content ?? '';
                     const thoughts = delta.reasoning_content ?? '';
                     content += fragment;
+                    const visibleText = textStream.push(fragment);
+                    if (visibleText) options.onEvent({ type: 'text_chunk', content: visibleText });
                     reasoning += thoughts;
                     outputChars += fragment.length + thoughts.length;
                     metrics.outputTokensEstimated += estimateTokens(fragment + thoughts);
@@ -125,15 +139,31 @@ export class AnalysisAgent {
             await check();
             const batch = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call);
             if (!batch.length) {
+                if (!content.trim() && delivered) {
+                    append({ role: 'assistant', content: '' });
+                    options.onEvent({ type: 'log_update', title: progressTitle, content: '已完成回答。' });
+                    await options.checkpoint();
+                    return { kind: 'response', status: 'complete', blocks: [] };
+                }
                 if (!content.trim()) throw new GenerationExecutionError('EMPTY_LLM_RESPONSE', '模型未返回正式结果或工具调用');
-                if (++textOnlyCount >= 3) throw new GenerationExecutionError('ANALYSIS_NO_PROGRESS', '模型连续返回未提交的文字，分析未取得进展；请重试。');
-                options.onEvent({ type: 'log_update', title: progressTitle, content: '需要调整：已收到模型回复，继续整理为正式结果。' });
-                // Unstructured text is not a final answer; do not publish unsupported conclusions.
-                append({ role: 'assistant', content });
-                messages.push({ role: 'system', content: '请通过 submit_analysis 提交正式结果，不能只输出自由文本。' });
-                continue;
+                if (chineseResponse && !textStream.published && predominantlyEnglish(content)) {
+                    if (languageRetries++ >= 1) throw new GenerationExecutionError('RESPONSE_LANGUAGE_MISMATCH', '模型未按要求使用中文回答，请重试。');
+                    messages.push({ role: 'assistant', content });
+                    messages.push({ role: 'system', content: '用户使用中文提问。请将上一条回答改为中文后重新回答，保留字段名、SQL 和技术标识符，不重复执行已完成的工具，不输出操作旁白。' });
+                    options.onEvent({ type: 'log_update', title: progressTitle, content: '正在整理中文回答…' });
+                    continue;
+                }
+                const remainingText = textStream.finish(content);
+                if (remainingText) options.onEvent({ type: 'text_chunk', content: remainingText });
+                const assistant: Message = { role: 'assistant', content };
+                if (reasoning) Object.assign(assistant, { reasoning_content: reasoning });
+                append(assistant);
+                options.onEvent({ type: 'log_update', title: progressTitle, content: '已完成回答。' });
+                await options.checkpoint();
+                await check();
+                // Internal outcome for state persistence, never a required model format.
+                return { kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content }] };
             }
-            textOnlyCount = 0;
             for (const call of batch) {
                 if (!call.id || !call.function.name || callIds.has(call.id)) throw new GenerationExecutionError('ANALYSIS_PROTOCOL_ERROR', '工具调用 ID 缺失或重复');
                 callIds.add(call.id);
@@ -221,6 +251,7 @@ export class AnalysisAgent {
                         }
                         await check();
                         result = output.toolResult;
+                        if (output.succeeded !== false && ['display_query_table', 'generate_chart'].includes(tool.name)) delivered = true;
                         if (output.succeeded === false) needsCorrection = true;
                         const data = JSON.parse(result);
                         if (activity) {

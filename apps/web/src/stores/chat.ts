@@ -201,7 +201,9 @@ export const useChatStore = defineStore('chat', () => {
         if (event.type === 'text' || event.type === 'text_chunk') {
             // Result and done can arrive in the same read, before Vue renders.
             message.animateText = true;
-            void nextTick(() => { message.animateText = false; });
+            void nextTick(() => {
+                message.animateText = false;
+            });
         }
         if (event.type === 'analysis_activity' && event.activity) {
             const index = message.blocks.findIndex((block) => block.type === 'analysis_activity' && block.activity?.id === event.activity?.id);
@@ -265,6 +267,8 @@ export const useChatStore = defineStore('chat', () => {
             return;
         }
         const block: MessageBlock = {
+            display: event.display,
+            conversationId: event.conversationId,
             analysis: event.analysis,
             type: event.type,
             content: event.content,

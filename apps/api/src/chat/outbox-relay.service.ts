@@ -9,10 +9,10 @@ const PUBLISH_TERMINAL_SCRIPT = `
 local existing = redis.call('GET', KEYS[4])
 if existing then return tonumber(existing) end
 local sequence = redis.call('INCR', KEYS[1])
-local event = cjson.decode(ARGV[1])
-event.sequence = sequence
-redis.call('XADD', KEYS[2], tostring(sequence) .. '-0', 'event', cjson.encode(event))
-redis.call('XADD', KEYS[3], '*', 'event', cjson.encode(event))
+-- Keep empty arrays and objects distinct; do not round-trip the body through cjson.
+local event = string.sub(ARGV[1], 1, -2) .. ',"sequence":' .. tostring(sequence) .. '}'
+redis.call('XADD', KEYS[2], tostring(sequence) .. '-0', 'event', event)
+redis.call('XADD', KEYS[3], '*', 'event', event)
 redis.call('SET', KEYS[4], tostring(sequence), 'PX', ARGV[2])
 redis.call('PEXPIRE', KEYS[1], ARGV[2])
 redis.call('PEXPIRE', KEYS[2], ARGV[2])
@@ -84,7 +84,7 @@ export class OutboxRelayService implements OnApplicationBootstrap, OnApplication
             generationId: payload.generationId,
             conversationId: payload.conversationId,
             messageId: payload.messageId,
-            sequence: 0,
+            sequence: undefined, // Assigned atomically by Lua without re-encoding the body.
             occurredAt: new Date().toISOString(),
         };
         return Number(await this.redis.eval(

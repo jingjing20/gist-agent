@@ -14,7 +14,10 @@
                 <div class="assistant-content">
                     <AnalysisProcessBlock v-if="hasAnalysisProcess" :blocks="msg.blocks" :is-streaming="isStreaming" :terminal-status="processTerminalStatus" />
                     <template v-for="(block, i) in visibleBlocks" :key="i">
-                        <component :is="block.analysis ? AnalysisBlock : blockComponent(block.type)" v-bind="blockProps(block)" />
+                        <component
+                            :is="block.analysis ? AnalysisBlock : block.display && block.queryArtifactId ? AnalysisArtifactTable : blockComponent(block.type)"
+                            v-bind="blockProps(block)"
+                        />
                     </template>
                     <p v-if="terminalStatus" role="status">{{ terminalStatus }}</p>
                     <div v-if="canResume" class="terminal-actions">
@@ -35,6 +38,7 @@
 import { useChatStore } from '../stores/chat';
 import { computed, ref, type Component } from 'vue';
 import AnalysisBlock from './blocks/AnalysisBlock.vue';
+import AnalysisArtifactTable from './blocks/AnalysisArtifactTable.vue';
 import AnalysisProcessBlock from './blocks/AnalysisProcessBlock.vue';
 import SqlBlock from './blocks/SqlBlock.vue';
 import TableBlock from './blocks/TableBlock.vue';
@@ -66,15 +70,21 @@ const terminalStatus = computed(() => {
 const analysisWorkflow = computed(() =>
     props.msg.blocks.some((block) => (block.type === 'analysis_activity' && !!block.activity) || (block.type === 'log' && /^分析步骤 \d+$/.test(block.title || '')))
 );
-const hasAnalysisProcess = computed(() => props.msg.blocks.some((block) => block.type === 'analysis_activity' && !!block.activity));
+const hasAnalysisProcess = computed(() => analysisWorkflow.value);
 const hasAnalysisResult = computed(() => props.msg.blocks.some((block) => !!block.analysis));
 const reportCharts = computed(() => props.msg.blocks.filter((block) => block.type === 'chart' && !!block.chartData));
 const visibleBlocks = computed(() =>
     props.msg.blocks.filter((block) => {
         if (block.type === 'thinking' || block.type === 'reasoning_chunk') return false;
-        if (analysisWorkflow.value && ['analysis_activity', 'log', 'sql', 'table'].includes(block.type)) return false;
-        if (hasAnalysisResult.value && block.type === 'table') return false;
-        if (hasAnalysisResult.value && block.type === 'chart' && block.chartData) return false;
+        if (analysisWorkflow.value && ['analysis_activity', 'log', 'sql', 'table'].includes(block.type) && !block.display) return false;
+        if (hasAnalysisResult.value && block.type === 'table' && !block.display) return false;
+        if (
+            hasAnalysisResult.value &&
+            block.type === 'chart' &&
+            block.chartData &&
+            props.msg.blocks.some((b) => b.analysis && !(b.analysis.outcome.kind === 'response' && b.analysis.outcome.blocks.length === 0))
+        )
+            return false;
         return true;
     })
 );
@@ -93,6 +103,7 @@ function blockComponent(type: string): Component {
 }
 
 function blockProps(block: MessageBlock): Record<string, unknown> {
+    if (block.display && block.queryArtifactId) return { artifactId: block.queryArtifactId, conversationId: block.conversationId, title: block.title };
     if (block.analysis) return { analysis: block.analysis, charts: reportCharts.value, messageId: props.msg.id, isStreaming: props.isStreaming || !!props.msg.animateText };
     if (block.type === 'log') {
         return {

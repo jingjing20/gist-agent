@@ -13,17 +13,20 @@
                     class="activity-pill"
                     :class="`is-${activity.status}`"
                     type="button"
-                    :aria-expanded="isCurrent(activity) || expanded.has(activity.id)"
+                    :aria-expanded="expanded.has(activity.id)"
                     @click="toggle(activity.id)"
                 >
                     <span class="activity-icon"><i :class="iconFor(activity)"></i></span>
                     <span class="activity-label">{{ activity.label }}</span>
                     <span v-if="activity.subject" class="activity-subject">{{ activity.subject }}</span>
-                    <span v-if="activity.status !== 'running' && activity.durationMs !== undefined" class="activity-meta">{{ formatDuration(activity.durationMs) }}</span>
-                    <i class="fas fa-chevron-down toggle" :class="{ expanded: isCurrent(activity) || expanded.has(activity.id) }"></i>
+                    <span v-if="activity.status === 'running'" class="activity-loading" role="status" aria-label="正在执行">
+                        <i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
+                    </span>
+                    <span v-else-if="activity.durationMs !== undefined" class="activity-meta" title="工具执行耗时（不含模型思考与生成参数）">{{ formatDuration(activity.durationMs) }}</span>
+                    <i class="fas fa-chevron-down toggle" :class="{ expanded: expanded.has(activity.id) }"></i>
                 </button>
 
-                <div v-if="isCurrent(activity) || expanded.has(activity.id)" class="activity-details">
+                <div v-if="expanded.has(activity.id)" class="activity-details">
                     <dl v-if="activity.details.length" class="detail-grid">
                         <template v-for="item in activity.details" :key="item.label">
                             <dt>{{ item.label }}</dt>
@@ -244,12 +247,7 @@ async function loadMore(activity: AnalysisActivityV1) {
     }
 }
 
-const currentActivityId = computed(() => [...activities.value].reverse().find((activity) => activity.status === 'running')?.id);
-function isCurrent(activity: AnalysisActivityV1) {
-    return activity.status === 'running' && activity.id === currentActivityId.value;
-}
 function iconFor(activity: AnalysisActivityV1): string {
-    if (activity.status === 'running') return 'fas fa-circle-notch fa-spin';
     if (activity.status === 'warning') return 'fas fa-exclamation-circle';
     if (activity.kind === 'query_data') return 'fas fa-terminal';
     if (activity.kind === 'generate_chart') return 'fas fa-chart-line';
@@ -371,6 +369,12 @@ const summaryIcon = computed(() => {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+}
+.activity-loading {
+    display: inline-flex;
+    width: 16px;
+    justify-content: center;
+    color: var(--da-primary);
 }
 .toggle {
     color: var(--da-text-muted);

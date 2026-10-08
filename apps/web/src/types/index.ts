@@ -22,6 +22,8 @@ export interface ArtifactColumn {
 }
 
 export interface SSEEvent {
+    display?: boolean;
+    conversationId?: string;
     analysis?: AnalysisPresentation;
     type:
         | 'sql'
@@ -56,6 +58,8 @@ export interface SSEEvent {
 }
 
 export interface MessageBlock {
+    display?: boolean;
+    conversationId?: string;
     analysis?: AnalysisPresentation;
     type: SSEEvent['type'];
     content?: string;

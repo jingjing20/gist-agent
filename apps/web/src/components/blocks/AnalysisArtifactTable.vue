@@ -5,6 +5,7 @@
             <span v-if="metadata">{{ metadata.returnedRowCount }} 行</span>
         </div>
         <p v-if="metadata?.isLimited" class="table-warning">查询结果有截断，仅展示已返回的数据。</p>
+        <p v-for="(warning, index) in metadata?.quality?.warnings" :key="index" class="table-warning">{{ warning.message }} {{ warning.action }}</p>
         <p v-if="error" role="alert">{{ error }} <button type="button" @click="load(true)">重试</button></p>
         <p v-else-if="!metadata">正在读取表格…</p>
         <template v-else>
@@ -41,6 +42,7 @@ interface Metadata {
     columns: Array<{ name: string }>;
     returnedRowCount: number;
     isLimited: boolean;
+    quality?: { warnings: Array<{ message: string; action?: string }> };
 }
 const metadata = ref<Metadata>();
 const rows = ref<Record<string, unknown>[]>([]);
