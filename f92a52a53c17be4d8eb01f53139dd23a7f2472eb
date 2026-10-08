@@ -1,0 +1,89 @@
+apps/web/src/components/blocks/AnalysisProcessBlock.vue
+  a26448eec9c93ae8 300-301,317-318,328,338,354,369,423,443,469
+apps/web/src/components/blocks/ChartBlock.vue
+  a26448eec9c93ae8 24-27,36,39,50,57-58,60,64,84,87,92,104,106,120-121,123,143,160-161,168,171,184,202-203,215,239-240,254,267,291,309,315,319,323,327
+apps/web/src/components/blocks/ThinkingBlock.vue
+  a26448eec9c93ae8 35,54
+apps/web/src/stores/chat.ts
+  e4391cd47bf3c7a4 1,201-205
+apps/web/src/views/LoginPage.vue
+  a26448eec9c93ae8 108,111,114,134,152,158,160,166,174,178,186,193,212,218,248,250,261
+apps/web/src/components/blocks/LogBlock.vue
+  a26448eec9c93ae8 37,43,56,72,76,123,125
+apps/web/src/style.css
+  a26448eec9c93ae8 53-68,113-123,180,183,186,189,192,195,241-247,249,251,253
+apps/web/src/components/ChatSidebar.vue
+  a26448eec9c93ae8 230-231,299-300
+apps/web/src/components/blocks/AnalysisBlock.vue
+  a26448eec9c93ae8 330,332,338-340,396,416,439,466,524
+  e4391cd47bf3c7a4 12,36,40,64,140
+apps/web/src/components/common/ToastItem.vue
+  a26448eec9c93ae8 40,43-45,62,65,68,71,80,83,86,89,102,113
+apps/web/src/views/ForgotPasswordPage.vue
+  a26448eec9c93ae8 113,116,119,139,157,163,165,171,179,183,191,198,217,223,234,236,242,244,252
+apps/web/src/components/ChatDetail.vue
+  a26448eec9c93ae8 122,179
+apps/web/src/components/ChatEmptyState.vue
+  a26448eec9c93ae8 157,163,165,235
+apps/web/src/components/ChatMessageItem.vue
+  e4391cd47bf3c7a4 96,109
+  a26448eec9c93ae8 162,169-170,190,211
+apps/web/src/components/blocks/AnalysisArtifactTable.vue
+  a26448eec9c93ae8 128,155
+apps/web/src/components/blocks/AuthBlock.vue
+  a26448eec9c93ae8 47,56,63,97
+apps/web/src/components/blocks/SqlBlock.vue
+  a26448eec9c93ae8 55,63,70,87,118,133,143
+apps/web/scripts/check-streaming-text.mjs
+  e4391cd47bf3c7a4 1-91
+apps/web/src/components/blocks/TableBlock.vue
+  a26448eec9c93ae8 113,121,134,144-146,158-159,165,191,202,215,228
+apps/web/src/components/DataSourceDrawer.vue
+  a26448eec9c93ae8 169,199,202,205,248
+apps/web/src/components/blocks/MarkdownBlock.vue
+  a26448eec9c93ae8 129
+  e4391cd47bf3c7a4 6,11-49,52-53
+apps/web/src/views/RegisterPage.vue
+  a26448eec9c93ae8 109,112,115,135,153,159,161,167,175,179,187,194,213,219,230,232,243
+apps/web/src/views/ResetPasswordPage.vue
+  a26448eec9c93ae8 119,122,125,143,153,161,169,175,201-202,214,233
+apps/web/src/types/index.ts
+  e4391cd47bf3c7a4 77-78
+apps/web/src/components/ChatInput.vue
+  a26448eec9c93ae8 78,110,151,157,169,183-184,188
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "f92a52a53c17be4d8eb01f53139dd23a7f2472eb",
+  "prompts": {
+    "a26448eec9c93ae8": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a0d15f-afc4-7300-820a-b41b4616a244",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/09/24/rollout-2026-09-24T11-05-04-01a0d15f-afc4-7300-820a-b41b4616a244.jsonl",
+      "total_additions": 252,
+      "total_deletions": 219,
+      "accepted_lines": 245,
+      "overriden_lines": 0
+    },
+    "e4391cd47bf3c7a4": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11a7c-8045-75e2-83cb-6107368c874a",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/08/rollout-2026-10-08T15-48-49-01a11a7c-8045-75e2-83cb-6107368c874a.jsonl",
+      "total_additions": 150,
+      "total_deletions": 12,
+      "accepted_lines": 148,
+      "overriden_lines": 0
+    }
+  }
+}
