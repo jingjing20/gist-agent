@@ -17,6 +17,7 @@ export interface SSEEvent {
         | 'log_update'
         | 'log_remove'
         | 'analysis_activity'
+        | 'suggestions'
         | 'analysis_activity_remove';
     [key: string]: unknown;
 }

@@ -1,4 +1,4 @@
-import type { AnalysisActivityV1, AnalysisOutcome, AnalysisState } from '@gist/contracts';
+import type { AnalysisActivityV1, AnalysisOutcome, AnalysisState, SuggestionItem } from '@gist/contracts';
 export interface AnalysisPresentation {
     outcome: AnalysisOutcome;
     state: AnalysisState;
@@ -40,6 +40,7 @@ export interface SSEEvent {
         | 'log_update'
         | 'log_remove'
         | 'analysis_activity'
+        | 'suggestions'
         | 'analysis_activity_remove';
     content?: string;
     columns?: string[];
@@ -55,9 +56,13 @@ export interface SSEEvent {
     chartData?: ChartData;
     activity?: AnalysisActivityV1;
     activityId?: string;
+    version?: 1;
+    items?: SuggestionItem[];
 }
 
 export interface MessageBlock {
+    version?: 1;
+    items?: SuggestionItem[];
     display?: boolean;
     conversationId?: string;
     analysis?: AnalysisPresentation;

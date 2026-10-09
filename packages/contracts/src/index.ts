@@ -231,6 +231,17 @@ export function parseGenerationTerminalOutboxPayload(value: unknown): Generation
     return candidate as GenerationTerminalOutboxPayload;
 }
 
+export interface SuggestionItem {
+    id: string;
+    text: string;
+}
+
+export interface SuggestionsBlock {
+    type: 'suggestions';
+    version: 1;
+    items: SuggestionItem[];
+}
+
 export interface ConversationEvent {
     type:
         | 'sql'
@@ -248,6 +259,7 @@ export interface ConversationEvent {
         | 'log_update'
         | 'log_remove'
         | 'analysis_activity'
+        | 'suggestions'
         | 'analysis_activity_remove';
     [key: string]: unknown;
 }

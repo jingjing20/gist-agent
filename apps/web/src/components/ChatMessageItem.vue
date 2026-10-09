@@ -17,6 +17,7 @@
                         <component
                             :is="block.analysis ? AnalysisBlock : block.display && block.queryArtifactId ? AnalysisArtifactTable : blockComponent(block.type)"
                             v-bind="blockProps(block)"
+                            @select="sendSuggestion"
                         />
                     </template>
                     <p v-if="terminalStatus" role="status">{{ terminalStatus }}</p>
@@ -36,7 +37,8 @@
 
 <script setup lang="ts">
 import { useChatStore } from '../stores/chat';
-import { computed, ref, type Component } from 'vue';
+import { computed, provide, ref, type Component } from 'vue';
+import { textPlaybackKey } from '../utils/text-playback';
 import AnalysisBlock from './blocks/AnalysisBlock.vue';
 import AnalysisArtifactTable from './blocks/AnalysisArtifactTable.vue';
 import AnalysisProcessBlock from './blocks/AnalysisProcessBlock.vue';
@@ -45,6 +47,7 @@ import TableBlock from './blocks/TableBlock.vue';
 import MarkdownBlock from './blocks/MarkdownBlock.vue';
 import LogBlock from './blocks/LogBlock.vue';
 import ChartBlock from './blocks/ChartBlock.vue';
+import SuggestionBlock from './blocks/SuggestionBlock.vue';
 import type { MessageBlock, ChatMessage } from '../types';
 
 const props = defineProps<{
@@ -53,12 +56,23 @@ const props = defineProps<{
 }>();
 
 const chat = useChatStore();
+const playingRenderers = new Set<symbol>();
+const playingTextCount = ref(0);
+provide(textPlaybackKey, {
+    setPlaying(token, playing) {
+        if (playing) playingRenderers.add(token);
+        else playingRenderers.delete(token);
+        playingTextCount.value = playingRenderers.size;
+    },
+});
 const generationStatus = computed(() => Object.values(chat.generations).find((g) => g.messageId === props.msg.id)?.status);
 const processTerminalStatus = computed(() => {
     const status = generationStatus.value;
     return status === 'failed' || status === 'cancelled' || status === 'completed' ? status : undefined;
 });
 const actionBusy = ref(false);
+const suggestionSending = ref(false);
+const isLatestMessage = computed(() => chat.activeConversation?.messages.at(-1)?.id === props.msg.id);
 const generationId = computed(() => Object.values(chat.generations).find((g) => g.messageId === props.msg.id)?.id);
 const canResume = computed(() => !!generationId.value && (generationStatus.value === 'failed' || generationStatus.value === 'cancelled'));
 const terminalStatus = computed(() => {
@@ -75,6 +89,8 @@ const hasAnalysisResult = computed(() => props.msg.blocks.some((block) => !!bloc
 const reportCharts = computed(() => props.msg.blocks.filter((block) => block.type === 'chart' && !!block.chartData));
 const visibleBlocks = computed(() =>
     props.msg.blocks.filter((block) => {
+        if (block.type === 'suggestions')
+            return isLatestMessage.value && !props.isStreaming && !props.msg.animateText && playingTextCount.value === 0 && generationStatus.value === 'completed';
         if (block.type === 'thinking' || block.type === 'reasoning_chunk') return false;
         if (analysisWorkflow.value && ['analysis_activity', 'log', 'sql', 'table'].includes(block.type) && !block.display) return false;
         if (hasAnalysisResult.value && block.type === 'table' && !block.display) return false;
@@ -96,6 +112,7 @@ const blockMap: Record<string, Component> = {
     error: MarkdownBlock,
     log: LogBlock,
     chart: ChartBlock,
+    suggestions: SuggestionBlock,
 };
 
 function blockComponent(type: string): Component {
@@ -103,6 +120,7 @@ function blockComponent(type: string): Component {
 }
 
 function blockProps(block: MessageBlock): Record<string, unknown> {
+    if (block.type === 'suggestions') return { items: block.items || [], disabled: chat.isLoading || suggestionSending.value };
     if (block.display && block.queryArtifactId) return { artifactId: block.queryArtifactId, conversationId: block.conversationId, title: block.title };
     if (block.analysis) return { analysis: block.analysis, charts: reportCharts.value, messageId: props.msg.id, isStreaming: props.isStreaming || !!props.msg.animateText };
     if (block.type === 'log') {
@@ -125,6 +143,16 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
         rowCount: block.rowCount,
         isLimited: block.isLimited,
     };
+}
+
+async function sendSuggestion(text: string) {
+    if (suggestionSending.value || chat.isLoading || !isLatestMessage.value || !text.trim()) return;
+    suggestionSending.value = true;
+    try {
+        await chat.sendMessage(text);
+    } finally {
+        suggestionSending.value = false;
+    }
 }
 
 async function restartAnalysis() {

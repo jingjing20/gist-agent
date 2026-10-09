@@ -41,10 +41,14 @@ const renderer = createRenderer({
 });
 const chatModulePath = new URL('./.chat-process-component.mjs', import.meta.url);
 const chatSource = (await readFile(new URL('../src/components/ChatMessageItem.vue', import.meta.url), 'utf8'))
-    .replace("import { useChatStore } from '../stores/chat';", 'const useChatStore = () => ({ generations: {} });')
-    .replace(/import (\w+) from '[^']+\.vue';/g, (match, name) =>
-        name === 'AnalysisProcessBlock' ? 'const AnalysisProcessBlock = { render: () => testH("section", { class: "process-probe" }) };' : `const ${name} = { render: () => null };`
-    );
+    .replace("import { textPlaybackKey } from '../utils/text-playback';", 'const textPlaybackKey = Symbol.for("test-text-playback");')
+    .replace("import { useChatStore } from '../stores/chat';", 'const useChatStore = () => globalThis.__suggestionTestChat;')
+    .replace(/import (\w+) from '[^']+\.vue';/g, (match, name) => {
+        if (name === 'AnalysisProcessBlock') return 'const AnalysisProcessBlock = { render: () => testH("section", { class: "process-probe" }) };';
+        if (name === 'SuggestionBlock')
+            return 'const SuggestionBlock = { props: ["items", "disabled"], emits: ["select"], render() { return testH("button", { class: "suggestion-probe", disabled: this.disabled, onClick: () => this.$emit("select", this.items[0].text) }); } };';
+        return `const ${name} = { render: () => null };`;
+    });
 const chatDescriptor = parse(chatSource.replace('<script setup lang="ts">', '<script setup lang="ts">\nimport { h as testH } from "vue";')).descriptor;
 await writeFile(
     chatModulePath,
@@ -112,7 +116,21 @@ try {
     app.unmount();
     const { default: ChatMessage } = await import(chatModulePath.href);
     const message = reactive({ id: 'message', role: 'assistant', blocks: [], content: '', timestamp: 0 });
-    app = renderer.createApp({ render: () => h(ChatMessage, { msg: message, isStreaming: true }) });
+    const chatProps = reactive({ msg: message, isStreaming: true });
+    const sent = [];
+    let finishSending;
+    globalThis.__suggestionTestChat = reactive({
+        generations: { test: { id: 'test', messageId: 'message', status: 'running' } },
+        activeConversation: { messages: [message] },
+        isLoading: false,
+        sendMessage: (text) => {
+            sent.push(text);
+            return new Promise((resolve) => {
+                finishSending = resolve;
+            });
+        },
+    });
+    app = renderer.createApp({ render: () => h(ChatMessage, chatProps) });
     const chatRoot = { children: [] };
     app.mount(chatRoot);
     const hasProcess = (node = chatRoot) => node.props?.class === 'process-probe' || !!node.children?.some((child) => hasProcess(child));
@@ -120,8 +138,31 @@ try {
     message.blocks.push({ type: 'log', title: '分析步骤 1', content: '正在评估下一步行动...' });
     await nextTick();
     assert.equal(hasProcess(), true, '首条日志到达就应挂载过程卡片，不必等工具执行完');
+    const findSuggestion = (node = chatRoot) => (node.props?.class === 'suggestion-probe' ? node : node.children?.map((child) => findSuggestion(child)).find(Boolean));
+    message.blocks.push({ type: 'suggestions', version: 1, items: [{ id: '1', text: '查看区域趋势' }] });
+    await nextTick();
+    assert.equal(findSuggestion(), undefined, '生成中隐藏推荐');
+    globalThis.__suggestionTestChat.generations.test.status = 'completed';
+    chatProps.isStreaming = false;
+    await nextTick();
+    assert.ok(findSuggestion(), '回答完成后动态渲染推荐组件');
+    const click = findSuggestion().props.onClick;
+    click();
+    click();
+    await nextTick();
+    assert.deepEqual(sent, ['查看区域趋势'], '点击直接发送并阻止重复提交');
+    assert.equal(findSuggestion().props.disabled, true);
+    finishSending(false);
+    await nextTick();
+    await nextTick();
+    assert.equal(findSuggestion().props.disabled, false, '发送失败后允许重试');
+    globalThis.__suggestionTestChat.activeConversation.messages.push({ id: 'next', role: 'user' });
+    await nextTick();
+    assert.equal(findSuggestion(), undefined, '下一轮开始后隐藏历史推荐');
     console.log('PASS: running → warning without expansion flicker, right-side loading, manual expansion and progress before tools');
+    console.log('PASS: suggestions renderer, completion visibility, direct sending, duplicate prevention and failed-send recovery');
 } finally {
+    delete globalThis.__suggestionTestChat;
     app?.unmount();
     await unlink(modulePath);
     await unlink(chatModulePath);

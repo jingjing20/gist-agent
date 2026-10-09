@@ -267,6 +267,8 @@ export const useChatStore = defineStore('chat', () => {
             return;
         }
         const block: MessageBlock = {
+            version: event.version,
+            items: event.items,
             display: event.display,
             conversationId: event.conversationId,
             analysis: event.analysis,

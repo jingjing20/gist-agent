@@ -3,7 +3,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, onBeforeUnmount } from 'vue';
+import { computed, inject, ref, watch, onBeforeUnmount } from 'vue';
+import { textPlaybackKey } from '../../utils/text-playback';
 import MarkdownIt from 'markdown-it';
 
 const markdown = new MarkdownIt({ html: false, linkify: true });
@@ -13,6 +14,13 @@ const props = defineProps<{ content?: string; isStreaming?: boolean }>();
 const displayedContent = ref('');
 let timer: ReturnType<typeof setTimeout> | undefined;
 let playing = false;
+const playback = inject(textPlaybackKey, undefined);
+const playbackToken = Symbol('markdown-playback');
+
+function setPlaying(value: boolean) {
+    playing = value;
+    playback?.setPlaying(playbackToken, value);
+}
 
 function stop() {
     clearTimeout(timer);
@@ -27,7 +35,7 @@ function advance() {
     const count = Math.max(1, Math.ceil(remaining.length / 80));
     displayedContent.value += remaining.slice(0, count).join('');
     if (displayedContent.value !== target) timer = setTimeout(advance, 16);
-    else playing = false;
+    else setPlaying(false);
 }
 
 watch(
@@ -39,14 +47,17 @@ watch(
             return;
         }
         if (!content.startsWith(displayedContent.value)) displayedContent.value = '';
-        playing = displayedContent.value !== content;
+        setPlaying(displayedContent.value !== content);
         if (playing && timer === undefined) timer = setTimeout(advance, 16);
     },
     { immediate: true }
 );
 // A done event often arrives immediately after the result. Drain the pending
 // text independently of generation status; history mounts without animation.
-onBeforeUnmount(stop);
+onBeforeUnmount(() => {
+    stop();
+    setPlaying(false);
+});
 
 const renderedHTML = computed(() => {
     if (!displayedContent.value) return '';
