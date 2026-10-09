@@ -1,0 +1,48 @@
+packages/contracts/src/index.ts
+  8096aa3fc578da7c 234-244,262
+apps/worker/src/analysis/follow-up-suggestions.ts
+  8096aa3fc578da7c 1-71
+apps/web/src/components/blocks/SuggestionBlock.vue
+  8096aa3fc578da7c 1-69
+apps/web/src/components/ChatMessageItem.vue
+  8096aa3fc578da7c 20,40-41,50,59-67,74-75,92-93,115,123,148-157
+apps/web/src/types/index.ts
+  8096aa3fc578da7c 1,43,59-60,64-65
+scripts/follow-up-suggestions-regression.mjs
+  8096aa3fc578da7c 1-91
+apps/web/scripts/check-analysis-process.mjs
+  8096aa3fc578da7c 44-51,119-133,141-161,163,165
+apps/web/scripts/check-streaming-text.mjs
+  8096aa3fc578da7c 8-11,17-34,67-73,138-199,201,208-209
+apps/web/src/components/blocks/MarkdownBlock.vue
+  8096aa3fc578da7c 6-7,17-23,38,50,57-60
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  8096aa3fc578da7c 2-3,39,67,435-464
+apps/worker/src/chat/tools/base-tool.ts
+  8096aa3fc578da7c 20
+apps/web/src/stores/chat.ts
+  8096aa3fc578da7c 270-271
+apps/web/src/utils/text-playback.ts
+  8096aa3fc578da7c 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "8672667b6e2d68be50ce32bfbe4c73db6dcd6925",
+  "prompts": {
+    "8096aa3fc578da7c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11b8a-21c1-75d2-96cc-14f338d775b7",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/08/rollout-2026-10-08T20-43-20-01a11b8a-21c1-75d2-96cc-14f338d775b7.jsonl",
+      "total_additions": 482,
+      "total_deletions": 60,
+      "accepted_lines": 474,
+      "overriden_lines": 0
+    }
+  }
+}
