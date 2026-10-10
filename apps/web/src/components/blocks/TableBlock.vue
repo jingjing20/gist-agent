@@ -7,7 +7,12 @@
             </div>
             <div class="header-right">
                 <span class="row-count"> 已返回 {{ rowCount ?? rows?.length ?? 0 }} 条记录<span v-if="isLimited">（查询结果受限，可能还有更多）</span> </span>
-                <button v-if="rows && rows.length > 0" class="export-btn" @click="exportToExcel"><i class="fas fa-download"></i> 导出</button>
+                <div class="table-actions">
+                    <Button v-if="rows && rows.length > 0" variant="ghost" size="icon-sm" aria-label="导出数据" title="导出数据" @click="exportToExcel"
+                        ><Download data-icon="inline-start"
+                    /></Button>
+                    <slot name="actions" />
+                </div>
             </div>
         </div>
         <div class="table-wrapper no-scrollbar">
@@ -32,6 +37,8 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
+import { Download } from '@lucide/vue';
+import { Button } from '../ui/button';
 
 const props = withDefaults(
     defineProps<{
@@ -109,11 +116,15 @@ function exportToExcel() {
     border-radius: 12px;
     border: 1px solid var(--da-border);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 420px;
     background: var(--da-panel);
     box-shadow: 0 4px 20px color-mix(in srgb, var(--shadow-color) 20%, transparent);
 }
 
 .table-header {
+    flex-shrink: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -123,42 +134,52 @@ function exportToExcel() {
 }
 
 .header-left {
+    min-width: 0;
     display: flex;
     align-items: center;
     gap: 8px;
 }
 
 .table-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
     font-size: 13px;
     font-weight: 600;
     color: var(--da-text-main);
 }
 
 .header-right {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     gap: 12px;
 }
 
-.export-btn {
-    background: color-mix(in srgb, var(--status-info) 10%, transparent);
-    color: var(--status-info);
-    border: 1px solid color-mix(in srgb, var(--status-info) 20%, transparent);
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    cursor: pointer;
+.table-actions {
     display: flex;
     align-items: center;
-    gap: 4px;
-    transition: all 0.2s;
+    gap: 2px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 150ms ease;
 }
-
-.export-btn:hover {
-    background: color-mix(in srgb, var(--status-info) 20%, transparent);
-    border-color: color-mix(in srgb, var(--status-info) 40%, transparent);
+.table-block:hover .table-actions,
+.table-block:focus-within .table-actions {
+    opacity: 1;
+    pointer-events: auto;
 }
-
+@media (hover: none) {
+    .table-actions {
+        opacity: 1;
+        pointer-events: auto;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .table-actions {
+        transition: none;
+    }
+}
 .row-count {
     font-size: 11px;
     color: var(--da-text-muted);
@@ -169,7 +190,8 @@ function exportToExcel() {
 
 .table-wrapper {
     overflow-x: auto;
-    max-height: 260px;
+    max-height: 420px;
+    min-height: 0;
     overflow-y: auto;
     position: relative;
 }
@@ -220,6 +242,7 @@ tbody tr:last-child td {
 }
 
 .table-footer {
+    flex-shrink: 0;
     padding: 10px 16px;
     font-size: 12px;
     color: var(--da-text-muted);

@@ -97,19 +97,19 @@ export class SqlQueryTool implements Tool {
             const r = await this.sqlExecutor.execute(sql, ctx.datasourceId, ctx.userId, ctx.signal);
             await ctx.assertWritable();
 
-            let resultRows = ctx.analysisContext ? r.rows.slice(0, 20) : r.rows;
-            let truncationNote = '';
-            const serialized = JSON.stringify(resultRows);
-            if (serialized.length > MAX_TOOL_RESULT_CHARS && resultRows.length > 1) {
-                const avgSize = serialized.length / resultRows.length;
-                const fitCount = Math.max(1, Math.floor(MAX_TOOL_RESULT_CHARS / avgSize));
-                resultRows = r.rows.slice(0, fitCount);
-                truncationNote = `[质量约束：完整查询共 ${r.rowCount} 条，模型仅收到前 ${fitCount} 条。禁止将子集描述为全集；必须追加聚合查询。]`;
+            // Bound by actual serialized size, rather than discarding small results after 20 rows.
+            const maxResultChars = ctx.analysisContext ? 16000 : MAX_TOOL_RESULT_CHARS;
+            const resultRows: Record<string, unknown>[] = [];
+            let resultChars = 2; // JSON array brackets.
+            for (const row of r.rows) {
+                const rowChars = JSON.stringify(row).length + (resultRows.length ? 1 : 0);
+                if (resultChars + rowChars > maxResultChars) break;
+                resultRows.push(row);
+                resultChars += rowChars;
             }
-            if (ctx.analysisContext) {
-                while (resultRows.length && JSON.stringify(resultRows).length > 16000) resultRows = resultRows.slice(0, -1);
-                if (resultRows.length !== r.rows.length) truncationNote = '[模型收到有界结果摘要；完整结果保存在 Artifact，不能把分页或省略数据当作全集。]';
-            }
+            const truncationNote = resultRows.length !== r.rows.length
+                ? `[质量约束：查询返回 ${r.rowCount} 行，模型收到前 ${resultRows.length} 行；完整返回结果保存在 Artifact。禁止基于子集推断全集，必须读取完整证据或追加聚合查询。]`
+                : '';
             const resultQuality = assessResultQuality({
                 plan: args.plan as QueryPlanV1,
                 sql: r.finalSql,

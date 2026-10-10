@@ -15,7 +15,7 @@
                     <AnalysisProcessBlock v-if="hasAnalysisProcess" :blocks="msg.blocks" :is-streaming="isStreaming" :terminal-status="processTerminalStatus" />
                     <template v-for="(block, i) in visibleBlocks" :key="i">
                         <component
-                            :is="block.analysis ? AnalysisBlock : block.display && block.queryArtifactId ? AnalysisArtifactTable : blockComponent(block.type)"
+                            :is="block.analysis ? AnalysisBlock : block.type === 'chart' || block.type === 'table' ? ArtifactResult : blockComponent(block.type)"
                             v-bind="blockProps(block)"
                             @select="sendSuggestion"
                         />
@@ -40,7 +40,7 @@ import { useChatStore } from '../stores/chat';
 import { computed, provide, ref, type Component } from 'vue';
 import { textPlaybackKey } from '../utils/text-playback';
 import AnalysisBlock from './blocks/AnalysisBlock.vue';
-import AnalysisArtifactTable from './blocks/AnalysisArtifactTable.vue';
+import ArtifactResult from './blocks/ArtifactResult.vue';
 import AnalysisProcessBlock from './blocks/AnalysisProcessBlock.vue';
 import SqlBlock from './blocks/SqlBlock.vue';
 import TableBlock from './blocks/TableBlock.vue';
@@ -121,7 +121,7 @@ function blockComponent(type: string): Component {
 
 function blockProps(block: MessageBlock): Record<string, unknown> {
     if (block.type === 'suggestions') return { items: block.items || [], disabled: chat.isLoading || suggestionSending.value };
-    if (block.display && block.queryArtifactId) return { artifactId: block.queryArtifactId, conversationId: block.conversationId, title: block.title };
+    if (block.type === 'chart' || block.type === 'table') return { block, conversationId: block.conversationId || chat.activeConversationId };
     if (block.analysis) return { analysis: block.analysis, charts: reportCharts.value, messageId: props.msg.id, isStreaming: props.isStreaming || !!props.msg.animateText };
     if (block.type === 'log') {
         return {
@@ -130,9 +130,6 @@ function blockProps(block: MessageBlock): Record<string, unknown> {
             isLoading: props.isStreaming && String(block.content || '').startsWith('正在'),
             isIncomplete: /^(需要调整|未完成|已取消)/.test(block.content || '') || (!props.isStreaming && String(block.content || '').startsWith('正在')),
         };
-    }
-    if (block.type === 'chart') {
-        return { chartData: block.chartData };
     }
     return {
         isStreaming: block.type === 'text' && (props.isStreaming || !!props.msg.animateText),

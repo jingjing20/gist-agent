@@ -9,20 +9,16 @@
 
         <div v-if="!collapsed" class="activity-list">
             <template v-for="activity in activities" :key="activity.id">
-                <button
-                    class="activity-pill"
-                    :class="`is-${activity.status}`"
-                    type="button"
-                    :aria-expanded="expanded.has(activity.id)"
-                    @click="toggle(activity.id)"
-                >
+                <button class="activity-pill" :class="`is-${activity.status}`" type="button" :aria-expanded="expanded.has(activity.id)" @click="toggle(activity.id)">
                     <span class="activity-icon"><i :class="iconFor(activity)"></i></span>
                     <span class="activity-label">{{ activity.label }}</span>
                     <span v-if="activity.subject" class="activity-subject">{{ activity.subject }}</span>
                     <span v-if="activity.status === 'running'" class="activity-loading" role="status" aria-label="正在执行">
                         <i class="fas fa-circle-notch fa-spin" aria-hidden="true"></i>
                     </span>
-                    <span v-else-if="activity.durationMs !== undefined" class="activity-meta" title="工具执行耗时（不含模型思考与生成参数）">{{ formatDuration(activity.durationMs) }}</span>
+                    <span v-else-if="activity.durationMs !== undefined" class="activity-meta" title="工具执行耗时（不含模型思考与生成参数）">{{
+                        formatDuration(activity.durationMs)
+                    }}</span>
                     <i class="fas fa-chevron-down toggle" :class="{ expanded: expanded.has(activity.id) }"></i>
                 </button>
 
@@ -133,17 +129,22 @@ const sqlOpen = ref(new Set<string>());
 const artifacts = ref<Record<string, ArtifactView>>({});
 const hasFormalResult = computed(() => props.blocks.some((block) => block.type === 'text' && !!block.analysis));
 
+// Show incoming steps throughout generation; collapse once the generation ends.
+// Step updates do not override the user's manual toggle.
 watch(
-    () => [props.isStreaming, hasFormalResult.value] as const,
-    ([streaming, hasResult]) => {
-        collapsed.value = !streaming || hasResult;
-        if (!streaming || hasResult) expanded.value = new Set();
+    () => props.isStreaming,
+    (streaming) => {
+        collapsed.value = !streaming;
+        if (!streaming) expanded.value = new Set();
     }
 );
 
 const rawActivities = computed(() =>
     props.blocks
-        .filter((block): block is MessageBlock & { activity: AnalysisActivityV1 } => block.type === 'analysis_activity' && !!block.activity && block.activity.kind !== 'inspect_evidence')
+        .filter(
+            (block): block is MessageBlock & { activity: AnalysisActivityV1 } =>
+                block.type === 'analysis_activity' && !!block.activity && block.activity.kind !== 'inspect_evidence'
+        )
         .map((block) => block.activity)
 );
 

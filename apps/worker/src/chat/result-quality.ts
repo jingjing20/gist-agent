@@ -15,15 +15,12 @@ export function assessResultQuality(input: {
         const nulls = input.rows.filter((row) => row[column.name] == null).length;
         nullRates[column.name] = rowCount === 0 ? 0 : Number((nulls / rowCount).toFixed(4));
         if (nulls > 0)
-            warnings.push(warning('NULL_VALUES', 'warning', `字段 ${column.name} 含 ${nulls}/${rowCount} 个空值`, '解释指标时说明空值处理方式，必要时追加过滤或完整性查询'));
+            warnings.push(warning('NULL_VALUES', nulls === rowCount ? 'warning' : 'info', `字段 ${column.name} 含 ${nulls}/${rowCount} 个空值`, '解释指标时说明空值处理方式，必要时追加过滤或完整性查询'));
     }
     if (rowCount === 0) warnings.push(warning('EMPTY_RESULT', 'warning', '查询没有返回记录', '不得将空结果直接解释为业务指标为零；检查过滤条件、数据完整性和字段口径'));
     if (input.isLimited) warnings.push(warning('RESULT_LIMITED', 'blocking', '结果达到查询返回上限，可能只是样本', '禁止据此推断全集分布、排名或总量；必须追加聚合或计数查询'));
     if (input.toolResultTruncated) warnings.push(warning('TOOL_RESULT_TRUNCATED', 'blocking', '模型只收到部分结果行', '禁止基于展示子集推断全集；使用 Artifact 或追加聚合查询'));
-    if (/\bjoin\b/i.test(input.sql))
-        warnings.push(
-            warning('JOIN_FANOUT_RISK', 'warning', '查询包含 JOIN，存在粒度放大风险', `核对 JOIN 键与预期粒度“${input.plan.expectedGrain}”，必要时比较 JOIN 前后行数或唯一键数`)
-        );
+    // JOIN alone does not prove fanout. Keep duplicate-grain checks below as evidence.
 
     const grainColumns = inferGrainColumns(input.plan.expectedGrain, input.columns);
     let duplicateKeyCount: number | undefined;

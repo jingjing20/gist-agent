@@ -2,7 +2,9 @@
     <section class="artifact-table">
         <div class="table-heading">
             <strong>{{ title || metadata?.title || '查询结果' }}</strong>
-            <span v-if="metadata">{{ metadata.returnedRowCount }} 行</span>
+            <div class="heading-right">
+                <span v-if="metadata">{{ metadata.returnedRowCount }} 行</span><slot name="actions" />
+            </div>
         </div>
         <p v-if="metadata?.isLimited" class="table-warning">查询结果有截断，仅展示已返回的数据。</p>
         <p v-for="(warning, index) in metadata?.quality?.warnings" :key="index" class="table-warning">{{ warning.message }} {{ warning.action }}</p>
@@ -109,14 +111,31 @@ watch(
     border-radius: 12px;
     background: var(--da-panel);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 420px;
 }
 .table-heading {
     display: flex;
     justify-content: space-between;
     gap: 16px;
+    align-items: center;
+    flex-shrink: 0;
     padding: 14px 16px;
     border-bottom: 1px solid var(--da-border);
     font-size: 14px;
+}
+.table-heading strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.heading-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
 }
 .table-heading span,
 .table-footer,
@@ -125,6 +144,7 @@ watch(
     font-size: 12px;
 }
 .table-warning {
+    flex-shrink: 0;
     margin: 0;
     padding: 8px 16px;
     color: var(--status-warning);
@@ -132,7 +152,8 @@ watch(
 }
 .table-scroll {
     overflow: auto;
-    max-height: 620px;
+    min-height: 0;
+    max-height: 420px;
 }
 table {
     width: 100%;
@@ -157,6 +178,7 @@ tbody tr:hover {
     background: color-mix(in srgb, var(--da-text-muted) 6%, transparent);
 }
 .table-footer {
+    flex-shrink: 0;
     display: flex;
     justify-content: space-between;
     align-items: center;

@@ -8,6 +8,7 @@
             <div class="skeleton-axis"></div>
         </div>
         <div v-else ref="chartRef" class="chart-container"></div>
+        <div v-if="$slots.actions" class="chart-actions"><slot name="actions" /></div>
     </div>
 </template>
 
@@ -34,9 +35,12 @@ const chartRef = ref<HTMLElement>();
 const barHeights = ['60%', '85%', '45%', '70%', '55%'];
 let chart: echarts.ECharts | null = null;
 let themeObserver: MutationObserver | null = null;
+let resizeObserver: ResizeObserver | null = null;
 
 function buildOption(data: ChartData): Record<string, unknown> {
-    const COLORS = ['--status-info', '--da-gradient-start', '--da-gradient-end', '--status-success', '--status-warning', '--chart-pink', '--destructive'].map((name) => themeColor(name));
+    const COLORS = ['--status-info', '--da-gradient-start', '--da-gradient-end', '--status-success', '--status-warning', '--chart-pink', '--destructive'].map((name) =>
+        themeColor(name)
+    );
     const isPie = data.chartType === 'pie';
     const isFunnel = data.chartType === 'funnel';
     const isRadar = data.chartType === 'radar';
@@ -44,11 +48,14 @@ function buildOption(data: ChartData): Record<string, unknown> {
     const base: Record<string, unknown> = {
         title: {
             text: data.title,
-            left: 'center',
+            left: 16,
+            right: 96,
             top: 10,
             textStyle: {
                 color: themeColor('--da-text-main'), // da-text-main
                 fontSize: 15,
+                overflow: 'truncate',
+                width: Math.max(0, (chartRef.value?.clientWidth || 380) - 112),
                 fontWeight: 600,
             },
         },
@@ -233,25 +240,34 @@ function renderChart() {
 
 function handleResize() {
     chart?.resize();
+    if (chart && chartRef.value) {
+        chart.setOption({ title: { textStyle: { width: Math.max(0, chartRef.value.clientWidth - 112) } } });
+    }
 }
 
 onMounted(() => {
     themeObserver = new MutationObserver(renderChart);
     themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     renderChart();
+    resizeObserver = new ResizeObserver(handleResize);
+    if (chartRef.value) resizeObserver.observe(chartRef.value);
     window.addEventListener('resize', handleResize);
 });
 
 watch(
     () => props.chartData,
     () => {
-        nextTick(renderChart);
+        nextTick(() => {
+            renderChart();
+            if (chartRef.value) resizeObserver?.observe(chartRef.value);
+        });
     },
     { deep: true }
 );
 
 onUnmounted(() => {
     themeObserver?.disconnect();
+    resizeObserver?.disconnect();
     window.removeEventListener('resize', handleResize);
     chart?.dispose();
     chart = null;
@@ -260,11 +276,20 @@ onUnmounted(() => {
 
 <style scoped>
 .chart-block {
+    position: relative;
     border: 1px solid var(--da-border);
     border-radius: 12px;
     overflow: hidden;
     background: var(--da-chart-bg);
     box-shadow: 0 8px 32px color-mix(in srgb, var(--shadow-color) 20%, transparent);
+}
+
+.chart-actions {
+    position: absolute;
+    top: 8px;
+    right: 10px;
+    background: var(--da-chart-bg);
+    border-radius: 8px;
 }
 
 .chart-container {

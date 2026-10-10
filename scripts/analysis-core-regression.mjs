@@ -561,6 +561,10 @@ await check('runtime adapter persists snapshot and structured result in existing
     blocks.length = 0;
     turnMessages.length = 0;
     adapter.llm.streamWithTools = async (_messages, definitions) => {
+        if (!definitions.length)
+            return (async function* () {
+                yield { choices: [{ delta: { content: '[]' } }] };
+            })();
         assert.ok(!definitions.some((tool) => tool.function.name === 'submit_analysis'));
         assert.ok(definitions.some((tool) => tool.function.name === 'display_query_table'));
         return (async function* () {
@@ -603,7 +607,12 @@ await check('runtime adapter persists snapshot and structured result in existing
         context.emitter.send({ type: 'table', queryArtifactId: artifact.id, rows: [{ n: 1 }] });
         return { succeeded: true, blocks: [], toolResult: JSON.stringify({ queryArtifactId: artifact.id, isLimited: true }) };
     };
-    adapter.llm.streamWithTools = async (messages) => {
+    adapter.llm.streamWithTools = async (messages, definitions) => {
+        // Follow-up suggestions are a separate generation, outside the analysis rounds.
+        if (!definitions.length)
+            return (async function* () {
+                yield { choices: [{ delta: { content: '[]' } }] };
+            })();
         if (round++ === 0) {
             const state = JSON.parse(messages[0].content.match(/<untrusted-analysis-data>(.*?)<\/untrusted-analysis-data>/s)[1]).state;
             return stream([call('update_analysis_state', { expectedRevision: state.revision, mode: 'patch', reason: '确认查询条件', patch: {} })]);

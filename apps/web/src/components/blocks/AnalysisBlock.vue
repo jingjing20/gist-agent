@@ -1,5 +1,5 @@
 <template>
-    <section class="analysis-result">
+    <section v-if="hasVisibleContent" class="analysis-result">
         <p v-if="outcome.kind !== 'response' && outcome.kind !== 'table' && outcome.kind !== 'direct'" class="status" :class="{ partial: outcome.kind === 'partial' }">
             {{
                 outcome.kind === 'partial' ? '部分结果 · 仍有待查项' : outcome.kind === 'clarification' ? '需要补充信息' : outcome.kind === 'refusal' ? '本次无法分析' : '分析结果'
@@ -10,25 +10,23 @@
             <div class="composed-result">
                 <template v-for="(block, index) in outcome.blocks" :key="index">
                     <MarkdownBlock :is-streaming="isStreaming" v-if="block.type === 'markdown'" :content="block.content" />
-                    <AnalysisArtifactTable
+                    <ArtifactResult
                         v-else-if="block.type === 'table'"
-                        :artifact-id="block.artifactId"
+                        :block="{ type: 'table', queryArtifactId: block.artifactId, title: block.title }"
                         :conversation-id="analysis.state.conversationId"
-                        :title="block.title"
                     />
-                    <ChartBlock v-else-if="chartFor(block.chartArtifactId)" :chart-data="chartFor(block.chartArtifactId)?.chartData" />
+                    <ArtifactResult v-else-if="chartFor(block.chartArtifactId)" :block="chartFor(block.chartArtifactId)!" :conversation-id="analysis.state.conversationId" />
                     <p v-else class="missing-chart">图表暂时无法读取。</p>
                 </template>
             </div>
         </template>
         <template v-if="outcome.kind === 'table'">
             <div class="result-tables">
-                <AnalysisArtifactTable
+                <ArtifactResult
                     v-for="table in outcome.tables"
                     :key="table.artifactId"
-                    :artifact-id="table.artifactId"
+                    :block="{ type: 'table', queryArtifactId: table.artifactId, title: table.title }"
                     :conversation-id="analysis.state.conversationId"
-                    :title="table.title"
                 />
             </div>
             <p v-if="outcome.note" class="table-note">{{ outcome.note }}</p>
@@ -52,7 +50,7 @@
                         <span v-if="metric.detail" class="metric-detail">{{ metric.detail }}</span>
                     </div>
                 </div>
-                <div v-if="primaryChart" class="featured-chart"><ChartBlock :chart-data="primaryChart.chartData" /></div>
+                <div v-if="primaryChart" class="featured-chart"><ArtifactResult :block="primaryChart" :conversation-id="analysis.state.conversationId" /></div>
             </section>
             <section v-if="outcome.answer.findings.length" class="report-section">
                 <h3>分析发现</h3>
@@ -63,7 +61,7 @@
                     </div>
                     <MarkdownBlock :is-streaming="isStreaming" class="finding-text" :content="finding.text" />
                     <div v-for="chart in chartsForFinding(finding)" :key="chart.chartArtifactId || chart.title" class="finding-chart">
-                        <ChartBlock :chart-data="chart.chartData" />
+                        <ArtifactResult :block="chart" :conversation-id="analysis.state.conversationId" />
                     </div>
                     <details v-for="ref in finding.evidence" :key="ref.artifactId + ref.role" @toggle="openEvidence($event, ref.artifactId)">
                         <summary>{{ roles[ref.role] }}{{ ref.comparisonLabel ? ` · ${ref.comparisonLabel}` : '' }} · 展开证据</summary>
@@ -121,7 +119,9 @@
             </section>
             <section v-if="extraCharts.length" class="report-section">
                 <h3>补充图表</h3>
-                <div v-for="chart in extraCharts" :key="chart.chartArtifactId || chart.title" class="finding-chart"><ChartBlock :chart-data="chart.chartData" /></div>
+                <div v-for="chart in extraCharts" :key="chart.chartArtifactId || chart.title" class="finding-chart">
+                    <ArtifactResult :block="chart" :conversation-id="analysis.state.conversationId" />
+                </div>
             </section>
             <div v-if="outcome.answer.limitations.length" class="report-notes">
                 <h3>局限</h3>
@@ -165,8 +165,7 @@ import { useChatStore } from '../../stores/chat';
 import { useDataSourceStore } from '../../stores/datasource';
 import { useAuthStore } from '../../stores/auth';
 import MarkdownBlock from './MarkdownBlock.vue';
-import ChartBlock from './ChartBlock.vue';
-import AnalysisArtifactTable from './AnalysisArtifactTable.vue';
+import ArtifactResult from './ArtifactResult.vue';
 import SqlBlock from './SqlBlock.vue';
 import MemoryContent from '../MemoryContent.vue';
 function formatRange(range: AnalysisEvidenceContext['state']['timeRange']) {
@@ -183,6 +182,10 @@ const chat = useChatStore(),
     sources = useDataSourceStore(),
     auth = useAuthStore();
 const outcome = computed(() => props.analysis.outcome);
+const hasVisibleContent = computed(() => {
+    const result = outcome.value;
+    return result.kind !== 'response' || result.blocks.length > 0 || result.status === 'partial' || candidates.value.length > 0 || !!candidateError.value;
+});
 const kinds = { observation: '观察发现', supported_explanation: '有验证证据的解释', hypothesis: '待验证假设' };
 const roles = { observation: '观察依据', verification: '验证依据', comparison: '比较依据' };
 function chartFor(id: string) {
@@ -268,9 +271,7 @@ async function loadCandidates() {
     const state = props.analysis.state;
     if (sources.list.find((s) => s.id === state.datasourceId)?.created_by !== auth.user?.id) return;
     try {
-        const pending: MemoryCandidate[] = await request(
-            `/memory-candidates?datasourceId=${state.datasourceId}&conversationId=${encodeURIComponent(state.conversationId)}`
-        );
+        const pending: MemoryCandidate[] = await request(`/memory-candidates?datasourceId=${state.datasourceId}&conversationId=${encodeURIComponent(state.conversationId)}`);
         if (seq === epoch) candidates.value = pending.filter((c) => c.sourceMessageId === props.analysis.snapshot.requestMessageId);
     } catch (e) {
         if (seq === epoch) candidateError.value = (e as Error).message;

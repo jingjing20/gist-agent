@@ -12,12 +12,25 @@
                     <i class="fas fa-database text-da-primary"></i>
                 </button>
             </div>
-            <div class="message-list no-scrollbar" ref="messageListRef" @scroll="handleScroll">
-                <ChatMessageItem v-for="msg in store.activeConversation.messages" :key="msg.id" :msg="msg" :isStreaming="store.isLoading && isLastAssistantMsg(msg)" />
+            <div
+                class="message-list no-scrollbar"
+                ref="messageListRef"
+                tabindex="0"
+                @scroll="handleScroll"
+                @wheel.passive="handleIntent"
+                @touchmove.passive="handleIntent"
+                @keydown="handleKey"
+                @pointerdown="handlePointer"
+                @result-panel-open="openResultPanel"
+                @result-panel-close="closeResultPanel"
+            >
+                <div ref="messageContentRef">
+                    <ChatMessageItem v-for="msg in store.activeConversation.messages" :key="msg.id" :msg="msg" :isStreaming="store.isLoading && isLastAssistantMsg(msg)" />
+                </div>
             </div>
-            <button v-if="isUserScrolledUp && store.isLoading" class="latest-button" type="button" @click="returnToLatest">
-                <i class="fas fa-arrow-down"></i>
-                回到最新进度
+            <button v-if="hasContentBelow" class="latest-button" type="button" :aria-label="store.isLoading ? '正在生成，滚动到最新内容' : '滚动到最下面'" @click="returnToLatest">
+                <span v-if="store.isLoading" class="latest-dots" aria-hidden="true"><span></span><span></span><span></span></span>
+                <i v-else class="fas fa-arrow-down" aria-hidden="true"></i>
             </button>
         </template>
         <template v-else>
@@ -28,7 +41,8 @@
 </template>
 
 <script setup lang="ts">
-import { watch, nextTick, ref } from 'vue';
+import { watch, nextTick, ref, onBeforeUnmount } from 'vue';
+import { isAtBottom, shouldPauseFollowing } from '../utils/scroll-follow';
 import { useChatStore } from '../stores/chat';
 import ChatInput from './ChatInput.vue';
 import ChatEmptyState from './ChatEmptyState.vue';
@@ -57,46 +71,133 @@ function isLastAssistantMsg(msg: ChatMessage): boolean {
     return false;
 }
 
-const isUserScrolledUp = ref(false);
-
-function handleScroll(e: Event) {
-    const el = e.target as HTMLElement;
-    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
-    // 给一定容差，超过 50px 认为用户主动上卷了
-    isUserScrolledUp.value = distance > 50;
+const messageContentRef = ref<HTMLElement>();
+const following = ref(true);
+const hasContentBelow = ref(false);
+const panelOpen = ref(false);
+let userIntent = false;
+let lastTop = 0;
+let lastHeight = 0;
+let lastViewport = 0;
+let intentFrame: number | undefined;
+let observer: ResizeObserver | undefined;
+let inputObserver: ResizeObserver | undefined;
+function openResultPanel() {
+    panelOpen.value = true;
+    following.value = false;
+}
+function closeResultPanel() {
+    panelOpen.value = false;
+    const el = messageListRef.value;
+    following.value = !!el && isAtBottom(el);
+    updatePosition();
 }
 
-function scrollToBottom(force = false) {
-    if (!force && isUserScrolledUp.value) return;
+function updatePosition() {
+    const el = messageListRef.value;
+    if (el) hasContentBelow.value = !isAtBottom(el);
+}
+function handleIntent() {
+    userIntent = true;
+    // Pause before the next content resize can move the reading position.
+    following.value = false;
+    if (typeof requestAnimationFrame === 'function') {
+        cancelAnimationFrame(intentFrame || 0);
+        intentFrame = requestAnimationFrame(() => {
+            const el = messageListRef.value;
+            if (userIntent && el && isAtBottom(el)) {
+                following.value = true;
+                userIntent = false;
+            }
+        });
+    }
+}
+function handleKey(event: KeyboardEvent) {
+    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) handleIntent();
+}
+function handlePointer(event: PointerEvent) {
+    const el = messageListRef.value;
+    if (el && event.clientX >= el.getBoundingClientRect().right - 16) handleIntent();
+}
+function handleScroll() {
+    const el = messageListRef.value;
+    if (!el || panelOpen.value) return;
+    if (shouldPauseFollowing(el.scrollTop, lastTop, userIntent, el.scrollHeight !== lastHeight || el.clientHeight !== lastViewport)) following.value = false;
+    if (userIntent || !following.value) following.value = isAtBottom(el);
+    userIntent = false;
+    lastTop = el.scrollTop;
+    lastHeight = el.scrollHeight;
+    lastViewport = el.clientHeight;
+    updatePosition();
+}
+function scrollToBottom() {
     nextTick(() => {
         const el = messageListRef.value;
-        if (el) el.scrollTop = el.scrollHeight;
+        if (!el || panelOpen.value) return;
+        if (following.value) {
+            el.scrollTop = el.scrollHeight;
+            lastTop = el.scrollTop;
+            lastHeight = el.scrollHeight;
+            lastViewport = el.clientHeight;
+        }
+        updatePosition();
     });
 }
-
 function returnToLatest() {
-    isUserScrolledUp.value = false;
-    nextTick(() => messageListRef.value?.scrollTo({ top: messageListRef.value.scrollHeight, behavior: 'smooth' }));
+    following.value = true;
+    userIntent = false;
+    scrollToBottom();
 }
-
+watch(
+    messageContentRef,
+    (content) => {
+        observer?.disconnect();
+        observer = new ResizeObserver(scrollToBottom);
+        if (content) observer.observe(content);
+        if (messageListRef.value) observer.observe(messageListRef.value);
+        inputObserver?.disconnect();
+        const detail = messageListRef.value?.parentElement;
+        const input = detail?.querySelector('.chat-input-wrapper');
+        if (input && detail) {
+            inputObserver = new ResizeObserver(() => detail.style.setProperty('--chat-input-height', `${input.getBoundingClientRect().height}px`));
+            inputObserver.observe(input);
+        }
+    },
+    { flush: 'post' }
+);
+watch(
+    () => store.activeConversationId,
+    () => {
+        following.value = true;
+        userIntent = false;
+        scrollToBottom();
+    }
+);
 watch(
     () => store.activeConversation?.messages.length,
-    (newLen, oldLen) => {
-        if (newLen && (!oldLen || newLen > oldLen)) {
-            isUserScrolledUp.value = false;
-            scrollToBottom(true);
+    (length, previous) => {
+        if (length && length !== previous) {
+            scrollToBottom();
         }
     },
     { immediate: true }
 );
-
 watch(
-    () => store.activeConversation?.messages,
+    () => store.activeConversation?.messages.filter((message) => message.role === 'user').at(-1)?.id,
     () => {
-        scrollToBottom(false);
-    },
-    { deep: true }
+        following.value = true;
+        scrollToBottom();
+    }
 );
+watch(() => store.activeConversation?.messages, scrollToBottom, { deep: true });
+watch(panelOpen, (open) => {
+    if (!open) updatePosition();
+});
+onBeforeUnmount(() => {
+    observer?.disconnect();
+    inputObserver?.disconnect();
+    if (intentFrame !== undefined) cancelAnimationFrame(intentFrame);
+});
 
 async function handleExample(query: string) {
     store.startNewChat();
@@ -165,13 +266,15 @@ async function handleExample(query: string) {
 .latest-button {
     position: absolute;
     left: 50%;
-    bottom: 112px;
+    bottom: calc(var(--chat-input-height, 112px) + 12px);
     transform: translateX(-50%);
     z-index: 4;
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    padding: 8px 12px;
+    width: 40px;
+    height: 40px;
+    justify-content: center;
+    padding: 0;
     border-radius: 999px;
     border: 1px solid var(--da-border);
     background: var(--da-panel);
@@ -180,6 +283,40 @@ async function handleExample(query: string) {
     cursor: pointer;
 }
 
+.latest-dots {
+    display: flex;
+    gap: 4px;
+}
+.latest-dots span {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: latest-bounce 1.2s infinite ease-in-out;
+}
+.latest-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+}
+.latest-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+}
+@keyframes latest-bounce {
+    0%,
+    70%,
+    100% {
+        transform: translateY(0);
+        opacity: 0.5;
+    }
+    35% {
+        transform: translateY(-3px);
+        opacity: 1;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    .latest-dots span {
+        animation: none;
+    }
+}
 .latest-button:hover {
     border-color: var(--da-primary);
 }

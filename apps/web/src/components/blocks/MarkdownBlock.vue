@@ -74,6 +74,33 @@ const renderedHTML = computed(() => {
     overflow-x: auto;
 }
 
+.markdown-block :deep(h1),
+.markdown-block :deep(h2),
+.markdown-block :deep(h3),
+.markdown-block :deep(h4) {
+    margin: 24px 0 12px;
+    line-height: 1.45;
+    font-weight: 650;
+}
+.markdown-block :deep(h1) {
+    font-size: 22px;
+}
+.markdown-block :deep(h2) {
+    font-size: 19px;
+}
+.markdown-block :deep(h3),
+.markdown-block :deep(h4) {
+    font-size: 16px;
+}
+.markdown-block :deep(:first-child) {
+    margin-top: 0;
+}
+.markdown-block :deep(blockquote) {
+    margin: 16px 0;
+    padding-left: 14px;
+    border-left: 3px solid var(--da-border);
+    color: var(--da-text-muted);
+}
 .markdown-block :deep(p) {
     margin: 0 0 12px;
 }

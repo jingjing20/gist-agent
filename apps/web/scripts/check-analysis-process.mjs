@@ -83,6 +83,9 @@ try {
         return all;
     };
     const pill = () => nodes().find((node) => node.props?.class?.includes('activity-pill'));
+    const summary = () => nodes().find((node) => node.props?.class?.includes('process-summary'));
+    assert.equal(summary().props['aria-expanded'], true, '执行中默认展开动作列表');
+    assert.ok(pill(), '默认显示动作列表');
     assert.equal(pill().props['aria-expanded'], false, '执行中详情应保持收起，避免完成后瞬间收起');
     assert.ok(
         nodes().some((node) => node.props?.class?.includes('activity-loading')),
@@ -113,6 +116,32 @@ try {
             .every((node) => node.props['aria-expanded'] === false),
         '警告完成应保持收起'
     );
+    summary().props.onClick();
+    await nextTick();
+    assert.equal(pill(), undefined, '执行中允许手动收起列表');
+    props.blocks.push({ type: 'analysis_activity', activity: { ...activity, id: 'query3' } });
+    await nextTick();
+    assert.equal(summary().props['aria-expanded'], false, '新增步骤不覆盖手动收起');
+    summary().props.onClick();
+    await nextTick();
+    props.blocks.push({ type: 'text', analysis: { kind: 'answer' } });
+    await nextTick();
+    assert.equal(summary().props['aria-expanded'], true, '结果到达但生成未结束时保持展开');
+    props.isStreaming = false;
+    await nextTick();
+    assert.equal(summary().props['aria-expanded'], false, '分析结束自动收起');
+    assert.equal(pill(), undefined);
+    summary().props.onClick();
+    await nextTick();
+    assert.ok(pill(), '完成后允许手动查看步骤');
+    props.isStreaming = true;
+    await nextTick();
+    assert.equal(summary().props['aria-expanded'], true, '重新开始分析默认展开');
+    app.unmount();
+    props.isStreaming = false;
+    app = renderer.createApp({ render: () => h(Component, props) });
+    app.mount(root);
+    assert.equal(summary().props['aria-expanded'], false, '历史已完成消息默认收起');
     app.unmount();
     const { default: ChatMessage } = await import(chatModulePath.href);
     const message = reactive({ id: 'message', role: 'assistant', blocks: [], content: '', timestamp: 0 });
