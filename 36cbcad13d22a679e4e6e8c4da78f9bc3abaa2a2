@@ -1,0 +1,77 @@
+apps/web/src/components/blocks/ArtifactResult.vue
+  b422814d50b8a1cd 1-115
+apps/web/src/components/blocks/ChartBlock.vue
+  b422814d50b8a1cd 11,38,41-43,51-52,57-58,243-245,252-253,260-263,270,279,287-294
+apps/web/src/components/blocks/AnalysisArtifactTable.vue
+  b422814d50b8a1cd 5-7,114-116,122-123,128-139,147,155-156,181
+apps/web/src/utils/scroll-follow.ts
+  b422814d50b8a1cd 1-7
+apps/web/scripts/check-analysis-process.mjs
+  32b243605143ed88 87-88,119-144
+scripts/result-quality-regression.mjs
+  32b243605143ed88 1-50
+apps/web/src/components/ChatMessageItem.vue
+  b422814d50b8a1cd 18,43,124
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  b422814d50b8a1cd 38-44
+apps/web/src/components/blocks/MarkdownBlock.vue
+  b422814d50b8a1cd 77-103
+apps/worker/src/chat/tools/sql-query.tool.ts
+  32b243605143ed88 100-108,110-112
+apps/worker/src/chat/result-quality.ts
+  32b243605143ed88 18,23
+docs/analysis-result-presentation.md
+  b422814d50b8a1cd 1-52
+apps/web/src/components/blocks/AnalysisProcessBlock.vue
+  b422814d50b8a1cd 12,19-21,144-147
+  32b243605143ed88 132-133,135-138
+apps/web/src/components/blocks/QueryEvidence.vue
+  b422814d50b8a1cd 1-59,61-107
+apps/web/src/components/blocks/AnalysisBlock.vue
+  b422814d50b8a1cd 2,13,15,18,25,28,53,64,122-124,168,185-188,274
+apps/web/src/components/ChatDetail.vue
+  b422814d50b8a1cd 15-29,31-33,44-45,74-83,96-133,136-143,147-149,151-175,178-180,186,188-190,192-200,269,274-277,286-319
+apps/web/scripts/check-result-reading.mjs
+  b422814d50b8a1cd 1-263
+apps/web/package.json
+  b422814d50b8a1cd 9
+scripts/analysis-core-regression.mjs
+  b422814d50b8a1cd 564-567,610-615
+apps/web/src/components/blocks/TableBlock.vue
+  b422814d50b8a1cd 10-15,40-41,119-121,127,137,144-146,153,159,162-165,167-181,193-194,245
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "36cbcad13d22a679e4e6e8c4da78f9bc3abaa2a2",
+  "prompts": {
+    "32b243605143ed88": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1201b-efe6-71a2-b51c-e4ace3d6c578",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/09/rollout-2026-10-09T18-01-04-01a1201b-efe6-71a2-b51c-e4ace3d6c578.jsonl",
+      "total_additions": 101,
+      "total_deletions": 28,
+      "accepted_lines": 98,
+      "overriden_lines": 0
+    },
+    "b422814d50b8a1cd": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a11e5f-117d-7223-8303-531e37a3f0db",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/09/rollout-2026-10-09T09-55-09-01a11e5f-117d-7223-8303-531e37a3f0db.jsonl",
+      "total_additions": 1115,
+      "total_deletions": 339,
+      "accepted_lines": 867,
+      "overriden_lines": 1
+    }
+  }
+}
