@@ -1,0 +1,92 @@
+apps/web/src/components/ChatEmptyState.vue
+  6958d6c3967fdd8c 34,86
+scripts/analysis-cutover-regression.mjs
+  6958d6c3967fdd8c 39-44,99,104,107-109,116-123
+README.en.md
+  6958d6c3967fdd8c 11,55-56
+apps/api/src/datasource/datasource.controller.ts
+  6958d6c3967fdd8c 1-2,85-86,99-113,220-221
+apps/web/src/stores/datasource.ts
+  6958d6c3967fdd8c 157-158,162,169,171-173,205
+packages/llm/src/index.ts
+  6958d6c3967fdd8c 124-125
+packages/contracts/src/schema-enrichment.ts
+  6958d6c3967fdd8c 1-21
+scripts/phase4-security-quality-regression.mjs
+  6958d6c3967fdd8c 4,76,79,96-97,99-101
+docs/prompt-refactor.md
+  6958d6c3967fdd8c 1-58
+apps/web/src/components/datasource/TableListModal.vue
+  6958d6c3967fdd8c 22-31,38,42-43,57-58
+apps/worker/src/analysis/analysis-prompt.ts
+  6958d6c3967fdd8c 1-38,41,43,45
+packages/llm/src/prompts.ts
+  6958d6c3967fdd8c 1-35,38-54
+.env.example
+  6958d6c3967fdd8c 53-55
+scripts/schema-enrichment-regression.mjs
+  6958d6c3967fdd8c 1-46,51-54,60-83,85-137,139-184
+scripts/analysis-core-regression.mjs
+  6958d6c3967fdd8c 170,186-202,223-226,229-230
+apps/api/src/datasource/suggestion.service.ts
+  6958d6c3967fdd8c 1-3,15-21,23-49,52,55-57
+packages/contracts/src/index.ts
+  6958d6c3967fdd8c 274
+apps/api/src/datasource/schema-enrichment.service.ts
+  6958d6c3967fdd8c 2-5,7,9-54,59-60,63-102,105,108-110,112-113,115-119,121-124,126-130,132-146
+apps/worker/src/analysis/finish-analysis.ts
+  6958d6c3967fdd8c 1-31
+scripts/analysis-text-channel-regression.mjs
+  6958d6c3967fdd8c 26-32,86,96,100
+scripts/phase3-artifacts-regression.mjs
+  6958d6c3967fdd8c 155-158
+apps/web/src/components/datasource/SchemaEnrichmentModal.vue
+  6958d6c3967fdd8c 1-119,131-158,160-182,184-198,200-209,214-215
+README.md
+  6958d6c3967fdd8c 115-116
+scripts/phase1-reliability-regression.mjs
+  6958d6c3967fdd8c 6,143-147,154,215
+docs/analysis-result-presentation.md
+  6958d6c3967fdd8c 31-32
+scripts/follow-up-suggestions-regression.mjs
+  6958d6c3967fdd8c 4-5,7,15
+packages/database/src/index.ts
+  6958d6c3967fdd8c 188-191
+benchmarks/saas-growth/agent-core-cases.json
+  6958d6c3967fdd8c 160
+benchmarks/saas-growth/s4-acceptance.json
+  6958d6c3967fdd8c 4
+scripts/prompt-runtime-regression.mjs
+  6958d6c3967fdd8c 1-187
+scripts/analysis-state-regression.mjs
+  6958d6c3967fdd8c 4,28,141,304,308,334-338,340-345,352,403,430,449-468,499-503,506
+scripts/analysis-failure-regression.mjs
+  6958d6c3967fdd8c 1-2
+package.json
+  6958d6c3967fdd8c 30-31
+apps/api/src/datasource/datasource.service.ts
+  6958d6c3967fdd8c 45,155
+docs/agent-refactor/02-agent-runtime.md
+  6958d6c3967fdd8c 15,23,25,27-30,32,50-52,58,60-63,75
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "b3f351638d614e460898d0c4840a1b8d62c48236",
+  "prompts": {
+    "6958d6c3967fdd8c": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a1238a-3e3e-7d12-9a02-844e912777f8",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/10/rollout-2026-10-10T10-00-25-01a1238a-3e3e-7d12-9a02-844e912777f8.jsonl",
+      "total_additions": 843,
+      "total_deletions": 1024,
+      "accepted_lines": 1139,
+      "overriden_lines": 20
+    }
+  }
+}
