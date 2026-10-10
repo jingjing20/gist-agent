@@ -140,12 +140,6 @@ export interface ChartFieldV1 {
     label: string;
 }
 
-export interface ArtifactFilterV1 {
-    field: string;
-    operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'in';
-    value: unknown;
-}
-
 export interface ArtifactSortV1 {
     field: string;
     direction: 'asc' | 'desc';
@@ -159,7 +153,6 @@ export interface ChartArtifactV1 {
     title: string;
     xField: string;
     yFields: ChartFieldV1[];
-    filters?: ArtifactFilterV1[];
     sort?: ArtifactSortV1[];
     createdAt: string;
 }
@@ -278,3 +271,4 @@ export interface ConversationEventEmitter {
     send(event: ConversationEvent): void;
 }
 export * from './memory';
+export * from './schema-enrichment';

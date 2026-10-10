@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { newAnalysisState, patchAnalysisState, evidenceMismatch, conditionSignature, validateEvidenceReference } = require('../apps/worker/dist/analysis/analysis-state.js');
+const { newAnalysisState, patchAnalysisState, evidenceMismatch, conditionSignature } = require('../apps/worker/dist/analysis/analysis-state.js');
 const { AnalysisStateRepository } = require('../apps/worker/dist/analysis/analysis-state.repository.js');
 const { AnalysisRuntimeAdapter } = require('../apps/worker/dist/analysis/analysis-runtime-adapter.js');
 const { GenerationService } = require('../apps/worker/dist/chat/generation.service.js');
@@ -25,7 +25,7 @@ const g = (id = 'g') => ({
     messageId: `a-${id}`,
     contextUpperBound: '2026-09-15T00:00:00Z',
     schemaContextVersion: 'schema-v1',
-    promptPolicyVersion: 'analysis-core-v2',
+    promptPolicyVersion: 'analysis-core-v3',
 });
 const def = { id: 'd', version: 1, name: '注册', description: '注册用户', status: 'active' };
 const deps = { memories: [def], sourceMessageId: 'user-message', fieldAllowed: async (f) => f === 'users.platform', validateEvidence: async () => {} };
@@ -138,7 +138,7 @@ await check('evidence applicability compares conditions, not revision or questio
     ])
         assert.ok(evidenceMismatch(a, state, 'now'));
     assert.ok(evidenceMismatch({ ...a, analysisContext: undefined }, s, 'now'));
-    assert.equal(conditionSignature(s), conditionSignature({ ...s, status: 'answered' }));
+    assert.equal(conditionSignature(s), conditionSignature({ ...s, status: 'complete' }));
 });
 await check('drafts remain isolated until successful finalize; failure and cancellation do not promote', async () => {
     const h = database(),
@@ -301,18 +301,11 @@ await check('artifact persistence round-trips state and memory snapshots without
 let callId = 0;
 const streamCalls = (calls) =>
     (async function* () {
+        if (calls.some((c) => c.function.name === 'finish_analysis')) yield { choices: [{ delta: { content: '已核对结果。' } }] };
         for (const [index, c] of calls.entries()) yield { choices: [{ delta: { tool_calls: [{ index, id: c.id, function: c.function }] } }] };
     })();
 const call = (name, args) => toolCall(`call-${++callId}`, name, args);
-const answer = (id) => ({
-    kind: 'answer',
-    answer: {
-        summary: '已核对结果',
-        findings: id ? [{ id: 'f', kind: 'observation', text: '查询结果已核对', evidence: [{ artifactId: id, role: 'observation' }] }] : [],
-        limitations: [],
-        unresolvedQuestions: [],
-    },
-});
+const answer = () => ({ status: 'complete', reason: null, missingItems: [] });
 await check('two real adapter rounds reuse matching evidence for chart without a second SQL execution', async () => {
     const h = database(),
         artifacts = new Map();
@@ -338,16 +331,25 @@ await check('two real adapter rounds reuse matching evidence for chart without a
     };
     const llm = {
         isReasoningActive: () => false,
-        streamWithTools: async (messages) => {
+        streamWithTools: async (messages, definitions) => {
+            if (!definitions.length)
+                return (async function* () {
+                    yield { choices: [{ delta: { content: '[]' } }] };
+                })();
             captured.push(messages);
-            const state = JSON.parse(messages[0].content.split('<untrusted-analysis-data>')[1].split('</untrusted-analysis-data>')[0]).state;
+            const state = JSON.parse(
+                messages
+                    .find((m) => String(m.content).includes('<untrusted-analysis-data>'))
+                    .content.split('<untrusted-analysis-data>')[1]
+                    .split('</untrusted-analysis-data>')[0]
+            ).state;
             const tools = messages.filter((m) => m.role === 'tool').map((m) => JSON.parse(m.content));
             if (!tools.some((t) => t.state)) return streamCalls([call('update_analysis_state', { expectedRevision: state.revision, patch: {}, reason: '确认本轮条件' })]);
             if (round === 0 && !tools.some((t) => t.queryArtifactId))
                 return streamCalls([call('execute_sql_query', { sql: 'select 1', title: '计数', plan: { purpose: '核对', expectedGrain: 'one', expectedShape: 'scalar' } })]);
             if (round === 1 && !tools.some((t) => t.queryArtifactId)) return streamCalls([call('read_query_artifact', { queryArtifactId: 'artifact' })]);
             if (round === 1 && !tools.some((t) => t.chartArtifactId)) return streamCalls([call('generate_chart', { queryArtifactId: 'artifact' })]);
-            return streamCalls([call('submit_analysis', answer('artifact'))]);
+            return streamCalls([call('finish_analysis', answer('artifact'))]);
         },
     };
     const sql = {
@@ -398,7 +400,7 @@ await check('two real adapter rounds reuse matching evidence for chart without a
             checkpoint: async () => {},
             onFirstDelta: async () => {},
         });
-        assert.equal(blocks.at(-1).analysis.outcome.kind, 'answer');
+        assert.equal(blocks.at(-1).analysis.outcome.status, 'complete');
         await h.db.withTransaction((tx) => promoteAnalysisDraft(tx, gen.id));
     }
     assert.equal(sqlCount, 1);
@@ -425,7 +427,7 @@ await check('provider context error retries once and reports reduced budget', as
         onContext: (r) => reports.push(r),
         stream: async () => {
             if (calls++ === 0) throw Object.assign(new Error('context'), { code: 'context_length_exceeded' });
-            return streamCalls([call('submit_analysis', answer())]);
+            return streamCalls([call('finish_analysis', answer())]);
         },
     };
     await new AnalysisAgent().run(opts);
@@ -444,18 +446,26 @@ await check('provider context error retries once and reports reduced budget', as
     );
     assert.equal(retries, 2);
 });
-await check('historical comparison requires explicit read and labeled role; source and freshness cannot be bypassed', async () => {
-    const s = newAnalysisState('c', 1, 'q');
-    const artifact = { id: 'a', datasourceId: 1, generationId: 'old', analysisContext: { state: { ...s, grain: 'daily' } } };
-    assert.throws(() => validateEvidenceReference(artifact, s, 'g', { role: 'observation' }, true));
-    assert.throws(() => validateEvidenceReference(artifact, s, 'g', { role: 'comparison', comparisonLabel: '旧日粒度与当前条件' }, false));
-    assert.doesNotThrow(() => validateEvidenceReference(artifact, s, 'g', { role: 'comparison', comparisonLabel: '旧日粒度与当前条件' }, true));
-    for (const state of [
-        { ...s, datasourceId: 2 },
-        { ...s, freshness: 'current_generation' },
-        { ...s, taskId: 'other' },
-    ])
-        assert.throws(() => validateEvidenceReference(artifact, state, 'g', { role: 'comparison', comparisonLabel: '历史' }, true));
+await check('historical comparison is explicit and cannot bypass task, datasource or freshness', async () => {
+    const { analysisTools } = require('../apps/worker/dist/analysis/analysis-tools.js');
+    const state = newAnalysisState('c', 1, 'q');
+    const artifact = { id: 'a', datasourceId: 1, generationId: 'old', returnedRowCount: 1, analysisContext: { state: { ...state, grain: 'daily' } } };
+    const session = { state, prepared: true, memories: [], memoryChanges: [], loadedSchema: new Map(), observed: new Map() };
+    const tool = analysisTools({
+        session,
+        schema: { assertDatasourceAccess: async () => {} },
+        artifacts: { readQueryArtifact: async () => ({ rows: [{ n: 1 }] }) },
+        states: {},
+        generation: g(),
+        readEvidence: async () => artifact,
+    }).find((t) => t.name === 'read_query_artifact');
+    const ctx = { assertWritable: async () => {} };
+    assert.equal((await tool.execute({ queryArtifactId: 'a' }, ctx)).succeeded, false);
+    assert.equal((await tool.execute({ queryArtifactId: 'a', mode: 'comparison' }, ctx)).succeeded, true);
+    for (const override of [{ datasourceId: 2 }, { taskId: 'other' }, { freshness: 'current_generation' }]) {
+        session.state = { ...state, ...override };
+        assert.equal((await tool.execute({ queryArtifactId: 'a', mode: 'comparison' }, ctx)).succeeded, false);
+    }
 });
 await check('state updates cannot share a model batch with dependent queries', async () => {
     let writes = 0,
@@ -486,37 +496,15 @@ await check('state updates cannot share a model batch with dependent queries', a
         onFirstDelta: async () => {},
         onContext: () => {},
         stream: async () =>
-            streamCalls(n++ === 0 ? [call('update_analysis_state', {}), call('execute_sql_query', {})] : [call('submit_analysis', { kind: 'clarification', question: '请确认' })]),
+            streamCalls(
+                n++ === 0
+                    ? [call('update_analysis_state', {}), call('execute_sql_query', {})]
+                    : [call('finish_analysis', { status: 'awaiting_clarification', reason: '请确认', missingItems: ['条件'] })]
+            ),
     });
     assert.equal(writes, 0);
-    assert.equal(outcome.kind, 'clarification');
+    assert.equal(outcome.status, 'awaiting_clarification');
     assert.equal(messages.filter((m) => m.role === 'tool').length, 3);
-});
-await check('failed final evidence validation cannot accidentally return an accepted answer', async () => {
-    let n = 0;
-    const outcomes = [];
-    const outcome = await new AnalysisAgent().run({
-        messages: [
-            { role: 'system', content: 'rules' },
-            { role: 'user', content: 'q' },
-        ],
-        turnMessages: [],
-        tools: [],
-        context: { signal: new AbortController().signal, assertWritable: async () => {} },
-        capability: { contextWindow: 10000, responseReserve: 1000 },
-        metrics: { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 },
-        onEvent: () => {},
-        checkpoint: async () => {},
-        onFirstDelta: async () => {},
-        onContext: () => {},
-        validateOutcome: async (o) => {
-            outcomes.push(o.kind);
-            if (o.kind === 'answer') throw new Error('条件已变化');
-        },
-        stream: async () => streamCalls([call('submit_analysis', n++ === 0 ? answer() : { kind: 'clarification', question: '重新确认条件' })]),
-    });
-    assert.equal(outcome.kind, 'clarification');
-    assert.deepEqual(outcomes, ['answer', 'clarification']);
 });
 await check('schema and memory pages remain discoverable; permission revocation blocks schema catalog and tools', async () => {
     const { analysisTools } = require('../apps/worker/dist/analysis/analysis-tools.js');
@@ -528,7 +516,6 @@ await check('schema and memory pages remain discoverable; permission revocation 
         state: newAnalysisState('c', 1, 'q'),
         memories: Array.from({ length: 25 }, (_, i) => ({ ...def, id: `d${i}`, name: `memory${i}` })),
         observed: new Map(),
-        comparisonIds: new Set(),
         loadedSchema: new Map(),
         memoryChanges: [],
         prepared: false,

@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import { createHash, randomUUID } from 'crypto';
 import type {
     ArtifactColumnV1,
-    ArtifactFilterV1,
     ArtifactSortV1,
     ChartArtifactV1,
     ChartFieldV1,
@@ -48,7 +47,6 @@ interface CreateChartArtifactInput {
     title: string;
     xField: string;
     yFields: ChartFieldV1[];
-    filters?: ArtifactFilterV1[];
     sort?: ArtifactSortV1[];
 }
 
@@ -167,8 +165,8 @@ export class ArtifactRepository {
             input,
             `INSERT INTO chart_artifact (
                 id,generation_id,query_artifact_id,user_id,conversation_id,datasource_id,
-                chart_type,title,x_field,y_fields,filters,sort
-             ) VALUES (?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb,?::jsonb)
+                chart_type,title,x_field,y_fields,sort
+             ) VALUES (?,?,?,?,?,?,?,?,?,?::jsonb,?::jsonb)
              RETURNING created_at`,
             [
                 id,
@@ -181,7 +179,6 @@ export class ArtifactRepository {
                 input.title,
                 input.xField,
                 JSON.stringify(input.yFields),
-                input.filters ? JSON.stringify(input.filters) : null,
                 input.sort ? JSON.stringify(input.sort) : null,
             ]
         );
@@ -193,7 +190,6 @@ export class ArtifactRepository {
             title: input.title,
             xField: input.xField,
             yFields: input.yFields,
-            ...(input.filters ? { filters: input.filters } : {}),
             ...(input.sort ? { sort: input.sort } : {}),
             createdAt: toIso(rows[0].created_at),
         };

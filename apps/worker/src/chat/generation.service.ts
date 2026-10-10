@@ -222,7 +222,7 @@ export class GenerationService implements OnModuleDestroy {
                 [status, error ?? null, errorCode ?? null, identity.id, identity.writerToken, identity.writerToken, status, identity.writerToken]
             );
             if (updated.rowCount !== 1) return false;
-            if (status === 'completed' && identity.promptPolicyVersion === 'analysis-core-v2') await promoteAnalysisDraft(transaction, identity.id);
+            if (status === 'completed') await promoteAnalysisDraft(transaction, identity.id);
             const finalAnswer = status === 'completed' && messageState ? extractFinalAnswer(messageState.blocks) : null;
             if (messageState) {
                 await transaction.execute('UPDATE message SET content=?,blocks=?::jsonb,llm_messages=?::jsonb WHERE id=?', [

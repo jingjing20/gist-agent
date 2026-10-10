@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import type OpenAI from 'openai';
 import type { AnalysisState, DatasourceMemory, QueryArtifactV1 } from '@gist/contracts';
 import type { Tool, ToolContext, ToolExecutionResult } from '../chat/tools/base-tool';
-import { exactKeys, record } from './submission';
+import { exactKeys, record } from './tool-arguments';
 import { patchAnalysisState, evidenceMismatch } from './analysis-state';
 import type { AnalysisStateRepository } from './analysis-state.repository';
 import type { SchemaService } from '../database/schema.service';
@@ -46,7 +46,6 @@ export interface AnalysisSession {
     state: AnalysisState;
     memories: DatasourceMemory[];
     observed: Map<string, QueryArtifactV1>;
-    comparisonIds: Set<string>;
     loadedSchema: Map<string, string>;
     memoryChanges: string[];
     prepared: boolean;
@@ -83,7 +82,7 @@ export function analysisTools(input: {
         }),
         tool(
             'update_analysis_state',
-            '先显式更新本轮问题、记忆引用、时间、筛选或粒度，再查询。新任务用 start_new_task。临时约定来源自动绑定当前用户消息；不写长期记忆。最新数据请求设 freshness=current_generation。',
+            '必须独立调用，不与其他工具同批执行；收到成功结果后再执行依赖工具。先显式更新本轮问题、记忆引用、时间、筛选或粒度，再查询。新任务用 start_new_task。临时约定来源自动绑定当前用户消息；不写长期记忆。最新数据请求设 freshness=current_generation。',
             {
                 expectedRevision: { type: 'integer' },
                 mode: { type: 'string', enum: ['patch', 'start_new_task'] },
@@ -197,7 +196,7 @@ export function analysisTools(input: {
         }),
         tool(
             'get_schema',
-            '读取一张授权表的字段页，字段不静默截断；nextOffset 非空需继续读取。表名来自目录，加载与否不改变权限。',
+            '读取一张授权表的字段页，字段不静默截断；nextOffset 非空表示还有字段，仅在所需字段尚未读取时继续分页。不得猜测未读取字段。表名来自目录，加载与否不改变权限。',
             { table: { type: 'string' }, offset: { type: 'integer', minimum: 0 } },
             ['table'],
             async (args, ctx) => {
@@ -242,7 +241,7 @@ export function analysisTools(input: {
         }),
         tool(
             'read_query_artifact',
-            '回读证据，默认检查当前条件适用性。显式历史条件比较可设 mode=comparison，最终引用必须 role=comparison 并填写 comparisonLabel 解释两组条件；不能据此绕过跨源、任务或最新数据要求。',
+            '回读证据，默认检查当前条件适用性。显式历史条件比较可设 mode=comparison，正文必须解释两组比较条件；不能据此绕过跨源、任务或最新数据要求。',
             { queryArtifactId: { type: 'string' }, offset: { type: 'integer', minimum: 0 }, mode: { type: 'string', enum: ['current', 'comparison'] } },
             ['queryArtifactId'],
             async (args, ctx) => {
@@ -263,8 +262,6 @@ export function analysisTools(input: {
                 if (JSON.stringify(page.rows).length > 16000)
                     return result({ error: '此页行数据超出上下文摘要上限，请查询更少字段或聚合结果', queryArtifactId: id, queriedAt: a.createdAt }, false);
                 session.observed.set(id, a);
-                if (mismatch) session.comparisonIds.add(id);
-                else session.comparisonIds.delete(id);
                 return result({
                     queryArtifactId: id,
                     executedSql: a.executedSql,

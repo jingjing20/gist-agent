@@ -148,7 +148,6 @@ CREATE TABLE IF NOT EXISTS chart_artifact (
   title VARCHAR(200) NOT NULL,
   x_field VARCHAR(200) NOT NULL,
   y_fields JSONB NOT NULL,
-  filters JSONB,
   sort JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

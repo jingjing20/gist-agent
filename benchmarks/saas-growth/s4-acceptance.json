@@ -1,7 +1,7 @@
 {
   "version": 1,
   "status": "not_run",
-  "runtime_version": "analysis-core-v2",
+  "runtime_version": "analysis-core-v3",
   "case_file": "agent-core-cases.json",
   "reference_file": "cases.json",
   "dataset_key": "saas_growth_demo",

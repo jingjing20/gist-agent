@@ -1,5 +1,4 @@
 import { AnalysisRuntimeAdapter } from '../analysis/analysis-runtime-adapter';
-import { ANALYSIS_RUNTIME_VERSIONS } from '@gist/contracts';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConversationService } from '../conversation/conversation.service';
 import { GenerationService, type GenerationIdentity } from './generation.service';
@@ -77,7 +76,6 @@ export class ChatService {
 
     private async runGeneration(generation: GenerationIdentity, message: string, datasourceId: number | null, ownershipLost: () => boolean): Promise<void> {
         const { conversationId, userId } = generation;
-        const newCore = generation.promptPolicyVersion === ANALYSIS_RUNTIME_VERSIONS.promptPolicy;
         const controller = new AbortController();
         const signal = controller.signal;
         const emitter = this.generations.emitter(generation);
@@ -111,7 +109,6 @@ export class ChatService {
         // 全局定时器与用户取消共用同一 AbortController。
         // 超时时先 abort LLM/工具/SQL，等执行栈退出后再写终态。
         try {
-            if (!newCore) throw new GenerationExecutionError('ANALYSIS_PROTOCOL_ERROR', '任务分析协议版本与当前 Worker 不匹配');
             await this.analysisRuntime.run({
                 generation,
                 message,
@@ -157,7 +154,7 @@ export class ChatService {
         try {
             finalized = await this.generations.finalize(generation, finalStatus, errorDetail, errorCode, terminal, { blocks, llmMessages: turnMessages });
         } catch (error) {
-            if (!newCore || !(error instanceof Error) || !['ANALYSIS_STATE_CONFLICT', 'ANALYSIS_DRAFT_MISSING'].includes(error.message)) throw error;
+            if (!(error instanceof Error) || !['ANALYSIS_STATE_CONFLICT', 'ANALYSIS_DRAFT_MISSING'].includes(error.message)) throw error;
             finalStatus = 'failed';
             const detail = '分析状态提交冲突，本轮草稿未提升；请重新发起分析';
             blocks.push({ type: 'error', content: detail, errorCode: 'INTERNAL_ERROR' });

@@ -7,7 +7,8 @@ import type { AnalysisActivityV1 } from '@gist/contracts';
 import type { ModelCapability } from '../chat/model-capabilities';
 import type { Tool, ToolContext, SSEEvent } from '../chat/tools/base-tool';
 import type { GenerationExecutionMetrics } from '../chat/generation.service';
-import { exactKeys, record, SUBMIT_TOOL, validateSubmission, type ObservedEvidence } from './submission';
+import { exactKeys, record } from './tool-arguments';
+import { FINISH_TOOL, validateFinish } from './finish-analysis';
 import { predominantlyEnglish, ResponseTextStream } from './response-text-stream';
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
@@ -16,7 +17,12 @@ type Call = OpenAI.Chat.Completions.ChatCompletionMessageToolCall;
 function expectsChinese(messages: Message[]): boolean {
     const question = messages.find((message) => message.role === 'user')?.content;
     if (typeof question !== 'string') return false;
-    return /[\u4e00-\u9fff]/.test(question) && !/(?:用|使用|以|改成|切换到|请)(?:\s*)(?:英文|英语)|\b(?:in English|use English|answer in English)\b/i.test(question);
+    return (
+        /[\u4e00-\u9fff]/.test(question) &&
+        !/(?:用|使用|以|改成|切换到|请)(?:\s*)(?:英文|英语|法语|法文|日语|日文|德语|德文|西班牙语|韩语|韩文)|\b(?:in|use|answer in) (?:English|French|Japanese|German|Spanish|Korean)\b/i.test(
+            question
+        )
+    );
 }
 
 export interface AnalysisRunOptions {
@@ -32,9 +38,6 @@ export interface AnalysisRunOptions {
     onFirstDelta(): Promise<void>;
     onContext(report: { estimatedTokens: number; budget: number; call: number; closing: boolean; selection?: unknown; snapshot?: unknown }): void | Promise<void>;
     prepareContext?(messages: Message[], tools: OpenAI.Chat.Completions.ChatCompletionTool[], budget: number): Promise<{ messages: Message[]; report: unknown; snapshot: unknown }>;
-    observeEvidence?(id: string): Promise<ObservedEvidence>;
-    validateOutcome?(outcome: AnalysisOutcome): Promise<void>;
-    validateEvidence?(ids: string[]): Promise<void>;
 }
 
 /** One decision loop. No queue, transport lifetime, background extraction or model-in-tool logic. */
@@ -42,8 +45,7 @@ export class AnalysisAgent {
     async run(options: AnalysisRunOptions): Promise<AnalysisOutcome> {
         const { messages, turnMessages, context, metrics } = options;
         const tools = new Map(options.tools.map((tool) => [tool.name, tool]));
-        const observed = new Map<string, ObservedEvidence>();
-        const generatedCharts = new Map<string, string>();
+        const observed = new Set<string>();
         const failedQueries = new Map<string, number>();
         const blockedQueries = new Set<string>();
         const callIds = new Set<string>();
@@ -51,6 +53,8 @@ export class AnalysisAgent {
         let repeatedAction = '';
         let repeatedActionCount = 0;
         let delivered = false;
+        let finishReminders = 0;
+        let responseText = '';
         const chineseResponse = expectsChinese(messages);
         let languageRetries = 0;
         let firstDelta = false;
@@ -66,9 +70,8 @@ export class AnalysisAgent {
         };
         while (true) {
             await check();
-            // Natural language is the answer channel; no terminal submission tool.
-            // The legacy handler below remains for older in-flight tool calls.
-            const definitions = options.tools.map((t) => t.definition);
+            // The finish tool records status only; narrative remains streamed.
+            const definitions = finishReminders ? [FINISH_TOOL] : [...options.tools.map((t) => t.definition), FINISH_TOOL];
             let input: Message[] = [...messages];
             const budget = Math.floor(
                 (options.capability.contextWindow - options.capability.responseReserve - Math.ceil(options.capability.contextWindow * 0.1)) * (contextRetried ? 0.75 : 1)
@@ -138,31 +141,32 @@ export class AnalysisAgent {
             }
             await check();
             const batch = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call);
+            if (chineseResponse && !textStream.published && predominantlyEnglish(content)) {
+                if (languageRetries++ >= 1) throw new GenerationExecutionError('RESPONSE_LANGUAGE_MISMATCH', '模型未按要求使用中文回答，请重试。');
+                // Discard unexecuted tool calls together with the rejected English answer.
+                messages.push({ role: 'assistant', content });
+                messages.push({
+                    role: 'system',
+                    content: '用户使用中文提问。请用中文重新回答，保留字段名、SQL 和技术标识符；不要重复已经完成的工具。回答后独立调用 finish_analysis。',
+                });
+                continue;
+            }
+            const remainingText = textStream.finish(content);
+            if (remainingText) options.onEvent({ type: 'text_chunk', content: remainingText });
+            if (content.trim()) responseText += (responseText ? '\n\n' : '') + content;
             if (!batch.length) {
-                if (!content.trim() && delivered) {
-                    append({ role: 'assistant', content: '' });
-                    options.onEvent({ type: 'log_update', title: progressTitle, content: '已完成回答。' });
-                    await options.checkpoint();
-                    return { kind: 'response', status: 'complete', blocks: [] };
+                if (content.trim()) {
+                    const answer: Message = { role: 'assistant', content };
+                    if (reasoning) Object.assign(answer, { reasoning_content: reasoning });
+                    append(answer);
                 }
-                if (!content.trim()) throw new GenerationExecutionError('EMPTY_LLM_RESPONSE', '模型未返回正式结果或工具调用');
-                if (chineseResponse && !textStream.published && predominantlyEnglish(content)) {
-                    if (languageRetries++ >= 1) throw new GenerationExecutionError('RESPONSE_LANGUAGE_MISMATCH', '模型未按要求使用中文回答，请重试。');
-                    messages.push({ role: 'assistant', content });
-                    messages.push({ role: 'system', content: '用户使用中文提问。请将上一条回答改为中文后重新回答，保留字段名、SQL 和技术标识符，不重复执行已完成的工具，不输出操作旁白。' });
-                    options.onEvent({ type: 'log_update', title: progressTitle, content: '正在整理中文回答…' });
-                    continue;
-                }
-                const remainingText = textStream.finish(content);
-                if (remainingText) options.onEvent({ type: 'text_chunk', content: remainingText });
-                const assistant: Message = { role: 'assistant', content };
-                if (reasoning) Object.assign(assistant, { reasoning_content: reasoning });
-                append(assistant);
-                options.onEvent({ type: 'log_update', title: progressTitle, content: '已完成回答。' });
                 await options.checkpoint();
-                await check();
-                // Internal outcome for state persistence, never a required model format.
-                return { kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content }] };
+                if (finishReminders++) throw new GenerationExecutionError('ANALYSIS_PROTOCOL_ERROR', '回答已保留，但模型未确认完成状态，请重试。');
+                messages.push({
+                    role: 'system',
+                    content: '请勿重复正文或工具。现在仅调用 finish_analysis 记录真实完成状态；缺少结果时标记 partial，需要用户补充时标记 awaiting_clarification。',
+                });
+                continue;
             }
             for (const call of batch) {
                 if (!call.id || !call.function.name || callIds.has(call.id)) throw new GenerationExecutionError('ANALYSIS_PROTOCOL_ERROR', '工具调用 ID 缺失或重复');
@@ -172,9 +176,9 @@ export class AnalysisAgent {
             // Provider continuity only. Raw reasoning never becomes a UI event.
             if (reasoning) Object.assign(assistant, { reasoning_content: reasoning });
             append(assistant);
-            const mixedSubmit = batch.length > 1 && batch.some((call) => call.function.name === 'submit_analysis');
+            const mixedFinish = batch.length > 1 && batch.some((call) => call.function.name === 'finish_analysis');
             const mixedState = batch.length > 1 && batch.some((call) => call.function.name === 'update_analysis_state');
-            const previouslyObserved = new Set(observed.keys());
+            const previouslyObserved = new Set(observed);
             let final: AnalysisOutcome | undefined;
             let needsCorrection = false;
             const actionLabels: Record<string, string> = {
@@ -187,7 +191,7 @@ export class AnalysisAgent {
                 execute_sql_query: '查询数据',
                 read_query_artifact: '读取查询证据',
                 generate_chart: '生成图表',
-                submit_analysis: '提交分析结果',
+                finish_analysis: '确认完成状态',
                 propose_memory: '提出记忆',
             };
             const actions = [...new Set(batch.map((c) => actionLabels[c.function.name] ?? '执行分析工具'))].join('、');
@@ -203,28 +207,15 @@ export class AnalysisAgent {
                 };
                 try {
                     if (mixedState) throw new Error('状态更新必须独立调用，收到成功结果后才能执行其他工具');
-                    if (mixedSubmit) throw new Error('提交结果必须独立调用，不允许与其他工具混用');
+                    if (mixedFinish) throw new Error('finish_analysis 必须独立调用，展示工具完成后再收尾');
                     const args = record(JSON.parse(call.function.arguments));
-                    if (call.function.name === 'submit_analysis') {
-                        const candidate = validateSubmission(args, observed, generatedCharts);
-                        await options.validateOutcome?.(candidate);
-                        const ids =
-                            candidate.kind === 'response'
-                                ? candidate.blocks.flatMap((block) =>
-                                      block.type === 'table' ? [block.artifactId] : block.type === 'chart' ? [generatedCharts.get(block.chartArtifactId)!] : []
-                                  )
-                                : candidate.kind === 'table'
-                                  ? candidate.tables.map((table) => table.artifactId)
-                                  : candidate.kind === 'direct'
-                                    ? candidate.evidence
-                                    : candidate.kind === 'answer' || candidate.kind === 'partial'
-                                      ? candidate.answer.findings.flatMap((f) => f.evidence.map((e) => e.artifactId))
-                                      : [];
-                        await options.validateEvidence?.([...new Set(ids)]);
-                        await check();
-                        final = candidate;
-                        result = JSON.stringify({ accepted: true, kind: final.kind });
+                    if (call.function.name === 'finish_analysis') {
+                        const finish = validateFinish(args);
+                        if (!responseText.trim() && !delivered) throw new Error('尚未向用户交付内容，请先回答、提问或解释无法完成的原因');
+                        final = { kind: 'response', ...finish, blocks: responseText ? [{ type: 'markdown', content: responseText }] : [] };
+                        result = JSON.stringify({ accepted: true, status: finish.status });
                     } else {
+                        if (finishReminders) throw new Error('回答已经结束，此时仅允许 finish_analysis');
                         metrics.toolCallCount++;
                         const tool = tools.get(call.function.name);
                         if (!tool) throw new Error('未知或不可用工具');
@@ -258,17 +249,11 @@ export class AnalysisAgent {
                             if (output.succeeded === false) removeActivity();
                             else options.onEvent({ type: 'analysis_activity', activity: completeActivity(activity, tool.name, parsed, data, output.activityData) });
                         }
-                        if (tool.name === 'read_query_artifact' && output.succeeded !== false && options.observeEvidence)
-                            observed.set(data.queryArtifactId, await options.observeEvidence(data.queryArtifactId));
-                        if (tool.name === 'generate_chart' && output.succeeded !== false && typeof data.chartArtifactId === 'string')
-                            generatedCharts.set(data.chartArtifactId, String(data.queryArtifactId));
+                        if (tool.name === 'read_query_artifact' && output.succeeded !== false) observed.add(data.queryArtifactId);
                         if (tool.name === 'execute_sql_query') {
                             if (output.succeeded !== false) {
                                 if (typeof data.queryArtifactId !== 'string') throw new GenerationExecutionError('TOOL_EXECUTION_FAILED', '查询成功但缺少持久化证据');
-                                observed.set(data.queryArtifactId, {
-                                    sql: sqlKey,
-                                    blocked: data.isLimited === true || data.resultQuality?.warnings?.some((w: { severity: string }) => w.severity === 'blocking') === true,
-                                });
+                                observed.add(data.queryArtifactId);
                             } else {
                                 const key = JSON.stringify([sqlKey, data.errorCode]);
                                 const count = (failedQueries.get(key) ?? 0) + 1;
@@ -288,13 +273,10 @@ export class AnalysisAgent {
                                 append({ role: 'tool', tool_call_id: skipped.id, content: JSON.stringify({ skipped: true, reason: 'SECURITY_STOP' }) });
                             }
                             options.onEvent({ type: 'log_update', title: progressTitle, content: `未完成：${actions}；查询被访问或安全规则阻止。` });
-                            return {
-                                kind: 'refusal',
-                                explanation:
-                                    error.code === 'DATASOURCE_ACCESS_CHANGED'
-                                        ? '当前数据源访问权限已变化，分析已停止。请确认数据源权限后重试。'
-                                        : '本次生成的 SQL 未通过安全校验，查询已停止。请重试；若持续出现，请检查查询语法与允许访问的表或字段。',
-                            };
+                            const explanation = error.code === 'DATASOURCE_ACCESS_CHANGED' ? '当前数据源访问权限已变化，分析已停止。' : '查询被访问或安全规则阻止，本次无法完成。';
+                            options.onEvent({ type: 'text_chunk', content: explanation });
+                            await options.checkpoint();
+                            return { kind: 'response', status: 'unable_to_complete', reason: explanation, missingItems: [], blocks: [] };
                         }
                         throw error;
                     }
@@ -304,7 +286,6 @@ export class AnalysisAgent {
                         errorCode: 'INVALID_TOOL_ARGUMENTS',
                         message: error instanceof Error ? error.message : '工具参数不合法',
                         retryable: true,
-                        ...(call.function.name === 'submit_analysis' ? { submissionGuide: SUBMIT_TOOL.function.description } : {}),
                     });
                 }
                 append({ role: 'tool', tool_call_id: call.id, content: result });

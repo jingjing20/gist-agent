@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import { DatabaseClient } from '../packages/database/dist/index.js';
 import { ConversationService } from '../apps/worker/dist/conversation/conversation.service.js';
 import { GenerationService } from '../apps/worker/dist/chat/generation.service.js';
+import { AnalysisStateRepository } from '../apps/worker/dist/analysis/analysis-state.repository.js';
 import { ANALYSIS_RUNTIME_VERSIONS } from '../packages/contracts/dist/index.js';
 import { ChatService } from '../apps/worker/dist/chat/chat.service.js';
 import { loadWorkspaceEnv } from '@gist/config';
@@ -139,12 +140,18 @@ try {
 
     // Writer fence: after terminal transition, neither events nor message checkpoints are accepted.
     const repository = new GenerationService(database);
+    const states = new AnalysisStateRepository(database);
+    async function completedDraft(identity) {
+        const draft = await states.begin(identity, Number(datasource.id), 'fixture', []);
+        await states.save(identity, draft.state.revision, { ...draft.state, revision: draft.state.revision + 1, status: 'complete' });
+    }
     const identity = await repository.claim(currentGeneration, randomUUID());
     assert.ok(identity);
     const emitter = repository.emitter(identity);
     emitter.send({ type: 'text_chunk', content: 'before terminal' });
     await repository.drain(identity);
     await repository.checkpointMessage(identity, [{ type: 'text', content: 'before terminal' }], []);
+    await completedDraft(identity);
     await repository.finalize(
         identity,
         'completed',
@@ -205,6 +212,7 @@ try {
     await repository.drain(redisIdentity);
     assert.ok(Date.now() - pauseStarted >= 100, 'Redis write pause did not affect the publish path');
     assert.equal(Number((await database.query('SELECT last_sequence FROM generation WHERE id=?', [redisGeneration]))[0].last_sequence), 1);
+    await completedDraft(redisIdentity);
     await repository.finalize(redisIdentity, 'completed', undefined, undefined, { type: 'done', status: 'completed' }, { blocks: [], llmMessages: [] });
 
     // A stuck LLM must be aborted before timeout/cancellation is finalized; no normal event may appear afterward.

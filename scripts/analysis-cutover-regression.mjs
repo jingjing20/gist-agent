@@ -36,21 +36,12 @@ function apiFixture({ existing = false, active = false } = {}) {
     };
     return { writes, reads, run: () => service.createTurn(1, 'c', 'question', 1, 'key', 'hash', false) };
 }
-await check('conversations stamp the sole runtime, obsolete selection is ignored', async () => {
-    const previous = process.env.ANALYSIS_CORE;
-    try {
-        for (const obsolete of ['legacy', 'new', 'invalid']) {
-            process.env.ANALYSIS_CORE = obsolete;
-            const h = apiFixture();
-            await h.run();
-            const generation = h.writes.find((w) => w.sql.includes('INSERT INTO generation'));
-            for (const version of Object.values(ANALYSIS_RUNTIME_VERSIONS)) assert.ok(generation.params.includes(version));
-            assert.ok(h.writes.findIndex((w) => w.sql.includes('outbox_event')) > h.writes.indexOf(generation));
-        }
-    } finally {
-        if (previous === undefined) delete process.env.ANALYSIS_CORE;
-        else process.env.ANALYSIS_CORE = previous;
-    }
+await check('conversations stamp current runtime versions before enqueue', async () => {
+    const h = apiFixture();
+    await h.run();
+    const generation = h.writes.find((w) => w.sql.includes('INSERT INTO generation'));
+    for (const version of Object.values(ANALYSIS_RUNTIME_VERSIONS)) assert.ok(generation.params.includes(version));
+    assert.ok(h.writes.findIndex((w) => w.sql.includes('outbox_event')) > h.writes.indexOf(generation));
 });
 await check('idempotent replay keeps original generation and active conversation retains serialization', async () => {
     const replay = apiFixture({ existing: true });
@@ -93,14 +84,6 @@ function workerFixture(run) {
         run: (version) => worker.runGeneration({ id: 'g', userId: 1, conversationId: 'c', promptPolicyVersion: version }, 'question', 1, () => false),
     };
 }
-await check('retired and unknown queued tasks fail explicitly without invoking any analysis', async () => {
-    for (const version of [undefined, 'prompt-policy-v5', 'analysis-core-v1', 'analysis-core-v999']) {
-        const h = workerFixture();
-        await h.run(version);
-        assert.equal(h.calls(), 0);
-        assert.deepEqual(h.finals, [{ status: 'failed', code: 'ANALYSIS_PROTOCOL_ERROR' }]);
-    }
-});
 await check('current runtime completes and cancellation still finalizes separately', async () => {
     const h = workerFixture();
     await h.run(ANALYSIS_RUNTIME_VERSIONS.promptPolicy);
@@ -113,24 +96,31 @@ await check('current runtime completes and cancellation still finalizes separate
     await cancel.run(ANALYSIS_RUNTIME_VERSIONS.promptPolicy);
     assert.deepEqual(cancel.finals, [{ status: 'cancelled', code: 'CANCELLED' }]);
 });
-await check('mock provider emits a valid structured clarification instead of unsupported free text', async () => {
+await check('mock provider streams a clarification and finishes with an explicit state', async () => {
     const previous = process.env.LLM_PROVIDER;
     try {
         process.env.LLM_PROVIDER = 'mock';
         const client = Object.create(LlmClient.prototype);
-        const stream = await client.streamWithTools([], [{ type: 'function', function: { name: 'submit_analysis' } }]);
+        const stream = await client.streamWithTools([], [{ type: 'function', function: { name: 'finish_analysis' } }]);
         const chunks = [];
         for await (const chunk of stream) chunks.push(chunk);
-        const call = chunks[0].choices[0].delta.tool_calls[0];
-        assert.equal(call.function.name, 'submit_analysis');
-        assert.equal(JSON.parse(call.function.arguments).kind, 'clarification');
+        const call = chunks[1].choices[0].delta.tool_calls[0];
+        assert.equal(call.function.name, 'finish_analysis');
+        assert.equal(JSON.parse(call.function.arguments).status, 'awaiting_clarification');
     } finally {
         if (previous === undefined) delete process.env.LLM_PROVIDER;
         else process.env.LLM_PROVIDER = previous;
     }
 });
 await check('retired runtime modules are absent from source and clean build output', async () => {
-    for (const path of ['chat/prompt-builder', 'chat/agent-orchestrator', 'chat/agents/semantic-distiller.service', 'chat/tools/tool-registry', 'memory/memory.service']) {
+    for (const path of [
+        'chat/prompt-builder',
+        'chat/agent-orchestrator',
+        'chat/agents/semantic-distiller.service',
+        'chat/tools/tool-registry',
+        'memory/memory.service',
+        'analysis/submission',
+    ]) {
         assert.equal(existsSync(new URL(`../apps/worker/src/${path}.ts`, import.meta.url)), false);
         assert.equal(existsSync(new URL(`../apps/worker/dist/${path}.js`, import.meta.url)), false);
     }

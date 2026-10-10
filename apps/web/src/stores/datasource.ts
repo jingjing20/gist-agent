@@ -32,6 +32,7 @@ export const useDataSourceStore = defineStore('datasource', () => {
     const loading = ref(false);
     const error = ref<string | null>(null);
     const suggestionsCache = ref<Record<number, string[]>>({});
+    const suggestionRevisions: Record<number, number> = {};
     const suggestionsLoading = ref<Record<number, boolean>>({});
 
     async function fetchAll() {
@@ -150,16 +151,24 @@ export const useDataSourceStore = defineStore('datasource', () => {
 
     async function fetchSuggestions(datasourceId: number): Promise<void> {
         if (suggestionsCache.value[datasourceId] || suggestionsLoading.value[datasourceId]) return;
+        const revision = suggestionRevisions[datasourceId] || 0;
         suggestionsLoading.value[datasourceId] = true;
         try {
-            const res = await apiFetch(`/datasources/${datasourceId}/suggestions`);
+            const res = await apiFetch(`/datasources/${datasourceId}/suggestions?language=zh-CN`);
+            if (!res.ok) throw new Error('获取推荐失败');
             const data = await res.json();
-            suggestionsCache.value[datasourceId] = data.questions;
+            if ((suggestionRevisions[datasourceId] || 0) === revision) suggestionsCache.value[datasourceId] = data.questions;
         } catch {
-            // 静默失败，前端回退到默认问题
+            // 推荐失败不阻断输入，也不显示无数据依据的默认问题
         } finally {
             suggestionsLoading.value[datasourceId] = false;
+            if ((suggestionRevisions[datasourceId] || 0) !== revision) void fetchSuggestions(datasourceId);
         }
+    }
+
+    function invalidateSuggestions(datasourceId: number) {
+        suggestionRevisions[datasourceId] = (suggestionRevisions[datasourceId] || 0) + 1;
+        delete suggestionsCache.value[datasourceId];
     }
 
     function clear() {
@@ -193,6 +202,7 @@ export const useDataSourceStore = defineStore('datasource', () => {
         listTables,
         deleteTable,
         fetchSuggestions,
+        invalidateSuggestions,
         fetchSchema,
         clear,
     };

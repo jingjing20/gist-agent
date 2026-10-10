@@ -112,3 +112,5 @@ packages/llm        OpenAI-compatible 模型适配
 ## 许可证
 
 [MIT](LICENSE)
+
+提示词与字段注释增强的当前实现、接口和人工验收清单见[重构说明](docs/prompt-refactor.md)。

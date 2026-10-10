@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { SchemaEnrichmentService } from './schema-enrichment.service';
+import { Controller, Get, Post, Patch, Delete, Param, Body, ParseIntPipe, UseInterceptors, UploadedFile, BadRequestException, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { DataSourceService } from './datasource.service';
 import { SuggestionService } from './suggestion.service';
@@ -81,7 +82,8 @@ function ensureUniqueColumnNames(rawNames: string[]): string[] {
 export class DataSourceController {
     constructor(
         private readonly datasourceService: DataSourceService,
-        private readonly suggestionService: SuggestionService
+        private readonly suggestionService: SuggestionService,
+        private readonly enrichment: SchemaEnrichmentService
     ) {}
 
     @Get()
@@ -92,6 +94,21 @@ export class DataSourceController {
     @Get(':id/tables')
     listTables(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
         return this.datasourceService.listTables(id, user.id);
+    }
+
+    @Get(':id/tables/:tableId/column-comments')
+    columnComments(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number, @Param('tableId', ParseIntPipe) tableId: number) {
+        return this.enrichment.inspect(id, tableId, user.id);
+    }
+
+    @Post(':id/tables/:tableId/column-comments/suggestions')
+    generateColumnComments(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number, @Param('tableId', ParseIntPipe) tableId: number, @Body() body: { columns?: unknown }) {
+        return this.enrichment.generate(id, tableId, user.id, body?.columns);
+    }
+
+    @Patch(':id/tables/:tableId/column-comments')
+    saveColumnComments(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number, @Param('tableId', ParseIntPipe) tableId: number, @Body() body: { changes?: unknown }) {
+        return this.enrichment.save(id, tableId, user.id, body?.changes);
     }
 
     @Post(':id/tables')
@@ -200,8 +217,8 @@ export class DataSourceController {
     }
 
     @Get(':id/suggestions')
-    async getSuggestions(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number) {
-        const questions = await this.suggestionService.getSuggestions(id, user.id);
+    async getSuggestions(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number, @Query('language') language = 'zh-CN') {
+        const questions = await this.suggestionService.getSuggestions(id, user.id, language);
         return { questions };
     }
 

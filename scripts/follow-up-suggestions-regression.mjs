@@ -1,16 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 
-const require = createRequire(new URL('../apps/web/package.json', import.meta.url));
-const ts = require('typescript');
-const source = await readFile(new URL('../apps/worker/src/analysis/follow-up-suggestions.ts', import.meta.url), 'utf8');
-const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText;
-const exports = {};
-new Function('exports', compiled)(exports);
-const { parseSuggestions, generateSuggestions } = exports;
+const require = createRequire(import.meta.url);
+const { parseSuggestions, generateSuggestions } = require('../apps/worker/dist/analysis/follow-up-suggestions.js');
 
-assert.deepEqual(parseSuggestions('```json\n["原问题", "  按地区对比  ", "按地区对比", "", null, "a", "b", "c"]\n```', '原问题'), [
+assert.deepEqual(parseSuggestions('```json\n["原问题", "  按地区对比  ", "按地区对比", "", "a", "b", "c"]\n```', '原问题'), [
     { id: 'suggestion-1', text: '按地区对比' },
     { id: 'suggestion-2', text: 'a' },
     { id: 'suggestion-3', text: 'b' },
@@ -18,6 +12,7 @@ assert.deepEqual(parseSuggestions('```json\n["原问题", "  按地区对比  ",
 assert.deepEqual(parseSuggestions(JSON.stringify(['x'.repeat(161), '']), '原问题'), []);
 assert.throws(() => parseSuggestions('{"items":[]}', '原问题'));
 assert.throws(() => parseSuggestions('invalid', '原问题'));
+assert.throws(() => parseSuggestions('[null]', '原问题'));
 
 const metrics = () => ({ llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 });
 const controller = new AbortController();

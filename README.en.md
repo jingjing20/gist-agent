@@ -8,7 +8,7 @@ English · [简体中文](README.md)
 
 Vue 3 / Pinia / ECharts frontend, NestJS API, separate BullMQ / Redis Worker, PostgreSQL storage, and an OpenAI-compatible model adapter.
 
-The single analysis agent explicitly updates task state, reads datasource memories and schema details, executes authorized SELECT queries, and submits structured answers. Recoverable SQL errors return to the main loop. Charts reference stored query artifacts.
+The single analysis agent explicitly updates task state, reads datasource memories and schema details, executes authorized SELECT queries, streams natural-language answers and records an explicit completion status. Recoverable SQL errors return to the main loop. Charts reference stored query artifacts.
 
 Explicit "remember" requests save datasource memories directly; model-proposed memories require user confirmation. The previous memory engine and hidden SQL repair loop are retired; old conversations and database schemas are not supported.
 
@@ -52,3 +52,5 @@ Detailed documentation is maintained in Chinese:
 Fast mock checks do not establish real-model accuracy or completed interaction acceptance. Check the validation record before treating a capability as verified.
 
 [MIT license](LICENSE)
+
+Prompt and schema-comment workflow: [implementation and acceptance checklist](docs/prompt-refactor.md).

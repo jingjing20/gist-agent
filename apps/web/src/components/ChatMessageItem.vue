@@ -94,13 +94,6 @@ const visibleBlocks = computed(() =>
         if (block.type === 'thinking' || block.type === 'reasoning_chunk') return false;
         if (analysisWorkflow.value && ['analysis_activity', 'log', 'sql', 'table'].includes(block.type) && !block.display) return false;
         if (hasAnalysisResult.value && block.type === 'table' && !block.display) return false;
-        if (
-            hasAnalysisResult.value &&
-            block.type === 'chart' &&
-            block.chartData &&
-            props.msg.blocks.some((b) => b.analysis && !(b.analysis.outcome.kind === 'response' && b.analysis.outcome.blocks.length === 0))
-        )
-            return false;
         return true;
     })
 );

@@ -181,6 +181,14 @@ export class TransactionConnection {
     async query<T extends QueryRow[] = QueryRow[]>(sql: string, params: unknown[] = []): Promise<[T]> {
         return [(await this.client.query(normalizeSql(sql), params)).rows as T];
     }
+    /** Native PostgreSQL SELECT, preserving question marks in quoted identifiers. */
+    async queryNative<T extends QueryRow[] = QueryRow[]>(sql: string): Promise<[T]> {
+        return [(await this.client.query(sql)).rows as T];
+    }
+    /** PostgreSQL-native statement: no question-mark placeholder rewriting (e.g. COMMENT literals). */
+    async executeNative(sql: string): Promise<ExecuteResult> {
+        return resultOf(await this.client.query(sql));
+    }
     async execute(sql: string, params: unknown[] = []): Promise<[ExecuteResult]> {
         return [resultOf(await this.client.query(normalizeSql(sql), params))];
     }

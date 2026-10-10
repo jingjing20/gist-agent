@@ -69,12 +69,12 @@ export class AnalysisStateRepository {
         });
     }
     async history(g: GenerationIdentity, ds: number) {
-        // Only completed new-core turns on this datasource, never old memory or failed drafts.
+        // Only completed turns on this datasource; failed drafts are excluded.
         return this.db.query(
             `SELECT ct.id,ct.sequence,u.content AS question,ct.final_answer AS answer FROM conversation_turn ct
          JOIN generation g ON g.id=ct.generation_id JOIN message u ON u.id=ct.user_message_id
          WHERE ct.conversation_id=? AND g.user_id=? AND ct.status='completed' AND g.id<>?
-         AND g.prompt_policy_version='analysis-core-v2' AND COALESCE(g.datasource_id,(SELECT id FROM data_source WHERE is_local=1 ORDER BY id LIMIT 1))=?
+         AND COALESCE(g.datasource_id,(SELECT id FROM data_source WHERE is_local=1 ORDER BY id LIMIT 1))=?
          AND g.created_at<=? ORDER BY ct.sequence DESC LIMIT 4`,
             [g.conversationId, g.userId, g.id, ds, g.contextUpperBound]
         );

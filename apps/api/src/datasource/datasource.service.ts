@@ -3,7 +3,6 @@ import { Injectable, BadRequestException, NotFoundException, ForbiddenException,
 import { DatabaseService } from '../database/database.service';
 import { SchemaService } from '../database/schema.service';
 import { QueryRow as RowDataPacket } from '../database/database.service';
-import { SchemaEnrichmentService } from './schema-enrichment.service';
 
 export interface DataSource {
     id: number;
@@ -43,8 +42,7 @@ export class DataSourceService {
     constructor(
         private readonly db: DatabaseService,
         @Inject(forwardRef(() => SchemaService))
-        private readonly schemaService: SchemaService,
-        private readonly schemaEnrichmentService: SchemaEnrichmentService
+        private readonly schemaService: SchemaService
     ) {}
 
     /**
@@ -154,7 +152,7 @@ export class DataSourceService {
      * 2. PostgreSQL 参数化批量 INSERT
      * 3. COMMENT ON 写入表和列注释
      * 4. 注册到统一表目录
-     * 5. 异步触发: Schema 增强 (LLM 推断业务语义) + 推荐问题重新生成
+     * 5. 刷新 Schema 缓存；注释增强由用户主动发起
      *
      * 表名使用 ut_{timestamp}_{random} 格式，避免用户输入带来的注入风险
      */
@@ -215,7 +213,6 @@ export class DataSourceService {
             await this.grantAgentReadAccess(tableName);
 
             this.schemaService.clearDatasourceCache(datasourceId);
-            this.schemaEnrichmentService.enrichTableSchemaAsync(tableName);
 
             return {
                 id: result.insertId,

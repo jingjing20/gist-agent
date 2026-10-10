@@ -17,16 +17,21 @@
             <!-- 数据源选择区域 -->
             <div class="ds-selection-box">
                 <div class="section-label">选择数据源</div>
-                <Select :model-value="chatStore.activeDatasourceId ? String(chatStore.activeDatasourceId) : undefined" @update:model-value="(value) => value && selectDs(Number(value))">
+                <Select
+                    :model-value="chatStore.activeDatasourceId ? String(chatStore.activeDatasourceId) : undefined"
+                    @update:model-value="(value) => value && selectDs(Number(value))"
+                >
                     <SelectTrigger class="w-full"><SelectValue placeholder="选择数据源" /></SelectTrigger>
-                    <SelectContent><SelectGroup>
-                        <SelectItem v-for="ds in dsStore.list" :key="ds.id" :value="String(ds.id)">{{ ds.name }}{{ ds.is_local ? ' · 公共库' : '' }}</SelectItem>
-                    </SelectGroup></SelectContent>
+                    <SelectContent
+                        ><SelectGroup>
+                            <SelectItem v-for="ds in dsStore.list" :key="ds.id" :value="String(ds.id)">{{ ds.name }}{{ ds.is_local ? ' · 公共库' : '' }}</SelectItem>
+                        </SelectGroup></SelectContent
+                    >
                 </Select>
             </div>
 
             <!-- 推荐查询区域 -->
-            <div class="suggestions-section">
+            <div v-if="suggestionsLoading || exampleQueries.length" class="suggestions-section">
                 <div class="section-label">您可能想问</div>
                 <div class="suggestions-grid">
                     <template v-if="suggestionsLoading">
@@ -68,8 +73,6 @@ const emit = defineEmits<{
 const chatStore = useChatStore();
 const dsStore = useDataSourceStore();
 
-const DEFAULT_QUERIES = ['帮我分析下近一月平台的日活趋势', '对比不同平台最近一周的新增用户数', '近 7 天用户行为类型分布是怎样的'];
-
 const suggestionsLoading = computed(() => {
     const id = chatStore.activeDatasourceId;
     return id != null && !!dsStore.suggestionsLoading[id];
@@ -80,7 +83,7 @@ const exampleQueries = computed(() => {
     if (id != null && dsStore.suggestionsCache[id]?.length) {
         return dsStore.suggestionsCache[id];
     }
-    return DEFAULT_QUERIES;
+    return [];
 });
 
 function selectDs(id: number) {

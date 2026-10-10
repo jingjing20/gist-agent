@@ -144,7 +144,6 @@ try {
         title: '每日趋势',
         xField: 'day',
         yFields: [{ field: 'value', label: '指标' }],
-        filters: [{ field: 'value', operator: 'gte', value: 118 }],
         sort: [{ field: 'value', direction: 'desc' }],
     });
     const chartResult = await chartTool.execute(
@@ -153,7 +152,10 @@ try {
     );
     const chartPayload = JSON.parse(chartResult.toolResult);
     assert.equal(chartEvents.at(-1).queryArtifactId, artifact.id);
-    assert.deepEqual(chartEvents.at(-1).chartData.series[0].data, [120, 119, 118]);
+    assert.deepEqual(
+        chartEvents.at(-1).chartData.series[0].data,
+        Array.from({ length: 120 }, (_, i) => 120 - i)
+    );
     assert.equal(
         Number(
             (await database.query('SELECT COUNT(*)::int AS count FROM chart_artifact WHERE id=? AND query_artifact_id=?', [chartPayload.chartArtifactId, artifact.id]))[0].count

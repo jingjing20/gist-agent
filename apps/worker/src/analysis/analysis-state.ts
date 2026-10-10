@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import type { AnalysisState, DatasourceMemory, QueryArtifactV1 } from '@gist/contracts';
 import { stableStringify } from '../chat/artifact.repository';
-import { exactKeys, record } from './submission';
+import { exactKeys, record } from './tool-arguments';
 
 export function newAnalysisState(conversationId: string, datasourceId: number, question: string, revision = 1): AnalysisState {
     return {
@@ -41,26 +41,6 @@ export function evidenceMismatch(artifact: QueryArtifactV1, state: AnalysisState
     if (state.freshness === 'current_generation' && artifact.generationId !== generationId) return '本轮要求最新数据，请重新查询';
     if (conditionSignature(artifact.analysisContext.state) !== conditionSignature(state)) return '定义、时间、筛选或粒度已变化，请重新查询或显式比较历史条件';
     return null;
-}
-export function validateEvidenceReference(
-    artifact: QueryArtifactV1,
-    state: AnalysisState,
-    generationId: string,
-    reference: { role: string; comparisonLabel?: string },
-    comparisonRead: boolean
-): void {
-    const mismatch = evidenceMismatch(artifact, state, generationId);
-    if (!mismatch) return;
-    if (
-        comparisonRead &&
-        reference.role === 'comparison' &&
-        reference.comparisonLabel?.trim() &&
-        artifact.datasourceId === state.datasourceId &&
-        artifact.analysisContext?.state.taskId === state.taskId &&
-        state.freshness !== 'current_generation'
-    )
-        return;
-    throw new Error(mismatch);
 }
 
 function text(v: unknown): string {

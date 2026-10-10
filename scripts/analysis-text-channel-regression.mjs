@@ -23,7 +23,13 @@ async function run(question, replies, capturedEvents = []) {
         capability: { contextWindow: 100000, responseReserve: 1000 },
         metrics: { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 },
         stream: async () => {
-            const reply = replies[calls++];
+            const reply = replies[calls++] ?? [
+                {
+                    tool_calls: [
+                        { index: 0, id: 'finish', function: { name: 'finish_analysis', arguments: JSON.stringify({ status: 'complete', reason: null, missingItems: [] }) } },
+                    ],
+                },
+            ];
             assert.ok(reply, 'unexpected extra model call');
             return (async function* () {
                 for (const delta of typeof reply === 'function' ? reply() : reply) yield { choices: [{ delta }] };
@@ -77,7 +83,7 @@ assert.equal(
 );
 const english = 'The activation rate is about half of all registered users and varies across customer segments.';
 const corrected = await run('首周激活率是多少？', [[{ content: english }], [{ content: answer }]]);
-assert.equal(corrected.calls, 2);
+assert.equal(corrected.calls, 3);
 assert.equal(
     corrected.events
         .filter((e) => e.type === 'text_chunk')
@@ -87,11 +93,11 @@ assert.equal(
     '不合语言要求的回答应在展示前重试'
 );
 const allowed = await run('请用英文回答首周激活率', [[{ content: english }]]);
-assert.equal(allowed.calls, 1);
+assert.equal(allowed.calls, 2);
 assert.equal(allowed.outcome.blocks[0].content, english);
 const technical = '激活率按 `activated_at` 与 `signup_at` 的间隔计算。\n```sql\nSELECT COUNT(*) FROM product_users WHERE activated_at IS NOT NULL;\n```';
 const identifiers = await run('怎么算激活率？', [[{ content: technical }]]);
-assert.equal(identifiers.calls, 1);
+assert.equal(identifiers.calls, 2);
 const rejectedEvents = [];
 await assert.rejects(run('首周激活率是多少？', [[{ content: english }], [{ content: english }]], rejectedEvents), { code: 'RESPONSE_LANGUAGE_MISMATCH' });
 assert.ok(!rejectedEvents.some((event) => event.type === 'text_chunk'), '修正失败也不能先展示英文回答');

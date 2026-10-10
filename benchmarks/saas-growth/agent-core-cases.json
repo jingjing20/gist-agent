@@ -157,7 +157,7 @@
       ],
       "reference_case_ids": [],
       "must": [
-        "软预算仅允许partial",
+        "未完成验证时通过 finish_analysis 标记 partial，并说明缺失",
         "硬取消后无新模型调用或写入"
       ],
       "must_not": [

@@ -23,7 +23,7 @@ export class SqlQueryTool implements Tool {
                 properties: {
                     title: {
                         type: 'string',
-                        description: '本次查询的简短动作标题，使用明确的中文动宾短语（建议 6-15 个字），例如“查询所有平台类型”；不要包含“SQL”“查询结果”等后缀',
+                        description: '本次查询的简短动作标题，使用本轮回答语言的简短动作短语，例如“查询所有平台类型”；不要包含“SQL”“查询结果”等后缀',
                     },
                     sql: {
                         type: 'string',
@@ -107,9 +107,10 @@ export class SqlQueryTool implements Tool {
                 resultRows.push(row);
                 resultChars += rowChars;
             }
-            const truncationNote = resultRows.length !== r.rows.length
-                ? `[质量约束：查询返回 ${r.rowCount} 行，模型收到前 ${resultRows.length} 行；完整返回结果保存在 Artifact。禁止基于子集推断全集，必须读取完整证据或追加聚合查询。]`
-                : '';
+            const truncationNote =
+                resultRows.length !== r.rows.length
+                    ? `[质量约束：查询返回 ${r.rowCount} 行，模型收到前 ${resultRows.length} 行；完整返回结果保存在 Artifact。禁止基于子集推断全集，必须读取完整证据或追加聚合查询。]`
+                    : '';
             const resultQuality = assessResultQuality({
                 plan: args.plan as QueryPlanV1,
                 sql: r.finalSql,

@@ -27,7 +27,8 @@
         "test:analysis-presentation": "pnpm --filter @gist/api... build && node scripts/analysis-presentation-regression.mjs",
         "test:analysis-cutover": "pnpm --filter @gist/api... --filter @gist/worker... build && node scripts/analysis-cutover-regression.mjs",
         "migrate:database": "pnpm --filter @gist/database... build && node scripts/migrate-database.mjs",
-        "test:analysis-failures": "pnpm --filter @gist/worker... build && node scripts/analysis-failure-regression.mjs"
+        "test:analysis-failures": "pnpm --filter @gist/worker... build && node scripts/analysis-failure-regression.mjs",
+        "test:prompts": "pnpm --filter @gist/api... --filter @gist/worker... build && node scripts/prompt-runtime-regression.mjs && node scripts/schema-enrichment-regression.mjs && node scripts/follow-up-suggestions-regression.mjs && node scripts/analysis-text-channel-regression.mjs"
     },
     "devDependencies": {
         "@gist/config": "workspace:*",

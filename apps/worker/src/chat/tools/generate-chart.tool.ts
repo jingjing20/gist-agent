@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type OpenAI from 'openai';
-import type { ArtifactFilterV1, ArtifactSortV1, ChartFieldV1, ChartType } from '@gist/contracts';
+import type { ArtifactSortV1, ChartFieldV1, ChartType } from '@gist/contracts';
 import { ArtifactRepository } from '../artifact.repository';
 import { GenerationExecutionError } from '../generation-errors';
 import { requireNonEmptyString, requireRecord, type Tool, type ToolContext, type ToolExecutionResult, type SSEEvent } from './base-tool';
 
 const CHART_TYPES = new Set<ChartType>(['line', 'bar', 'pie', 'scatter', 'radar', 'funnel']);
-const FILTER_OPERATORS = new Set<ArtifactFilterV1['operator']>(['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in']);
 
 @Injectable()
 export class GenerateChartTool implements Tool {
@@ -31,18 +30,6 @@ export class GenerateChartTool implements Tool {
                             type: 'object',
                             properties: { field: { type: 'string' }, label: { type: 'string' } },
                             required: ['field', 'label'],
-                        },
-                    },
-                    filters: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                field: { type: 'string' },
-                                operator: { type: 'string', enum: ['eq', 'neq', 'gt', 'gte', 'lt', 'lte', 'in'] },
-                                value: {},
-                            },
-                            required: ['field', 'operator', 'value'],
                         },
                     },
                     sort: {
@@ -77,9 +64,8 @@ export class GenerateChartTool implements Tool {
             } satisfies ChartFieldV1;
         });
         if (['pie', 'funnel'].includes(chartType) && yFields.length !== 1) throw new Error(`${chartType} 只允许一个数值字段`);
-        const filters = this.parseFilters(args.filters);
         const sort = this.parseSort(args.sort);
-        return { queryArtifactId, chartType, title, xField, yFields, ...(filters ? { filters } : {}), ...(sort ? { sort } : {}) };
+        return { queryArtifactId, chartType, title, xField, yFields, ...(sort ? { sort } : {}) };
     }
 
     async execute(args: Record<string, unknown>, ctx: ToolContext): Promise<ToolExecutionResult> {
@@ -103,7 +89,7 @@ export class GenerateChartTool implements Tool {
                 throw new GenerationExecutionError('ARTIFACT_FIELD_INVALID', `字段 ${item.field} 不是可安全绘图的数值字段`);
             }
         }
-        let rows = this.applyFilters(source.rows, args.filters as ArtifactFilterV1[] | undefined, columns);
+        let rows = [...source.rows];
         rows = this.applySort(rows, args.sort as ArtifactSortV1[] | undefined, columns);
         const chartData = {
             chartType: args.chartType,
@@ -122,7 +108,6 @@ export class GenerateChartTool implements Tool {
                 title: args.title as string,
                 xField,
                 yFields,
-                filters: args.filters as ArtifactFilterV1[] | undefined,
                 sort: args.sort as ArtifactSortV1[] | undefined,
             },
             source.artifact.datasourceId
@@ -132,17 +117,6 @@ export class GenerateChartTool implements Tool {
         const chartEvent: SSEEvent = { type: 'chart', chartData, chartArtifactId: chartArtifact.id, queryArtifactId };
         ctx.emitter.send(chartEvent);
         return { toolResult: JSON.stringify({ chartArtifactId: chartArtifact.id, queryArtifactId, status: 'rendered' }), blocks: [chartEvent] };
-    }
-
-    private parseFilters(value: unknown): ArtifactFilterV1[] | undefined {
-        if (value === undefined) return undefined;
-        if (!Array.isArray(value)) throw new Error('filters 必须是数组');
-        return value.map((item, index) => {
-            const filter = requireRecord(item);
-            const operator = requireNonEmptyString(filter.operator, `filters[${index}].operator`) as ArtifactFilterV1['operator'];
-            if (!FILTER_OPERATORS.has(operator)) throw new Error(`filters[${index}].operator 不受支持`);
-            return { field: requireNonEmptyString(filter.field, `filters[${index}].field`), operator, value: filter.value };
-        });
     }
 
     private parseSort(value: unknown): ArtifactSortV1[] | undefined {
@@ -156,12 +130,6 @@ export class GenerateChartTool implements Tool {
         });
     }
 
-    private applyFilters(rows: Array<Record<string, unknown>>, filters: ArtifactFilterV1[] | undefined, columns: Map<string, string>) {
-        if (!filters?.length) return [...rows];
-        for (const filter of filters) if (!columns.has(filter.field)) throw new GenerationExecutionError('ARTIFACT_FIELD_INVALID', `筛选字段 ${filter.field} 不存在`);
-        return rows.filter((row) => filters.every((filter) => compare(row[filter.field], filter.operator, filter.value)));
-    }
-
     private applySort(rows: Array<Record<string, unknown>>, sort: ArtifactSortV1[] | undefined, columns: Map<string, string>) {
         if (!sort?.length) return rows;
         for (const item of sort) if (!columns.has(item.field)) throw new GenerationExecutionError('ARTIFACT_FIELD_INVALID', `排序字段 ${item.field} 不存在`);
@@ -173,17 +141,6 @@ export class GenerateChartTool implements Tool {
             return 0;
         });
     }
-}
-
-function compare(left: unknown, operator: ArtifactFilterV1['operator'], right: unknown): boolean {
-    if (operator === 'in') return Array.isArray(right) && right.includes(left);
-    const comparison = compareValues(left, right);
-    if (operator === 'eq') return comparison === 0;
-    if (operator === 'neq') return comparison !== 0;
-    if (operator === 'gt') return comparison > 0;
-    if (operator === 'gte') return comparison >= 0;
-    if (operator === 'lt') return comparison < 0;
-    return comparison <= 0;
 }
 
 function compareValues(left: unknown, right: unknown): number {

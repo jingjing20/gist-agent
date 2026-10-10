@@ -2,16 +2,12 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { cloneAnalysisActivity } from '../apps/web/src/utils/analysis-activity.js';
 const require = createRequire(import.meta.url);
-const { AnalysisAgent } = require('../apps/worker/dist/analysis/analysis-agent.js');
-const { validateSubmission } = require('../apps/worker/dist/analysis/submission.js');
-const { AnalysisRuntimeAdapter, requestedPresentation, assertRequestedPresentation } = require('../apps/worker/dist/analysis/analysis-runtime-adapter.js');
 const { startActivity, completeActivity } = require('../apps/worker/dist/analysis/analysis-activity.js');
 const { assessResultQuality } = require('../apps/worker/dist/chat/result-quality.js');
 const { SqlExecutorAgent } = require('../apps/worker/dist/chat/agents/sql-executor.js');
 const { SqlQueryTool } = require('../apps/worker/dist/chat/tools/sql-query.tool.js');
 const { ArtifactRepository } = require('../apps/worker/dist/chat/artifact.repository.js');
 const { GenerationExecutionError } = require('../apps/worker/dist/chat/generation-errors.js');
-const { ChatService } = require('../apps/worker/dist/chat/chat.service.js');
 const { ANALYSIS_RUNTIME_VERSIONS } = require('../packages/contracts/dist/index.js');
 let checks = 0;
 const check = async (name, fn) => {
@@ -19,62 +15,6 @@ const check = async (name, fn) => {
     checks++;
     console.log(`PASS ${name}`);
 };
-let id = 0;
-const call = (name, args) => ({ id: `call-${++id}`, type: 'function', function: { name, arguments: JSON.stringify(args) } });
-const query = (sql = 'SELECT 1') => call('execute_sql_query', { title: '核对数据', sql, plan: { purpose: '核对', expectedGrain: '一行', expectedShape: 'scalar' } });
-const answer = (kind = 'answer', findings = []) => ({
-    kind,
-    ...(kind === 'partial' ? { reason: '查询预算已用完' } : {}),
-    answer: { summary: '分析结果', findings, limitations: kind === 'partial' ? ['尚未完成验证'] : [], unresolvedQuestions: [] },
-});
-const observation = (artifactId) => ({ id: 'f1', text: '查询返回一条结果', kind: 'observation', evidence: [{ artifactId, role: 'observation' }] });
-const stream = (calls) =>
-    (async function* () {
-        for (let index = 0; index < calls.length; index++) {
-            const c = calls[index];
-            yield { choices: [{ delta: { tool_calls: [{ index, id: c.id, function: { name: c.function.name, arguments: c.function.arguments.slice(0, 5) } }] } }] };
-            yield { choices: [{ delta: { tool_calls: [{ index, function: { arguments: c.function.arguments.slice(5) } }] } }] };
-        }
-    })();
-function harness(responses, extras = {}) {
-    const executions = [],
-        seen = [],
-        events = [],
-        reports = [],
-        messages = [],
-        turnMessages = [];
-    const controller = new AbortController();
-    const sql = {
-        name: 'execute_sql_query',
-        definition: { type: 'function', function: { name: 'execute_sql_query', parameters: { type: 'object', properties: { title: {}, sql: {}, plan: {} } } } },
-        parseArguments: (v) => v,
-        execute: async (args) => {
-            executions.push(args.sql);
-            return { succeeded: true, blocks: [], toolResult: JSON.stringify({ queryArtifactId: `a${executions.length}`, isLimited: false, data: [{ n: 1 }] }) };
-        },
-    };
-    const options = {
-        messages,
-        turnMessages,
-        tools: [sql],
-        context: { signal: controller.signal, assertWritable: async () => {}, emitter: { send: (e) => events.push(e) } },
-        metrics: { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 },
-        capability: { contextWindow: 100000, responseReserve: 1000 },
-        stream: async (history, memories) => {
-            seen.push({ history: structuredClone(history), names: memories.map((t) => t.function.name) });
-            assert.ok(responses.length, 'Mock responses exhausted');
-            const next = responses.shift();
-            return typeof next === 'function' ? next() : stream(next);
-        },
-        onEvent: (e) => events.push(e),
-        checkpoint: async () => {},
-        onFirstDelta: async () => {},
-        onContext: (r) => reports.push(r),
-        ...extras,
-    };
-    return { options, sql, controller, executions, seen, events, messages, turnMessages, reports, run: () => new AnalysisAgent().run(options) };
-}
-
 await check('structured activities snapshot mechanical execution facts', async () => {
     const started = startActivity(
         'activity-1',
@@ -168,278 +108,6 @@ await check('activity snapshots tolerate malformed in-flight details', async () 
     }
 });
 
-await check('submission can correct a chart id mistaken for query evidence', async () => {
-    const invalid = answer('partial', [observation('chart-id')]);
-    const valid = answer('partial', [observation('a1')]);
-    const h = harness([[query()], [call('submit_analysis', invalid)], [call('submit_analysis', valid)]]);
-    assert.equal((await h.run()).kind, 'partial');
-    assert.match(h.turnMessages.find((message) => message.role === 'tool' && String(message.content).includes('INVALID_TOOL_ARGUMENTS')).content, /查询证据/);
-});
-
-await check('direct answer and clarification without SQL', async () => {
-    for (const outcome of [answer(), { kind: 'clarification', question: '使用哪个观察截止日期？' }]) {
-        const h = harness([[call('submit_analysis', outcome)]]);
-        assert.equal((await h.run()).kind, outcome.kind);
-        assert.equal(h.executions.length, 0);
-        assert.equal(h.turnMessages.at(-1).role, 'tool');
-    }
-});
-await check('query, independent verification, structured evidence answer', async () => {
-    const finding = {
-        id: 'f',
-        text: '解释得到支持',
-        kind: 'supported_explanation',
-        evidence: [
-            { artifactId: 'a1', role: 'observation' },
-            { artifactId: 'a2', role: 'verification' },
-        ],
-    };
-    const h = harness([[query()], [query('SELECT 2')], [call('submit_analysis', answer('answer', [finding]))]]);
-    assert.equal((await h.run()).kind, 'answer');
-    assert.deepEqual(h.executions, ['SELECT 1', 'SELECT 2']);
-    assert.equal(h.reports.length, 3);
-    const activities = h.events.filter((event) => event.type === 'analysis_activity');
-    assert.equal(activities.length, 4);
-    assert.deepEqual(
-        activities.map((event) => event.activity.status),
-        ['running', 'completed', 'running', 'completed']
-    );
-    assert.deepEqual(
-        h.turnMessages.map((m) => m.role),
-        ['assistant', 'tool', 'assistant', 'tool', 'assistant', 'tool']
-    );
-});
-await check('fabricated and blocked evidence cannot support findings', async () => {
-    assert.throws(() => validateSubmission(answer('answer', [observation('fake')]), new Map(), false), /本轮/);
-    assert.throws(() => validateSubmission(answer('answer', [observation('a')]), new Map([['a', { blocked: true, sql: 'SELECT 1' }]]), false), /质量/);
-    const f = { ...observation('a'), kind: 'supported_explanation' };
-    assert.throws(() => validateSubmission(answer('answer', [f]), new Map([['a', { blocked: false, sql: 'SELECT 1' }]]), false), /验证/);
-});
-await check('key metrics must point to an evidenced finding', async () => {
-    const evidence = new Map([['a1', { blocked: false, sql: 'SELECT 1' }]]);
-    const valid = {
-        ...answer('answer', [observation('a1')]),
-        answer: {
-            ...answer('answer', [observation('a1')]).answer,
-            summary: '收入上升。',
-            keyPoints: ['期末高于期初'],
-            metrics: [{ label: '期末收入', value: '59.6 万元', findingId: 'f1' }],
-        },
-    };
-    assert.equal(validateSubmission(valid, evidence).answer.metrics[0].value, '59.6 万元');
-    assert.throws(() => validateSubmission({ ...valid, answer: { ...valid.answer, metrics: [{ label: '收入', value: '59.6 万元', findingId: 'missing' }] } }, evidence), /已证实/);
-    assert.throws(() => validateSubmission({ ...valid, answer: { ...valid.answer, keyPoints: ['重复', '重复'] } }, evidence), /不能重复/);
-});
-await check('table-only answer references observed query rows without report fields', async () => {
-    const h = harness([[query('SELECT region, amount FROM revenue')], [call('submit_analysis', { kind: 'table', tables: [{ artifactId: 'a1', title: '地区明细' }] })]]);
-    const outcome = await h.run();
-    assert.deepEqual(outcome, { kind: 'table', tables: [{ artifactId: 'a1', title: '地区明细' }] });
-    assert.throws(() => validateSubmission({ kind: 'table', tables: [{ artifactId: 'unknown' }] }, new Map()), /不是本轮已观察/);
-    assert.throws(() => validateSubmission({ kind: 'table', tables: [{ artifactId: 'a1' }] }, new Map([['a1', { blocked: true, sql: 'SELECT 1' }]])), /质量受限/);
-});
-await check('explicit user output preference wins over the default report', async () => {
-    assert.equal(requestedPresentation('帮我查下北区详细的数据，以表格给我就行'), 'table');
-    assert.equal(requestedPresentation('只要一句话告诉我结果'), 'direct');
-    assert.equal(requestedPresentation('不要表格，给我解释原因'), null);
-    assert.equal(requestedPresentation('用表格展示数据并解释原因'), null);
-    const tableResponse = { kind: 'response', status: 'complete', blocks: [{ type: 'table', artifactId: 'a1' }] };
-    assert.throws(() => assertRequestedPresentation('以表格给我就行', answer()), /只用表格/);
-    assert.doesNotThrow(() => assertRequestedPresentation('以表格给我就行', tableResponse));
-    assert.throws(() => assertRequestedPresentation('以表格给我就行', { ...tableResponse, blocks: [...tableResponse.blocks, { type: 'markdown', content: '总结' }] }), /只用表格/);
-    const h = harness([[query()], [call('submit_analysis', { kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '北区收入为 8 万元。' }] })]]);
-    assert.equal((await h.run()).kind, 'response');
-});
-await check('ordered response blocks validate table and chart references', async () => {
-    const evidence = new Map([['a1', { blocked: false, sql: 'SELECT 1' }]]);
-    const charts = new Map([['c1', 'a1']]);
-    const response = {
-        kind: 'response',
-        status: 'complete',
-        blocks: [
-            { type: 'markdown', content: '北区明细如下。' },
-            { type: 'table', artifactId: 'a1' },
-            { type: 'chart', chartArtifactId: 'c1' },
-        ],
-    };
-    assert.deepEqual(
-        validateSubmission(response, evidence, charts).blocks.map((block) => block.type),
-        ['markdown', 'table', 'chart']
-    );
-    assert.throws(() => validateSubmission(response, evidence), /不是本轮已生成/);
-    assert.throws(() => validateSubmission({ ...response, blocks: [{ type: 'table', artifactId: 'missing' }] }, evidence, charts), /不是本轮已观察/);
-    assert.deepEqual(validateSubmission({ kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '当前数据源有 10 张表。' }] }, new Map()).blocks, [
-        { type: 'markdown', content: '当前数据源有 10 张表。' },
-    ]);
-    assert.throws(
-        () => validateSubmission({ kind: 'response', status: 'complete', blocks: [{ type: 'markdown', content: '旧格式', evidence: [] }] }, evidence, charts),
-        /不允许的字段/
-    );
-});
-await check('malformed arguments return paired feedback, no side effect', async () => {
-    const bad = query();
-    bad.function.arguments = '{';
-    const h = harness([[bad], [call('submit_analysis', { kind: 'clarification', question: '请明确口径' })]]);
-    await h.run();
-    assert.equal(h.executions.length, 0);
-    assert.match(h.turnMessages[1].content, /INVALID_TOOL_ARGUMENTS/);
-});
-await check('SQL failure is repaired by the main loop', async () => {
-    const h = harness([[query('SELECT bad')], [query('SELECT 1')], [call('submit_analysis', answer('answer', [observation('a1')]))]]);
-    const execute = h.sql.execute;
-    h.sql.execute = async (args) =>
-        args.sql.includes('bad') ? { succeeded: false, toolResult: JSON.stringify({ errorCode: '42703', retryable: true }), blocks: [] } : execute(args);
-    await h.run();
-    assert.deepEqual(h.executions, ['SELECT 1']);
-    assert.equal(h.options.metrics.sqlCallCount, 2);
-    assert.match(h.seen[1].history.at(-1).content, /42703/);
-    assert.equal(h.events.filter((event) => event.type === 'analysis_activity_remove').length, 1);
-    assert.deepEqual(
-        h.events.filter((event) => event.type === 'analysis_activity').map((event) => event.activity.status),
-        ['running', 'running', 'completed']
-    );
-});
-await check('repeated failing query stops without executing a third time', async () => {
-    const h = harness([[query()], [query()], [query()]]);
-    let attempts = 0;
-    h.sql.execute = async () => {
-        attempts++;
-        return { succeeded: false, toolResult: '{"errorCode":"42703"}', blocks: [] };
-    };
-    await assert.rejects(h.run(), { code: 'ANALYSIS_NO_PROGRESS' });
-    assert.equal(attempts, 2);
-});
-await check('analysis can continue past the former SQL budget and finish', async () => {
-    const responses = Array.from({ length: 9 }, (_, i) => [query(`SELECT ${i + 1}`)]);
-    responses.push([call('submit_analysis', answer('answer', [observation('a9')]))]);
-    const h = harness(responses);
-    assert.equal((await h.run()).kind, 'answer');
-    assert.equal(h.executions.length, 9);
-    assert.ok(h.seen.every((turn) => turn.names.includes('execute_sql_query')));
-});
-await check('mixed final submission batch executes no tools', async () => {
-    const h = harness([[query(), call('submit_analysis', answer())], [call('submit_analysis', answer())]]);
-    await h.run();
-    assert.equal(h.executions.length, 0);
-    assert.equal(h.turnMessages[1].role, 'tool');
-    assert.equal(h.turnMessages[2].role, 'tool');
-});
-await check('security rejection stops the batch and closes tool references', async () => {
-    const h = harness([[query(), query('SELECT 2')]]);
-    let attempts = 0;
-    h.sql.execute = async () => {
-        attempts++;
-        throw new GenerationExecutionError('SQL_SECURITY_REJECTED', 'denied');
-    };
-    assert.equal((await h.run()).kind, 'refusal');
-    assert.equal(attempts, 1);
-    assert.equal(h.turnMessages.length, 3);
-});
-await check('pre-cancel and mid-tool cancel prevent further model calls', async () => {
-    const h = harness([]);
-    h.controller.abort(new GenerationExecutionError('CANCELLED', 'cancelled'));
-    await assert.rejects(h.run(), { code: 'CANCELLED' });
-    assert.equal(h.seen.length, 0);
-    const m = harness([[query()]]);
-    m.sql.execute = async () => {
-        m.controller.abort(new GenerationExecutionError('CANCELLED', 'cancelled'));
-        return { toolResult: '{}', blocks: [] };
-    };
-    await assert.rejects(m.run(), { code: 'CANCELLED' });
-    assert.equal(m.seen.length, 1);
-});
-await check('empty output and context overflow fail explicitly', async () => {
-    await assert.rejects(harness([[]]).run(), { code: 'EMPTY_LLM_RESPONSE' });
-    const h = harness([], { capability: { contextWindow: 10, responseReserve: 5 } });
-    await assert.rejects(h.run(), { code: 'CONTEXT_BUDGET_EXCEEDED' });
-    assert.equal(h.seen.length, 0);
-});
-await check('plain text streams before model completion without structured submission', async () => {
-    let h;
-    h = harness(
-        [
-            () =>
-                (async function* () {
-                    yield { choices: [{ delta: { content: '直接回答', reasoning_content: 'private thoughts' } }] };
-                    assert.equal(
-                        h.events
-                            .filter((e) => e.type === 'text_chunk')
-                            .map((e) => e.content)
-                            .join(''),
-                        '直接回答'
-                    );
-                    yield { choices: [{ delta: { content: '，无需固定格式。' } }] };
-                })(),
-        ],
-        {
-            validateOutcome: async () => {
-                throw new Error('free text must not require outcome validation');
-            },
-        }
-    );
-    const outcome = await h.run();
-    assert.equal(outcome.blocks[0].content, '直接回答，无需固定格式。');
-    assert.equal(h.seen.length, 1);
-    assert.ok(!h.seen[0].names.includes('submit_analysis'));
-    assert.ok(!h.events.some((e) => e.type === 'reasoning_chunk'));
-    assert.equal(h.turnMessages.at(-1).content, outcome.blocks[0].content);
-});
-await check('model can explain, query and answer in natural language', async () => {
-    let h;
-    h = harness([
-        () =>
-            (async function* () {
-                yield { choices: [{ delta: { content: '我先核对数据。' } }] };
-                yield* stream([query()]);
-            })(),
-        () =>
-            (async function* () {
-                yield { choices: [{ delta: { content: '查询返回 1。' } }] };
-            })(),
-    ]);
-    await h.run();
-    assert.equal(h.executions.length, 1);
-    assert.deepEqual(
-        h.events.filter((e) => e.type === 'text_chunk').map((e) => e.content),
-        ['我先核对数据。', '查询返回 1。']
-    );
-    assert.ok(h.seen[1].history.some((m) => m.role === 'tool'));
-});
-await check('tools-only delivery may finish without forced prose', async () => {
-    const h = harness([[call('display_query_table', { queryArtifactId: 'a1' })], []]);
-    h.options.tools.push({
-        name: 'display_query_table',
-        definition: { type: 'function', function: { name: 'display_query_table', parameters: { properties: { queryArtifactId: {} } } } },
-        parseArguments: (v) => v,
-        execute: async () => ({ succeeded: true, blocks: [], toolResult: '{"displayed":true}' }),
-    });
-    const outcome = await h.run();
-    assert.deepEqual(outcome.blocks, []);
-    assert.equal(h.seen.length, 2);
-    assert.ok(!h.events.some((e) => e.type === 'text_chunk'));
-});
-await check('cancelled text stream stops publishing additional chunks', async () => {
-    let h;
-    h = harness([
-        () =>
-            (async function* () {
-                yield { choices: [{ delta: { content: '已收到' } }] };
-                h.controller.abort(new GenerationExecutionError('CANCELLED', '已取消'));
-                yield { choices: [{ delta: { content: '不可继续发布' } }] };
-            })(),
-    ]);
-    await assert.rejects(h.run(), { code: 'CANCELLED' });
-    assert.deepEqual(
-        h.events.filter((e) => e.type === 'text_chunk').map((e) => e.content),
-        ['已收到']
-    );
-});
-await check('tool dependency failures are not exposed as model argument errors', async () => {
-    const h = harness([[query()]]);
-    h.sql.execute = async () => {
-        throw new Error('private connection information');
-    };
-    await assert.rejects(h.run(), (e) => e.code === 'TOOL_EXECUTION_FAILED' && !e.message.includes('private'));
-});
 await check('new SQL execution disables nested model repair', async () => {
     let dbCalls = 0;
     const executor = new SqlExecutorAgent(
@@ -499,192 +167,7 @@ await check('evidence write fence locks generation and prevents terminal writes'
     assert.deepEqual(await repo.writeArtifact({ generationId: 'g', conversationId: 'c', userId: 1, writerToken: 'w' }, 'INSERT evidence', []), [{ ok: true }]);
     assert.equal(statements.at(-1), 'INSERT evidence');
 });
-await check('runtime adapter persists snapshot and structured result in existing blocks', async () => {
-    const events = [],
-        blocks = [],
-        turnMessages = [];
-    const adapter = new AnalysisRuntimeAdapter(
-        { assertDatasourceAccess: async () => {}, getSchemaCatalogSummary: async () => ({ datasourceId: 1, tables: [] }), getStructuredSchema: async () => [] },
-        { isReasoningActive: () => false, streamWithTools: async () => stream([call('submit_analysis', { kind: 'clarification', question: '请提供口径' })]) },
-        { name: 'execute_sql_query', definition: { type: 'function', function: { name: 'execute_sql_query', parameters: {} } } },
-        { name: 'generate_chart', definition: { type: 'function', function: { name: 'generate_chart', parameters: {} } } },
-        { listAnalysisEvidence: async () => ({ items: [], nextOffset: null }) },
-        {
-            query: async () => [],
-            withTransaction: async (fn) =>
-                fn({
-                    query: async (sql) => [
-                        sql.includes('FROM data_source d') || sql.includes('SELECT id FROM generation')
-                            ? [{ id: 1 }]
-                            : sql.includes('SELECT d.id')
-                              ? [
-                                    {
-                                        id: 'stored-memory',
-                                        datasource_id: 1,
-                                        version: 3,
-                                        current_status: 'active',
-                                        status: 'active',
-                                        source: 'manual',
-                                        content: { type: 'term', name: '已确认口径', description: '来自数据库' },
-                                    },
-                                ]
-                              : [],
-                    ],
-                    execute: async () => [{ rowCount: 1 }],
-                }),
-        }
-    );
-    await adapter.run({
-        generation: { id: 'g', datasourceId: 1, userId: 1, requestMessageId: 'r', conversationId: 'c', contextUpperBound: '2026-09-15T00:00:00Z', writerToken: 'w' },
-        message: '激活率',
-        signal: new AbortController().signal,
-        emitter: { send: (e) => events.push(e) },
-        blocks,
-        turnMessages,
-        metrics: { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 },
-        assertWritable: async () => {},
-        checkpoint: async () => {},
-        onFirstDelta: async () => {},
-    });
-    assert.equal(blocks.at(-1).analysis.snapshot.datasourceId, 1);
-    assert.deepEqual(blocks.at(-1).analysis.snapshot.memoryRefs, []);
-    assert.equal(blocks.at(-1).analysis.contextReports[0].snapshot.promptPolicy, 'analysis-core-v2');
-    assert.ok(blocks.at(-1).analysis.contextReports[0].selection.some((c) => c.candidateId === 'catalogs' && c.selected));
-    assert.equal(blocks.at(-1).analysis.outcome.kind, 'clarification');
-    assert.equal(blocks.length, 2);
-    assert.equal(blocks[0].type, 'log');
-    assert.equal(blocks[0].title, '分析步骤 1');
-    assert.match(blocks[0].content, /^已完成/);
-    assert.ok(events.some((e) => e.type === 'log'));
-    assert.equal(events.at(-1).content, blocks.at(-1).content);
-    events.length = 0;
-    blocks.length = 0;
-    turnMessages.length = 0;
-    adapter.llm.streamWithTools = async (_messages, definitions) => {
-        if (!definitions.length)
-            return (async function* () {
-                yield { choices: [{ delta: { content: '[]' } }] };
-            })();
-        assert.ok(!definitions.some((tool) => tool.function.name === 'submit_analysis'));
-        assert.ok(definitions.some((tool) => tool.function.name === 'display_query_table'));
-        return (async function* () {
-            yield { choices: [{ delta: { content: '普通问题' } }] };
-            assert.ok(events.some((event) => event.type === 'text_chunk'));
-            yield { choices: [{ delta: { content: '直接回答。' } }] };
-        })();
-    };
-    await adapter.run({
-        generation: { id: 'g', datasourceId: 1, userId: 1, requestMessageId: 'r', conversationId: 'c', contextUpperBound: '2026-09-15T00:00:00Z', writerToken: 'w' },
-        message: '你好',
-        signal: new AbortController().signal,
-        emitter: { send: (event) => events.push(event) },
-        blocks,
-        turnMessages,
-        metrics: { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 },
-        assertWritable: async () => {},
-        checkpoint: async () => {},
-        onFirstDelta: async () => {},
-    });
-    assert.deepEqual(
-        blocks.filter((block) => block.type === 'text').map((block) => block.content),
-        ['普通问题直接回答。', '']
-    );
-    assert.deepEqual(blocks.at(-1).analysis.outcome.blocks, []);
-    assert.equal(blocks.at(-1).analysis.state.status, 'answered');
-    events.length = 0;
-    blocks.length = 0;
-    turnMessages.length = 0;
-    let artifact,
-        round = 0;
-    adapter.schema.getAllowedTableNames = async () => [];
-    adapter.schema.getColumnPolicies = async () => [];
-    adapter.artifacts.readQueryArtifact = async () => ({ artifact, rows: [] });
-    adapter.artifacts.assertUsableInGeneration = async () => {};
-    adapter.sql.definition.function.parameters = { properties: { title: {}, sql: {}, plan: {} } };
-    adapter.sql.parseArguments = (value) => value;
-    adapter.sql.execute = async (_args, context) => {
-        artifact = { id: 'a-table', datasourceId: 1, generationId: 'g', executedSql: 'SELECT 1', isLimited: true, analysisContext: structuredClone(context.analysisContext) };
-        context.emitter.send({ type: 'table', queryArtifactId: artifact.id, rows: [{ n: 1 }] });
-        return { succeeded: true, blocks: [], toolResult: JSON.stringify({ queryArtifactId: artifact.id, isLimited: true }) };
-    };
-    adapter.llm.streamWithTools = async (messages, definitions) => {
-        // Follow-up suggestions are a separate generation, outside the analysis rounds.
-        if (!definitions.length)
-            return (async function* () {
-                yield { choices: [{ delta: { content: '[]' } }] };
-            })();
-        if (round++ === 0) {
-            const state = JSON.parse(messages[0].content.match(/<untrusted-analysis-data>(.*?)<\/untrusted-analysis-data>/s)[1]).state;
-            return stream([call('update_analysis_state', { expectedRevision: state.revision, mode: 'patch', reason: '确认查询条件', patch: {} })]);
-        }
-        if (round === 2) return stream([query()]);
-        if (round === 3) return stream([call('display_query_table', { queryArtifactId: artifact.id, title: '样例数据' })]);
-        return stream([]);
-    };
-    await adapter.run({
-        generation: { id: 'g', datasourceId: 1, userId: 1, requestMessageId: 'r', conversationId: 'c', contextUpperBound: '2026-09-15T00:00:00Z', writerToken: 'w' },
-        message: '只要表格',
-        signal: new AbortController().signal,
-        emitter: { send: (event) => events.push(event) },
-        blocks,
-        turnMessages,
-        metrics: { llmCallCount: 0, toolCallCount: 0, sqlCallCount: 0, inputTokensEstimated: 0, outputTokensEstimated: 0 },
-        assertWritable: async () => {},
-        checkpoint: async () => {},
-        onFirstDelta: async () => {},
-    });
-    const tables = events.filter((event) => event.type === 'table');
-    assert.equal(tables.length, 1, 'query previews must not be automatically delivered');
-    assert.equal(tables[0].display, true);
-    assert.equal(tables[0].conversationId, 'c');
-    assert.equal(tables[0].queryArtifactId, 'a-table');
-    assert.equal(round, 4);
-    assert.equal(blocks.at(-1).content, '');
-    assert.deepEqual(blocks.at(-1).analysis.outcome.blocks, []);
-});
-await check('generation selects persisted core and does not call legacy prompt or distiller', async () => {
-    let ran = 0,
-        finalized;
-    const unexpected = () => {
-        throw new Error('legacy must not run');
-    };
-    const generations = {
-        emitter: () => ({ send() {} }),
-        isCancelRequested: async () => false,
-        assertWritable: async () => {},
-        checkpointMessage: async () => {},
-        markFirstDelta: async () => {},
-        recordExecutionMetrics: async () => {},
-        recordSpan: async () => {},
-        drain: async () => {},
-        finalize: async (_g, status) => {
-            finalized = status;
-            return true;
-        },
-    };
-    const service = new ChatService(
-        {},
-        generations,
-        {},
-        {
-            run: async () => {
-                ran++;
-            },
-        }
-    );
-    service.logger = { error() {}, warn() {} };
-    const saved = process.env.ANALYSIS_CORE;
-    process.env.ANALYSIS_CORE = 'legacy';
-    try {
-        await service.runGeneration({ id: 'g', conversationId: 'c', userId: 1, promptPolicyVersion: ANALYSIS_RUNTIME_VERSIONS.promptPolicy }, 'question', 1, () => false);
-    } finally {
-        if (saved === undefined) delete process.env.ANALYSIS_CORE;
-        else process.env.ANALYSIS_CORE = saved;
-    }
-    assert.equal(ran, 1);
-    assert.equal(finalized, 'completed');
-});
-await check('new SQL tool persists evidence even when legacy dual-write is disabled', async () => {
+await check('SQL tool always persists evidence', async () => {
     let persisted, executionOptions;
     const tool = new SqlQueryTool(
         {
@@ -700,31 +183,23 @@ await check('new SQL tool persists evidence even when legacy dual-write is disab
             },
         }
     );
-    const saved = process.env.ARTIFACT_DUAL_WRITE_ENABLED;
-    process.env.ARTIFACT_DUAL_WRITE_ENABLED = '0';
-    try {
-        const result = await tool.execute(
-            { title: '核对', sql: 'SELECT 1', plan: { purpose: '核对', expectedGrain: '一行', expectedShape: 'scalar' } },
-            {
-                analysisCore: true,
-                writerToken: 'writer',
-                generationId: 'g',
-                conversationId: 'c',
-                userId: 1,
-                datasourceId: 1,
-                schemaContextVersion: 'v',
-                signal: new AbortController().signal,
-                assertWritable: async () => {},
-                emitter: { send() {} },
-            }
-        );
-        assert.equal(JSON.parse(result.toolResult).queryArtifactId, 'persisted');
-        assert.equal(persisted.writerToken, 'writer');
-        assert.equal(executionOptions, undefined);
-    } finally {
-        if (saved === undefined) delete process.env.ARTIFACT_DUAL_WRITE_ENABLED;
-        else process.env.ARTIFACT_DUAL_WRITE_ENABLED = saved;
-    }
+    const result = await tool.execute(
+        { title: '核对', sql: 'SELECT 1', plan: { purpose: '核对', expectedGrain: '一行', expectedShape: 'scalar' } },
+        {
+            writerToken: 'writer',
+            generationId: 'g',
+            conversationId: 'c',
+            userId: 1,
+            datasourceId: 1,
+            schemaContextVersion: 'v',
+            signal: new AbortController().signal,
+            assertWritable: async () => {},
+            emitter: { send() {} },
+        }
+    );
+    assert.equal(JSON.parse(result.toolResult).queryArtifactId, 'persisted');
+    assert.equal(persisted.writerToken, 'writer');
+    assert.equal(executionOptions, undefined);
 });
 await check('generation creation always stamps the sole runtime before enqueue', async () => {
     const { GenerationService } = require('../apps/api/dist/chat/generation.service.js');
@@ -745,20 +220,11 @@ await check('generation creation always stamps the sole runtime before enqueue',
                 },
             }),
     };
-    const saved = process.env.ANALYSIS_CORE;
-    try {
-        process.env.ANALYSIS_CORE = 'new';
-        await service.createTurn(1, 'c', 'question', 1, 'key', 'hash', false);
-        const insert = writes.find((w) => w.sql.includes('INSERT INTO generation'));
-        for (const version of Object.values(ANALYSIS_RUNTIME_VERSIONS)) assert.ok(insert.params.includes(version));
-        assert.ok(writes.findIndex((w) => w.sql.includes('outbox_event')) > writes.indexOf(insert));
-        writes.length = 0;
-        delete process.env.ANALYSIS_CORE;
-        await service.createTurn(1, 'c', 'question', 1, 'key2', 'hash', false);
-        assert.ok(writes.find((w) => w.sql.includes('INSERT INTO generation')).params.includes(ANALYSIS_RUNTIME_VERSIONS.promptPolicy));
-    } finally {
-        if (saved === undefined) delete process.env.ANALYSIS_CORE;
-        else process.env.ANALYSIS_CORE = saved;
-    }
+    await service.createTurn(1, 'c', 'question', 1, 'key', 'hash', false);
+    const insert = writes.find((w) => w.sql.includes('INSERT INTO generation'));
+    for (const version of Object.values(ANALYSIS_RUNTIME_VERSIONS)) assert.ok(insert.params.includes(version));
+    assert.ok(writes.findIndex((w) => w.sql.includes('outbox_event')) > writes.indexOf(insert));
 });
 console.log(`analysis core regression: ${checks} groups PASS (mock only, no external services)`);
+
+await import('./prompt-runtime-regression.mjs');

@@ -114,9 +114,7 @@ export function completeActivity(
                 detail('分析粒度', text(state.grain) || '未设置'),
                 detail(
                     '使用记忆',
-                    Array.isArray(state.memoryRefs)
-                        ? state.memoryRefs.map((item: unknown) => `${text(record(item).id)} · v${text(record(item).version)}`).filter(Boolean)
-                        : []
+                    Array.isArray(state.memoryRefs) ? state.memoryRefs.map((item: unknown) => `${text(record(item).id)} · v${text(record(item).version)}`).filter(Boolean) : []
                 ),
                 detail('临时约定', Array.isArray(state.temporaryNotes) ? state.temporaryNotes.map((item: unknown) => text(record(item).name)).filter(Boolean) : []),
             ])
@@ -156,13 +154,7 @@ export function completeActivity(
         );
     } else if (toolName === 'generate_chart') {
         const yFields = Array.isArray(args.yFields) ? args.yFields.map((item) => `${text(record(item).label)}（${text(record(item).field)}）`) : [];
-        details.push(
-            ...compact([
-                detail('数值字段', yFields),
-                detail('筛选条件', Array.isArray(args.filters) && args.filters.length ? JSON.stringify(args.filters) : '无'),
-                detail('排序规则', Array.isArray(args.sort) && args.sort.length ? JSON.stringify(args.sort) : '无'),
-            ])
-        );
+        details.push(...compact([detail('数值字段', yFields), detail('排序规则', Array.isArray(args.sort) && args.sort.length ? JSON.stringify(args.sort) : '无')]));
     }
     const durationMs = Math.max(0, completedAt.getTime() - new Date(activity.startedAt).getTime());
     const queryArtifactId = text(data.queryArtifactId);
