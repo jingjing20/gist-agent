@@ -205,6 +205,7 @@ export function normalizeSql(sql: string): string {
 
 export * from './memory-schema';
 export * from './memory-repository';
+export * from './memory-policy';
 export * from './analysis-state-schema';
 
 export * from './schema';

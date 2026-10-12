@@ -16,7 +16,9 @@
                     <Select :model-value="datasourceId ? String(datasourceId) : undefined" :disabled="busy" @update:model-value="selectSource">
                         <SelectTrigger class="w-full" aria-labelledby="source-label"><SelectValue placeholder="请选择数据源" /></SelectTrigger>
                         <SelectContent class="memory-ui"
-                            ><SelectGroup><SelectItem v-for="ds in sources.list" :key="ds.id" :value="String(ds.id)">{{ ds.name }}</SelectItem></SelectGroup></SelectContent
+                            ><SelectGroup
+                                ><SelectItem v-for="ds in sources.list" :key="ds.id" :value="String(ds.id)">{{ ds.name }}</SelectItem></SelectGroup
+                            ></SelectContent
                         >
                     </Select>
                 </div>
@@ -47,21 +49,16 @@
                     <p class="mt-1 text-sm text-muted-foreground">检查完整内容后保存到记忆，或放弃候选。</p>
                 </div>
                 <div class="grid gap-3">
-                    <article
+                    <MemoryCandidateCard
                         v-for="candidate in candidates"
                         :key="candidate.id"
-                        class="flex flex-wrap items-center justify-between gap-5 rounded-xl border border-border bg-card p-5"
-                    >
-                        <div class="min-w-0 flex-1">
-                            <h3 class="font-medium">{{ candidate.content.name }}</h3>
-                            <p class="mt-2 whitespace-pre-wrap wrap-break-word text-sm leading-6 text-muted-foreground">{{ candidate.content.description }}</p>
-                            <p v-if="candidate.memoryId" class="mt-2 text-xs text-muted-foreground">修改现有记忆 · 目标版本 {{ candidate.expectedVersion }}</p>
-                        </div>
-                        <div class="flex gap-2">
-                            <Button variant="outline" :disabled="busy" @click="decide(candidate, false)">放弃</Button
-                            ><Button :disabled="busy" @click="decide(candidate, true)">保存到记忆</Button>
-                        </div>
-                    </article>
+                        :candidate="candidate"
+                        :source-name="sources.list.find((source) => source.id === candidate.datasourceId)?.name"
+                        :busy="busy"
+                        @saved="refresh"
+                        @reject="decide(candidate, false)"
+                        @busy="busy = $event"
+                    />
                 </div>
             </section>
 
@@ -95,9 +92,7 @@
                                         <Button variant="ghost" size="sm" @click="viewing = item">查看</Button
                                         ><Button variant="ghost" size="sm" :disabled="!canWrite || busy" @click="startEdit(item)">修改</Button
                                         ><Button variant="ghost" size="sm" :disabled="busy" @click="openHistory(item)">历史</Button
-                                        ><Button variant="ghost" size="sm" class="text-destructive" :disabled="!canWrite || busy" @click="deleting = item"
-                                            >删除</Button
-                                        >
+                                        ><Button variant="ghost" size="sm" class="text-destructive" :disabled="!canWrite || busy" @click="deleting = item">删除</Button>
                                     </div></TableCell
                                 ></TableRow
                             >
@@ -122,18 +117,19 @@
                     ><DialogTitle>{{ editing?.id ? '修改记忆' : '新增记忆' }}</DialogTitle
                     ><DialogDescription>保存即确认这条记忆，用于此数据源后续分析。</DialogDescription></DialogHeader
                 >
-                <div class="grid gap-3">
-                    <label for="memory-name" class="text-sm font-medium">标题</label><Input id="memory-name" v-model="form.name" maxlength="200" /><label
-                        for="memory-description"
-                        class="text-sm font-medium"
-                        >内容</label
-                    ><Textarea id="memory-description" v-model="form.description" rows="7" />
-                </div>
-                <DialogFooter
-                    ><Button variant="outline" :disabled="busy" @click="editing = null">取消</Button><Button :disabled="busy" @click="save">确认保存</Button></DialogFooter
-                ></DialogContent
-            ></Dialog
-        >
+                <MemoryEditor
+                    v-if="editing"
+                    :datasource-id="datasourceId"
+                    :content="form"
+                    :memory-id="editing.id"
+                    :expected-version="editing.version"
+                    @saved="
+                        editing = null;
+                        refresh();
+                    "
+                    @cancel="editing = null"
+                    @busy="busy = $event" /></DialogContent
+        ></Dialog>
         <Dialog :open="!!viewing" @update:open="closeViewing"
             ><DialogContent class="memory-ui sm:max-w-xl"
                 ><DialogHeader
@@ -142,7 +138,16 @@
                 >
                 <div class="max-h-[50vh] overflow-auto whitespace-pre-wrap wrap-break-word text-sm leading-7">{{ viewing?.description }}</div>
                 <DialogFooter
-                    ><Button variant="outline" @click="viewing = null">关闭</Button><Button :disabled="!canWrite || busy" @click="editViewed">修改记忆</Button></DialogFooter
+                    ><Button variant="outline" @click="viewing = null">关闭</Button><Button :disabled="!canWrite || busy" @click="editViewed">修改记忆</Button
+                    ><Button
+                        variant="destructive"
+                        :disabled="!canWrite || busy"
+                        @click="
+                            deleting = viewing;
+                            viewing = null;
+                        "
+                        >删除记忆</Button
+                    ></DialogFooter
                 ></DialogContent
             ></Dialog
         >
@@ -189,15 +194,18 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Table, TableBody, TableCell, TableEmpty, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import MemoryEditor from '../components/MemoryEditor.vue';
+import MemoryCandidateCard from '../components/MemoryCandidateCard.vue';
+import { useRoute } from 'vue-router';
 import { Badge } from '@/components/ui/badge';
 import { BookOpen, Plus, Search } from '@lucide/vue';
 import { apiFetch } from '../api';
 import { useDataSourceStore } from '../stores/datasource';
 import { useAuthStore } from '../stores/auth';
-import type { DatasourceMemory, MemoryCandidate, MemoryContent } from '@gist/contracts';
+import type { DatasourceMemory, MemoryCandidate } from '@gist/contracts';
 const sources = useDataSourceStore(),
     auth = useAuthStore();
+const route = useRoute();
 const datasourceId = ref(0),
     search = ref(''),
     error = ref(''),
@@ -276,8 +284,29 @@ watch(datasourceId, () => {
 });
 onMounted(async () => {
     await sources.fetchAll();
-    if (sources.list.length) datasourceId.value = sources.list[0]!.id;
+    const requested = Number(route.query.datasourceId);
+    datasourceId.value = sources.list.some((s) => s.id === requested) ? requested : (sources.list[0]?.id ?? 0);
+    await openLinkedMemory();
 });
+async function openLinkedMemory() {
+    const id = route.query.memoryId;
+    if (typeof id !== 'string' || !datasourceId.value) return;
+    const ds = datasourceId.value;
+    try {
+        const memory: DatasourceMemory = await request(`/memories/${encodeURIComponent(id)}`);
+        if (datasourceId.value === ds && memory.datasourceId === ds && memory.status === 'active') viewing.value = memory;
+    } catch (e) {
+        if (datasourceId.value === ds) error.value = (e as Error).message;
+    }
+}
+watch(
+    () => [route.query.datasourceId, route.query.memoryId],
+    async () => {
+        const ds = Number(route.query.datasourceId);
+        if (sources.list.some((s) => s.id === ds)) datasourceId.value = ds;
+        await openLinkedMemory();
+    }
+);
 function startEdit(item?: DatasourceMemory) {
     editing.value = item ? { id: item.id, version: item.version } : {};
     Object.assign(form, { name: item?.name ?? '', description: item?.description ?? '' });
@@ -299,18 +328,6 @@ async function mutate(fn: () => Promise<unknown>) {
     } finally {
         busy.value = false;
     }
-}
-function save() {
-    if (!editing.value) return;
-    const edit = editing.value;
-    const content: MemoryContent = { name: form.name, description: form.description };
-    return mutate(async () => {
-        await request(edit.id ? `/memories/${edit.id}` : '/memories', edit.id ? 'PATCH' : 'POST', {
-            ...content,
-            ...(edit.id ? { expectedVersion: edit.version } : { datasourceId: datasourceId.value }),
-        });
-        editing.value = null;
-    });
 }
 function remove() {
     const item = deleting.value;

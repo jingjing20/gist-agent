@@ -252,6 +252,7 @@ export interface ConversationEvent {
         | 'log_update'
         | 'log_remove'
         | 'analysis_activity'
+        | 'memory_notice'
         | 'suggestions'
         | 'analysis_activity_remove';
     [key: string]: unknown;

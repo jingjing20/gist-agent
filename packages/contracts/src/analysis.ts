@@ -3,7 +3,7 @@ export const ANALYSIS_RUNTIME_VERSIONS = {
     promptPolicy: 'analysis-core-v3',
     toolset: 'analysis-tools-v4',
     contextPolicy: 'analysis-context-v3',
-    memoryPolicy: 'datasource-memory-v1',
+    memoryPolicy: 'datasource-memory-v2',
     schemaContext: 'schema-context-v4',
 } as const;
 

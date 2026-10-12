@@ -37,6 +37,14 @@ class MemoryController {
     @Get(':id') get(@CurrentUser() user: User, @Param('id') id: string, @Query('version') version?: string) {
         return http(() => this.memories.get(user.id, id, version === undefined ? undefined : positiveInteger(version)));
     }
+    @Post('related') related(@CurrentUser() user: User, @Body() body: unknown) {
+        return http(() => {
+            const b = bodyObject(body);
+            if (Object.keys(b).some((k) => !['datasourceId', 'content', 'excludeId'].includes(k))) throw new MemoryError(400, '存在不允许的字段');
+            if (b.excludeId !== undefined && typeof b.excludeId !== 'string') throw new MemoryError(400, '记忆 ID 格式错误');
+            return this.memories.related(user.id, positiveInteger(b.datasourceId), b.content, b.excludeId as string | undefined);
+        });
+    }
     @Post() create(@CurrentUser() user: User, @Body() body: unknown) {
         return http(() => {
             const { datasourceId, ...content } = bodyObject(body);
@@ -64,8 +72,23 @@ class CandidateController {
     private decide(user: User, id: string, body: unknown, accept: boolean) {
         return http(() => {
             const b = bodyObject(body);
-            if (Object.keys(b).some((k) => k !== 'expectedVersion')) throw new MemoryError(400, '存在不允许的字段');
-            return this.memories.decide(user.id, id, positiveInteger(b.expectedVersion), accept);
+            const allowed = accept ? ['expectedVersion', 'content', 'memoryId', 'expectedMemoryVersion'] : ['expectedVersion'];
+            if (Object.keys(b).some((k) => !allowed.includes(k))) throw new MemoryError(400, '存在不允许的字段');
+            if (b.memoryId !== undefined && (typeof b.memoryId !== 'string' || b.content === undefined)) throw new MemoryError(400, '替换记忆需要完整内容和目标 ID');
+            if (b.expectedMemoryVersion !== undefined && b.memoryId === undefined) throw new MemoryError(400, '请选择要替换的记忆');
+            return this.memories.decide(
+                user.id,
+                id,
+                positiveInteger(b.expectedVersion),
+                accept,
+                b.content === undefined
+                    ? undefined
+                    : {
+                          content: b.content,
+                          memoryId: b.memoryId as string | undefined,
+                          expectedMemoryVersion: b.expectedMemoryVersion === undefined ? undefined : positiveInteger(b.expectedMemoryVersion),
+                      }
+            );
         });
     }
     @Post(':id/confirm') confirm(@CurrentUser() user: User, @Param('id') id: string, @Body() body: unknown) {

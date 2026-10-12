@@ -40,6 +40,7 @@ import { useChatStore } from '../stores/chat';
 import { computed, provide, ref, type Component } from 'vue';
 import { textPlaybackKey } from '../utils/text-playback';
 import AnalysisBlock from './blocks/AnalysisBlock.vue';
+import MemoryNoticeBlock from './blocks/MemoryNoticeBlock.vue';
 import ArtifactResult from './blocks/ArtifactResult.vue';
 import AnalysisProcessBlock from './blocks/AnalysisProcessBlock.vue';
 import SqlBlock from './blocks/SqlBlock.vue';
@@ -59,6 +60,7 @@ const chat = useChatStore();
 const playingRenderers = new Set<symbol>();
 const playingTextCount = ref(0);
 provide(textPlaybackKey, {
+    isPlaying: computed(() => playingTextCount.value > 0),
     setPlaying(token, playing) {
         if (playing) playingRenderers.add(token);
         else playingRenderers.delete(token);
@@ -106,6 +108,7 @@ const blockMap: Record<string, Component> = {
     log: LogBlock,
     chart: ChartBlock,
     suggestions: SuggestionBlock,
+    memory_notice: MemoryNoticeBlock,
 };
 
 function blockComponent(type: string): Component {
@@ -113,6 +116,7 @@ function blockComponent(type: string): Component {
 }
 
 function blockProps(block: MessageBlock): Record<string, unknown> {
+    if (block.type === 'memory_notice') return { notice: block.memoryNotice };
     if (block.type === 'suggestions') return { items: block.items || [], disabled: chat.isLoading || suggestionSending.value };
     if (block.type === 'chart' || block.type === 'table') return { block, conversationId: block.conversationId || chat.activeConversationId };
     if (block.analysis) return { analysis: block.analysis, charts: reportCharts.value, messageId: props.msg.id, isStreaming: props.isStreaming || !!props.msg.animateText };

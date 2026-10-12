@@ -19,6 +19,7 @@ import { AnalysisAgent } from './analysis-agent';
 import { record } from './tool-arguments';
 import { buildAnalysisPrompt, buildAnalysisData, ANALYSIS_PROMPT_METADATA } from './analysis-prompt';
 import { ProposeMemoryTool } from './propose-memory-tool';
+import { prepareConversationMemory } from './prepare-conversation-memory';
 import { AnalysisStateRepository } from './analysis-state.repository';
 import { analysisTools, type AnalysisSession } from './analysis-tools';
 import { evidenceMismatch } from './analysis-state';
@@ -62,39 +63,6 @@ export class AnalysisRuntimeAdapter {
                 throw e;
             }
         };
-        await access();
-        const catalog = await this.schema.getSchemaCatalogSummary(g.datasourceId, g.userId);
-        const memoriesRepository = new MemoryRepository(this.db),
-            states = new AnalysisStateRepository(this.db);
-        const explicitMemory = input.message.match(/^\s*(?:请|帮我|请帮我)?记住(?:这条|以下|下面)?(?:规则|口径|信息|内容)?\s*[：:，,]\s*([\s\S]+)$/);
-        if (explicitMemory) {
-            const description = explicitMemory[1].trim();
-            await memoriesRepository.rememberFromConversation(g.userId, catalog.datasourceId, g.requestMessageId, {
-                name: description.split(/\n/)[0].slice(0, 80),
-                description,
-            });
-        }
-        const draft = await states.begin(g, catalog.datasourceId, input.message, await memoriesRepository.snapshot(g.userId, catalog.datasourceId));
-        const session: AnalysisSession = { ...draft, observed: new Map(), loadedSchema: new Map(), prepared: false };
-        const history = await states.history(g, catalog.datasourceId);
-        const evidenceIndex = await this.artifacts.listAnalysisEvidence(g.userId, g.conversationId, catalog.datasourceId);
-        const anchor = new Date(g.contextUpperBound).toISOString();
-        const snapshot = (): AnalysisRunSnapshot => ({
-            taskId: session.state.taskId,
-            datasourceId: catalog.datasourceId,
-            stateRevision: session.state.revision,
-            requestMessageId: g.requestMessageId,
-            question: input.message,
-            timeAnchor: anchor,
-            memoryRefs: session.state.memoryRefs,
-            schemaTables: [...session.loadedSchema.keys()].sort(),
-        });
-        const selectedMemories = () => session.memories.filter((d) => session.state.memoryRefs.some((r) => r.id === d.id && r.version === d.version));
-        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-            { role: 'system', content: '' },
-            { role: 'user', content: input.message },
-        ];
-        const reports: unknown[] = [];
         const emit = (event: SSEEvent) => {
             if (event.type === 'table' && !event.display) return;
             if (signal.aborted) throw signal.reason ?? new GenerationExecutionError('CANCELLED', '已取消');
@@ -121,6 +89,43 @@ export class AnalysisRuntimeAdapter {
                 }
             } else input.blocks.push(event);
         };
+        await access();
+        const catalog = await this.schema.getSchemaCatalogSummary(g.datasourceId, g.userId);
+        const memoriesRepository = new MemoryRepository(this.db),
+            states = new AnalysisStateRepository(this.db);
+        const memoryNotice = await prepareConversationMemory(memoriesRepository, {
+            userId: g.userId,
+            datasourceId: catalog.datasourceId,
+            generationId: g.id,
+            writerToken: g.writerToken,
+            requestMessageId: g.requestMessageId,
+            message: input.message,
+        });
+        if (memoryNotice) {
+            emit({ type: 'memory_notice', memoryNotice });
+            await input.checkpoint();
+        }
+        const draft = await states.begin(g, catalog.datasourceId, input.message, await memoriesRepository.snapshot(g.userId, catalog.datasourceId));
+        const session: AnalysisSession = { ...draft, observed: new Map(), loadedSchema: new Map(), prepared: false };
+        const history = await states.history(g, catalog.datasourceId);
+        const evidenceIndex = await this.artifacts.listAnalysisEvidence(g.userId, g.conversationId, catalog.datasourceId);
+        const anchor = new Date(g.contextUpperBound).toISOString();
+        const snapshot = (): AnalysisRunSnapshot => ({
+            taskId: session.state.taskId,
+            datasourceId: catalog.datasourceId,
+            stateRevision: session.state.revision,
+            requestMessageId: g.requestMessageId,
+            question: input.message,
+            timeAnchor: anchor,
+            memoryRefs: session.state.memoryRefs,
+            schemaTables: [...session.loadedSchema.keys()].sort(),
+        });
+        const selectedMemories = () => session.memories.filter((d) => session.state.memoryRefs.some((r) => r.id === d.id && r.version === d.version));
+        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+            { role: 'system', content: '' },
+            { role: 'user', content: input.message },
+        ];
+        const reports: unknown[] = [];
         const context: ToolContext = {
             emitter: { send: emit },
             signal,
@@ -255,6 +260,7 @@ export class AnalysisRuntimeAdapter {
                                 content: buildAnalysisData(snapshot(), selectedMemories(), {
                                     ...session.state,
                                     memoryChanges: session.memoryChanges,
+                                    memoryAction: memoryNotice,
                                     observedEvidence: [...session.observed.values()].map((a) => ({
                                         id: a.id,
                                         queriedAt: a.createdAt,

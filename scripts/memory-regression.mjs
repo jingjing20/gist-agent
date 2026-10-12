@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { MemoryRepository, validateMemory, positiveInteger, MemoryError } = require('../packages/database/dist/index.js');
+const { MemoryRepository, validateMemory, positiveInteger, MemoryError, MemoryReviewRequired, parseMemoryIntent, relatedMemories } = require('../packages/database/dist/index.js');
 let checks = 0;
 async function check(name, fn) {
     await fn();
@@ -77,6 +77,8 @@ function harness() {
         }
         if (sql.startsWith('SELECT request_message_id'))
             return ['running', 'starting'].includes(state.generation.status) && p[1] === 1 && p[2] === 1 && p[3] === 'writer' ? [state.generation] : [];
+        if (sql.startsWith('SELECT id FROM datasource_memory_candidate'))
+            return state.candidates.filter((c) => c.generation_id === p[0] && JSON.stringify(c.content) === p[1] && c.memory_id === p[2] && c.expected_version === p[3]);
         if (sql.startsWith('SELECT COUNT(*)')) return [{ count: state.candidates.length }];
         if (sql.startsWith('INSERT INTO datasource_memory_candidate')) {
             state.candidates.push({
@@ -210,5 +212,64 @@ await check('free-text memory can be edited without a type schema', async () => 
     const result = await h.repo.update(1, id, 1, { description: '新的业务约定' });
     assert.equal(result.description, '新的业务约定');
     assert.equal(result.version, 2);
+});
+await check('explicit syntax keeps analysis requests out of memory and retains multiline rules', async () => {
+    assert.equal(parseMemoryIntent('请分析销售额'), null);
+    assert.equal(parseMemoryIntent('记住：有效订单不包含退款订单').mode, 'save');
+    assert.equal(parseMemoryIntent('记住：收入按支付时间统计，退款金额从收入中扣除').mode, 'save');
+    assert.equal(parseMemoryIntent('记住：统计口径按支付时间计算').mode, 'save');
+    const mixed = parseMemoryIntent('记住：有效订单不包含退款订单。另外帮我看看上个月的销售额。');
+    assert.equal(mixed.mode, 'review');
+    assert.equal(mixed.content.description, '有效订单不包含退款订单');
+    const multiline = parseMemoryIntent('记住：有效订单不包含退款订单。\n金额单位为元。\n另外帮我看看销售额');
+    assert.equal(multiline.content.description, '有效订单不包含退款订单。\n金额单位为元');
+    assert.equal(parseMemoryIntent('记住：退款订单不再排除').mode, 'review');
+    assert.equal(parseMemoryIntent('记住：刚才那个口径').content, undefined);
+    assert.equal(parseMemoryIntent('记住：有效订单应该排除什么？').content, undefined);
+    assert.equal(parseMemoryIntent('记住：有效订单不包含退款订单并帮我查询销售额').content, undefined);
+});
+await check('text matches flag duplicates and related wording without claiming semantic conflict', async () => {
+    const base = { id, status: 'active', name: '有效订单口径', description: '有效订单不包含退款订单' };
+    assert.equal(relatedMemories({ name: '另一个标题', description: base.description }, [base])[0].reason, 'same_content');
+    assert.equal(relatedMemories({ name: '订单规则', description: '有效订单包含退款订单' }, [base])[0].reason, 'similar_content');
+    assert.deepEqual(relatedMemories({ name: '时区', description: '业务时区为上海' }, [base]), []);
+    assert.deepEqual(relatedMemories(base, [base], id), []);
+    assert.deepEqual(relatedMemories(base, [{ ...base, status: 'deleted' }]), []);
+});
+await check('related lookup authorizes datasource and direct save defers duplicate content', async () => {
+    const h = harness();
+    await h.repo.create(1, 1, content);
+    await fails(() => h.repo.related(3, 1, content), 404);
+    assert.equal((await h.repo.related(2, 1, content)).length, 1);
+    assert.deepEqual(await h.repo.related(1, 1, content, id), []);
+    await assert.rejects(() => h.repo.rememberFromConversation(1, 1, cid, { ...content, name: '不同标题' }), MemoryReviewRequired);
+    assert.equal(h.state().memories.length, 1);
+});
+await check('repeated proposals within a generation return the same candidate', async () => {
+    const h = harness();
+    h.state().generation.status = 'running';
+    const a = await h.repo.propose(1, 1, 'g', 'writer', { content });
+    const b = await h.repo.propose(1, 1, 'g', 'writer', { content });
+    assert.equal(a.candidateId, b.candidateId);
+    assert.equal(h.state().candidates.length, 1);
+});
+await check('edited confirmation replaces only the explicitly chosen datasource version', async () => {
+    const h = harness();
+    await h.repo.create(1, 1, content);
+    h.state().generation.status = 'running';
+    await h.repo.propose(1, 1, 'g', 'writer', { content: { name: '候选', description: '待编辑' } });
+    h.state().generation.status = 'completed';
+    const edit = { content: { name: '激活率', description: '确认后的完整口径' }, memoryId: id, expectedMemoryVersion: 1 };
+    await fails(() => h.repo.decide(1, cid, 1, true, { ...edit, memoryId: '00000000-0000-4000-8000-000000000009' }), 404);
+    await fails(() => h.repo.decide(1, cid, 1, true, { ...edit, expectedMemoryVersion: 9 }), 409);
+    await fails(() => h.repo.decide(1, cid, 1, false, edit), 400);
+    assert.equal(h.state().candidates[0].status, 'pending');
+    const saved = await h.repo.decide(1, cid, 1, true, edit);
+    assert.equal(saved.version, 2);
+    assert.equal(h.state().memories.length, 1);
+    assert.equal((await h.repo.get(1, id)).description, edit.content.description);
+    assert.equal((await h.repo.get(1, id, 1)).description, content.description);
+    await h.repo.decide(1, cid, 1, true, edit);
+    assert.equal(h.state().revisions.length, 2);
 });
 console.log(`${checks} datasource memory mock groups passed (no external services)`);

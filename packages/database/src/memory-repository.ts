@@ -1,5 +1,6 @@
 import type { DatasourceMemory, MemoryContent, MemoryCandidate } from '@gist/contracts';
 import type { DatabaseClient, QueryRow } from './index';
+import { relatedMemories } from './memory-policy';
 
 type Session = { query(sql: string, params?: unknown[]): Promise<QueryRow[]> };
 export class MemoryError extends Error {
@@ -8,6 +9,11 @@ export class MemoryError extends Error {
         message: string
     ) {
         super(message);
+    }
+}
+export class MemoryReviewRequired extends MemoryError {
+    constructor() {
+        super(409, '发现同名或相似记忆，请核对是否重复或口径冲突后确认。');
     }
 }
 export function positiveInteger(value: unknown): number {
@@ -25,8 +31,7 @@ function text(v: unknown, max = 4000): string {
     return v.trim();
 }
 export function validateMemory(v: unknown): MemoryContent {
-    if (!object(v) || Object.keys(v).some((k) => !['name', 'description'].includes(k)))
-        throw new MemoryError(400, '存在不允许的记忆字段');
+    if (!object(v) || Object.keys(v).some((k) => !['name', 'description'].includes(k))) throw new MemoryError(400, '存在不允许的记忆字段');
     return { name: text(v.name, 200), description: text(v.description) };
 }
 const normalizedName = (name: string) => name.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -100,6 +105,12 @@ export class MemoryRepository {
             return rows.map((r) => record(r));
         });
     }
+    async related(user: number, ds: number, body: unknown, excludeId?: string) {
+        positiveInteger(ds);
+        const content = validateMemory(body);
+        if (excludeId !== undefined) memoryId(excludeId);
+        return relatedMemories(content, await this.snapshot(user, ds), excludeId);
+    }
     async get(user: number, id: string, version?: number): Promise<DatasourceMemory> {
         memoryId(id);
         if (version !== undefined) positiveInteger(version);
@@ -156,14 +167,13 @@ export class MemoryRepository {
         const content = validateMemory(body);
         return this.transaction(async (session) => {
             await this.authorize(session, ds, user, true);
-            const existing = await session.query(
-                `${SELECT} WHERE d.datasource_id=? AND r.source_message_id=?`,
-                [ds, sourceMessageId]
-            );
+            const existing = await session.query(`${SELECT} WHERE d.datasource_id=? AND r.source_message_id=?`, [ds, sourceMessageId]);
             if (existing.length) {
                 const current = await session.query(`${SELECT} WHERE d.id=? AND r.version=d.version`, [existing[0].id]);
                 return record(current[0]);
             }
+            const active = await session.query(`${SELECT} WHERE d.datasource_id=? AND d.status='active' AND r.version=d.version ORDER BY d.id`, [ds]);
+            if (relatedMemories(content, active.map(record)).length) throw new MemoryReviewRequired();
             return this.save(session, user, ds, content, undefined, undefined, sourceMessageId);
         });
     }
@@ -203,6 +213,11 @@ export class MemoryRepository {
                 if (!target.length) throw new MemoryError(404, '目标定义不可访问');
                 if (target[0].version !== input.expectedVersion) throw new MemoryError(409, '目标记忆已变化');
             }
+            const existing = await s.query(
+                'SELECT id FROM datasource_memory_candidate WHERE generation_id=? AND content=?::jsonb AND memory_id IS NOT DISTINCT FROM ?::uuid AND expected_version IS NOT DISTINCT FROM ?::integer',
+                [generationId, JSON.stringify(content), input.memoryId ?? null, input.expectedVersion ?? null]
+            );
+            if (existing.length) return { candidateId: existing[0].id, status: 'draft', message: '此候选已存在；尚未保存为正式记忆' };
             const count = await s.query('SELECT COUNT(*)::int AS count FROM datasource_memory_candidate WHERE generation_id=?', [generationId]);
             if (count[0].count >= 10) throw new MemoryError(409, '本轮候选已达上限');
             const rows = await s.query(
@@ -210,7 +225,7 @@ export class MemoryRepository {
              VALUES (?,?,?,?,?,?,?::jsonb) RETURNING id`,
                 [ds, user, generationId, generations[0].request_message_id, input.memoryId ?? null, input.expectedVersion ?? null, JSON.stringify(content)]
             );
-            return { candidateId: rows[0].id, status: 'draft', message: '任务成功后可在记忆页面确认；尚未保存为正式记忆' };
+            return { candidateId: rows[0].id, status: 'draft', message: '任务成功后请在下方候选卡片核对并保存，保存后用于后续分析' };
         });
     }
     async candidates(user: number, ds: number, conversationId?: string): Promise<MemoryCandidate[]> {
@@ -237,9 +252,15 @@ export class MemoryRepository {
             }));
         });
     }
-    async decide(user: number, id: string, expected: number, accept: boolean) {
+    async decide(user: number, id: string, expected: number, accept: boolean, edit?: { content: unknown; memoryId?: string; expectedMemoryVersion?: number }) {
         memoryId(id);
         positiveInteger(expected);
+        const editedContent = edit ? validateMemory(edit.content) : undefined;
+        if (edit && !accept) throw new MemoryError(400, '放弃候选时不能修改内容');
+        if (edit?.memoryId !== undefined) {
+            memoryId(edit.memoryId);
+            positiveInteger(edit.expectedMemoryVersion);
+        } else if (edit?.expectedMemoryVersion !== undefined) throw new MemoryError(400, '请选择要替换的记忆');
         return this.transaction(async (s) => {
             const rows = await s.query(
                 `SELECT c.* FROM datasource_memory_candidate c JOIN generation g ON g.id=c.generation_id
@@ -249,11 +270,18 @@ export class MemoryRepository {
             if (!rows.length) throw new MemoryError(404, '候选不可访问');
             const c = rows[0];
             await this.authorize(s, c.datasource_id, user, true);
-            if (c.status === (accept ? 'accepted' : 'rejected') && expected === c.version - 1)
-                return { status: c.status, memoryId: c.result_memory_id, version: c.result_version };
+            if (c.status === (accept ? 'accepted' : 'rejected') && expected === c.version - 1) return { status: c.status, memoryId: c.result_memory_id, version: c.result_version };
             if (c.status !== 'pending' || c.version !== expected) throw new MemoryError(409, '候选已变化，请刷新后重试');
             const result = accept
-                ? await this.save(s, user, c.datasource_id, validateMemory(c.content), c.memory_id ?? undefined, c.expected_version ?? undefined, c.source_message_id)
+                ? await this.save(
+                      s,
+                      user,
+                      c.datasource_id,
+                      editedContent ?? validateMemory(c.content),
+                      edit?.memoryId ?? c.memory_id ?? undefined,
+                      edit?.expectedMemoryVersion ?? c.expected_version ?? undefined,
+                      c.source_message_id
+                  )
                 : null;
             await s.query('UPDATE datasource_memory_candidate SET status=?,version=version+1,result_memory_id=?,result_version=? WHERE id=?', [
                 accept ? 'accepted' : 'rejected',
@@ -265,4 +293,3 @@ export class MemoryRepository {
         });
     }
 }
-

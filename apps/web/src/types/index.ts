@@ -1,5 +1,6 @@
-import type { AnalysisActivityV1, AnalysisOutcome, AnalysisState, SuggestionItem } from '@gist/contracts';
+import type { AnalysisActivityV1, AnalysisOutcome, AnalysisState, SuggestionItem, DatasourceMemory, MemoryNotice } from '@gist/contracts';
 export interface AnalysisPresentation {
+    memories?: DatasourceMemory[];
     outcome: AnalysisOutcome;
     state: AnalysisState;
     snapshot: { requestMessageId: string };
@@ -25,6 +26,7 @@ export interface SSEEvent {
     display?: boolean;
     conversationId?: string;
     analysis?: AnalysisPresentation;
+    memoryNotice?: MemoryNotice;
     type:
         | 'sql'
         | 'table'
@@ -40,6 +42,7 @@ export interface SSEEvent {
         | 'log_update'
         | 'log_remove'
         | 'analysis_activity'
+        | 'memory_notice'
         | 'suggestions'
         | 'analysis_activity_remove';
     content?: string;
@@ -66,6 +69,7 @@ export interface MessageBlock {
     display?: boolean;
     conversationId?: string;
     analysis?: AnalysisPresentation;
+    memoryNotice?: MemoryNotice;
     type: SSEEvent['type'];
     content?: string;
     columns?: string[];

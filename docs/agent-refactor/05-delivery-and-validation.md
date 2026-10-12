@@ -28,6 +28,7 @@
 | pnpm typecheck / pnpm build | 类型及构建 |
 | pnpm test:analysis-core | 模型循环、工具协议、提交和预算 |
 | pnpm test:memories | 记忆及候选规则 |
+| pnpm test:memory-workflow | 明确记忆指令、混合请求、保存回执与候选分流（mock 仓库） |
 | pnpm test:analysis-state | 多轮状态、草稿、上下文和证据复用 |
 | pnpm test:analysis-presentation | 证据接口、分页和展示资产结构 |
 | pnpm test:analysis-cutover | 唯一入口及退役约束 |

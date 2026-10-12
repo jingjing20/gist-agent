@@ -95,7 +95,11 @@ export const useChatStore = defineStore('chat', () => {
     async function deleteConversation(id: string) {
         const running = Object.values(generations.value).find((g) => g.conversationId === id && ['pending', 'running'].includes(g.status));
         if (running) await cancelGeneration(running.id);
-        await apiFetch(`/conversations/${id}`, { method: 'DELETE' });
+        const response = await apiFetch(`/conversations/${id}`, { method: 'DELETE' });
+        if (!response.ok) {
+            const error = await response.json().catch(() => ({}));
+            throw new Error(error.message || '删除失败，请重试');
+        }
         conversations.value = conversations.value.filter((c) => c.id !== id);
         if (activeConversationId.value === id) {
             const next = conversations.value[0]?.id;
@@ -272,6 +276,7 @@ export const useChatStore = defineStore('chat', () => {
             display: event.display,
             conversationId: event.conversationId,
             analysis: event.analysis,
+            memoryNotice: event.memoryNotice,
             type: event.type,
             content: event.content,
             columns: event.columns,
