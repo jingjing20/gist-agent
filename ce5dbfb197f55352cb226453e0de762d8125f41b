@@ -1,0 +1,58 @@
+apps/web/src/components/ChatMessageItem.vue
+  ff04539946d1aa6f 17-23,29,63,67-69,71,96,242-245
+apps/worker/src/analysis/analysis-prompt.ts
+  ff04539946d1aa6f 25-28,36
+apps/worker/src/analysis/analysis-agent.ts
+  ff04539946d1aa6f 13,57-63,65,67,84,107-113,120-122,129,163-176,179-181,189,210,230-244,255-263,268,283-293,309-310,329,344
+scripts/analysis-narrative-regression.mjs
+  ff04539946d1aa6f 1-85
+apps/worker/src/chat/text-event-buffer.ts
+  ff04539946d1aa6f 1-28
+scripts/prompt-runtime-regression.mjs
+  ff04539946d1aa6f 89-93,113,115-125
+apps/web/scripts/check-streaming-text.mjs
+  ff04539946d1aa6f 37,125,129-132,160,171,183,196
+apps/web/src/stores/chat.ts
+  ff04539946d1aa6f 78,82-91,234-236
+scripts/text-event-buffer-regression.mjs
+  ff04539946d1aa6f 1-42
+apps/web/src/components/blocks/AnalysisBlock.vue
+  ff04539946d1aa6f 7,15,134-139
+apps/web/src/components/blocks/MarkdownBlock.vue
+  ff04539946d1aa6f 2,16,19,22,33-36,38,40,49,56
+apps/web/scripts/check-analysis-process.mjs
+  ff04539946d1aa6f 87-91,142,148-166,188
+scripts/analysis-text-channel-regression.mjs
+  ff04539946d1aa6f 81,124,128-170
+apps/worker/src/chat/generation.service.ts
+  ff04539946d1aa6f 10,55,193-195,197-204,208-214
+apps/worker/src/analysis/analysis-narrative.ts
+  ff04539946d1aa6f 1-20
+apps/web/src/components/blocks/AnalysisProcessBlock.vue
+  ff04539946d1aa6f 6,125,131,136,265,271-272
+apps/web/src/utils/text-playback.ts
+  ff04539946d1aa6f 4-5
+apps/worker/src/analysis/finish-analysis.ts
+  ff04539946d1aa6f 29-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "ce5dbfb197f55352cb226453e0de762d8125f41b",
+  "prompts": {
+    "ff04539946d1aa6f": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a12f66-f8c4-7453-9521-66a986b4b945",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/12/rollout-2026-10-12T17-17-21-01a12f66-f8c4-7453-9521-66a986b4b945.jsonl",
+      "total_additions": 656,
+      "total_deletions": 247,
+      "accepted_lines": 442,
+      "overriden_lines": 0
+    }
+  }
+}
