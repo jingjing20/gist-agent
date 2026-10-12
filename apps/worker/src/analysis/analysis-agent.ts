@@ -10,6 +10,7 @@ import type { GenerationExecutionMetrics } from '../chat/generation.service';
 import { exactKeys, record } from './tool-arguments';
 import { FINISH_TOOL, validateFinish } from './finish-analysis';
 import { predominantlyEnglish, ResponseTextStream } from './response-text-stream';
+import { actionNarrative } from './analysis-narrative';
 
 type Message = OpenAI.Chat.Completions.ChatCompletionMessageParam;
 type Call = OpenAI.Chat.Completions.ChatCompletionMessageToolCall;
@@ -53,8 +54,17 @@ export class AnalysisAgent {
         let repeatedAction = '';
         let repeatedActionCount = 0;
         let delivered = false;
+        let answered = false;
+        let awaitingConclusion = false;
+        const question = messages.find((message) => message.role === 'user')?.content;
+        const visualOnly =
+            typeof question === 'string' &&
+            /(?:只|仅)(?:需要|需|要|输出|展示|显示)?\s*(?:图表|表格|图|表)|\b(?:only|just)\s+(?:a\s+|the\s+)?(?:chart|table)\b/i.test(question) &&
+            !/(?:最后|最终|并|同时)[^。！？]{0,15}(?:总结|结论|解释)|\b(?:summary|summarize|explain)\b/i.test(question);
         let finishReminders = 0;
+        let closingOnly = false;
         let responseText = '';
+        let hasVisibleText = false;
         const chineseResponse = expectsChinese(messages);
         let languageRetries = 0;
         let firstDelta = false;
@@ -71,7 +81,7 @@ export class AnalysisAgent {
         while (true) {
             await check();
             // The finish tool records status only; narrative remains streamed.
-            const definitions = finishReminders ? [FINISH_TOOL] : [...options.tools.map((t) => t.definition), FINISH_TOOL];
+            const definitions = closingOnly || awaitingConclusion ? [FINISH_TOOL] : [...options.tools.map((t) => t.definition), FINISH_TOOL];
             let input: Message[] = [...messages];
             const budget = Math.floor(
                 (options.capability.contextWindow - options.capability.responseReserve - Math.ceil(options.capability.contextWindow * 0.1)) * (contextRetried ? 0.75 : 1)
@@ -94,20 +104,29 @@ export class AnalysisAgent {
             options.onEvent({ type: 'log', title: progressTitle, content: '正在评估下一步行动...' });
             const calls = new Map<number, Call>();
             let content = '';
+            let roundTextStarted = false;
+            const publishText = (text: string) => {
+                if (!text || closingOnly) return;
+                options.onEvent({ type: 'text_chunk', content: `${!roundTextStarted && hasVisibleText ? '\n\n' : ''}${text}` });
+                roundTextStarted = true;
+                hasVisibleText = true;
+            };
             const textStream = new ResponseTextStream(chineseResponse);
             let reasoning = '';
             let outputChars = 0;
             try {
                 const stream = await options.stream(input, definitions);
                 for await (const chunk of stream) {
-                    await check();
+                    // Publishing and tool boundaries independently fence writer ownership.
+                    // Do not round-trip to the database for every model token.
+                    if (context.signal.aborted) throw context.signal.reason ?? new GenerationExecutionError('CANCELLED', '已取消');
                     const delta = chunk.choices[0]?.delta as (OpenAI.Chat.Completions.ChatCompletionChunk.Choice.Delta & { reasoning_content?: string }) | undefined;
                     if (!delta) continue;
                     const fragment = delta.content ?? '';
                     const thoughts = delta.reasoning_content ?? '';
                     content += fragment;
                     const visibleText = textStream.push(fragment);
-                    if (visibleText) options.onEvent({ type: 'text_chunk', content: visibleText });
+                    publishText(visibleText);
                     reasoning += thoughts;
                     outputChars += fragment.length + thoughts.length;
                     metrics.outputTokensEstimated += estimateTokens(fragment + thoughts);
@@ -141,19 +160,25 @@ export class AnalysisAgent {
             }
             await check();
             const batch = [...calls.entries()].sort(([a], [b]) => a - b).map(([, call]) => call);
-            if (chineseResponse && !textStream.published && predominantlyEnglish(content)) {
-                if (languageRetries++ >= 1) throw new GenerationExecutionError('RESPONSE_LANGUAGE_MISMATCH', '模型未按要求使用中文回答，请重试。');
-                // Discard unexecuted tool calls together with the rejected English answer.
-                messages.push({ role: 'assistant', content });
-                messages.push({
-                    role: 'system',
-                    content: '用户使用中文提问。请用中文重新回答，保留字段名、SQL 和技术标识符；不要重复已经完成的工具。回答后独立调用 finish_analysis。',
-                });
-                continue;
+            if (!closingOnly && chineseResponse && !textStream.published && predominantlyEnglish(content)) {
+                if (batch.some((call) => call.function.name !== 'finish_analysis')) {
+                    // Optional prose must not discard valid work or add a model round.
+                    // A Chinese action description will replace the withheld preamble.
+                    content = '';
+                } else {
+                    if (languageRetries++ >= 1) throw new GenerationExecutionError('RESPONSE_LANGUAGE_MISMATCH', '模型未按要求使用中文回答，请重试。');
+                    messages.push({ role: 'assistant', content });
+                    messages.push({
+                        role: 'system',
+                        content: '用户使用中文提问。请用中文重新回答，保留字段名、SQL 和技术标识符；不要重复已经完成的工具。回答后独立调用 finish_analysis。',
+                    });
+                    continue;
+                }
             }
             const remainingText = textStream.finish(content);
-            if (remainingText) options.onEvent({ type: 'text_chunk', content: remainingText });
-            if (content.trim()) responseText += (responseText ? '\n\n' : '') + content;
+            publishText(remainingText);
+            if (content.trim() && !closingOnly) responseText += (responseText ? '\n\n' : '') + content;
+            if (content.trim() && !closingOnly && batch.every((call) => call.function.name === 'finish_analysis')) answered = true;
             if (!batch.length) {
                 if (content.trim()) {
                     const answer: Message = { role: 'assistant', content };
@@ -161,6 +186,7 @@ export class AnalysisAgent {
                     append(answer);
                 }
                 await options.checkpoint();
+                closingOnly = true;
                 if (finishReminders++) throw new GenerationExecutionError('ANALYSIS_PROTOCOL_ERROR', '回答已保留，但模型未确认完成状态，请重试。');
                 messages.push({
                     role: 'system',
@@ -181,6 +207,7 @@ export class AnalysisAgent {
             const previouslyObserved = new Set(observed);
             let final: AnalysisOutcome | undefined;
             let needsCorrection = false;
+            const narratedActions = new Set<string>();
             const actionLabels: Record<string, string> = {
                 update_analysis_state: '确认分析条件',
                 get_analysis_state: '读取分析状态',
@@ -200,6 +227,21 @@ export class AnalysisAgent {
                 let result: string;
                 let activity: AnalysisActivityV1 | undefined;
                 let activityRemoved = false;
+                const reportFailure = (message: string, sql?: string) => {
+                    const failed = activity ?? startActivity(call.id, call.function.name, {}, new Date(), `analysis-round-${modelCalls}`);
+                    if (failed)
+                        options.onEvent({
+                            type: 'analysis_activity',
+                            activity: {
+                                ...failed,
+                                status: 'warning',
+                                completedAt: new Date().toISOString(),
+                                warning: message,
+                                details: [...failed.details, { label: '错误详情', value: message }, ...(sql ? [{ label: '提交 SQL', value: sql }] : [])],
+                            },
+                        });
+                    if (!content.trim() && call.function.name === 'execute_sql_query') publishText(`${roundTextStarted ? '\n\n' : ''}本次查询未成功，我会根据反馈调整后重新核对。`);
+                };
                 const removeActivity = () => {
                     if (!activity || activityRemoved) return;
                     options.onEvent({ type: 'analysis_activity_remove', activityId: activity.id });
@@ -210,12 +252,20 @@ export class AnalysisAgent {
                     if (mixedFinish) throw new Error('finish_analysis 必须独立调用，展示工具完成后再收尾');
                     const args = record(JSON.parse(call.function.arguments));
                     if (call.function.name === 'finish_analysis') {
+                        // Repair status arguments without restarting delivered analysis.
+                        if (!answered && !(delivered && visualOnly)) {
+                            if (delivered) {
+                                awaitingConclusion = true;
+                                throw new Error('图表或表格已展示，但还缺少最终结论。请先用本轮提问语言简短总结已有结果，不再查询或绘图，然后调用 finish_analysis。');
+                            }
+                            throw new Error('尚未向用户交付内容，请先回答、提问或解释无法完成的原因');
+                        }
+                        closingOnly = true;
                         const finish = validateFinish(args);
-                        if (!responseText.trim() && !delivered) throw new Error('尚未向用户交付内容，请先回答、提问或解释无法完成的原因');
                         final = { kind: 'response', ...finish, blocks: responseText ? [{ type: 'markdown', content: responseText }] : [] };
                         result = JSON.stringify({ accepted: true, status: finish.status });
                     } else {
-                        if (finishReminders) throw new Error('回答已经结束，此时仅允许 finish_analysis');
+                        if (closingOnly || awaitingConclusion) throw new Error('分析工具已经结束，请只补充所需结论并调用 finish_analysis，不再查询或绘图');
                         metrics.toolCallCount++;
                         const tool = tools.get(call.function.name);
                         if (!tool) throw new Error('未知或不可用工具');
@@ -223,7 +273,6 @@ export class AnalysisAgent {
                         if (args.plan) exactKeys(record(args.plan), ['purpose', 'expectedGrain', 'expectedShape']);
                         const parsed = tool.parseArguments(args);
                         activity = startActivity(call.id, tool.name, parsed, new Date(), `analysis-round-${modelCalls}`);
-                        if (activity) options.onEvent({ type: 'analysis_activity', activity });
                         if (tool.name === 'generate_chart' && !previouslyObserved.has(String(parsed.queryArtifactId))) throw new Error('图表必须引用本轮已观察到的证据');
                         let sqlKey = '';
                         if (tool.name === 'execute_sql_query') {
@@ -231,6 +280,17 @@ export class AnalysisAgent {
                             if (blockedQueries.has(sqlKey)) throw new Error('同一查询已重复失败，请修改查询或提交部分结果');
                             metrics.sqlCallCount++;
                         }
+                        // A silent model round still describes actual validated actions.
+                        // Do not count fallback prose as delivery of an answer.
+                        if (!content.trim() && !narratedActions.has(tool.name)) {
+                            const narrative = actionNarrative(tool.name, parsed, chineseResponse);
+                            if (narrative) {
+                                publishText(`${roundTextStarted ? '\n\n' : ''}${narrative}`);
+                                assistant.content = `${assistant.content ? `${assistant.content}\n\n` : ''}${narrative}`;
+                                narratedActions.add(tool.name);
+                            }
+                        }
+                        if (activity) options.onEvent({ type: 'analysis_activity', activity });
                         let output;
                         try {
                             output = await tool.execute(parsed, context);
@@ -246,7 +306,8 @@ export class AnalysisAgent {
                         if (output.succeeded === false) needsCorrection = true;
                         const data = JSON.parse(result);
                         if (activity) {
-                            if (output.succeeded === false) removeActivity();
+                            if (output.succeeded === false)
+                                reportFailure(String(data.message || data.error || data.errorCode || '工具未成功完成'), typeof parsed.sql === 'string' ? parsed.sql : undefined);
                             else options.onEvent({ type: 'analysis_activity', activity: completeActivity(activity, tool.name, parsed, data, output.activityData) });
                         }
                         if (tool.name === 'read_query_artifact' && output.succeeded !== false) observed.add(data.queryArtifactId);
@@ -263,9 +324,9 @@ export class AnalysisAgent {
                         }
                     }
                 } catch (error) {
-                    removeActivity();
                     await check();
                     if (error instanceof GenerationExecutionError) {
+                        removeActivity();
                         if (error.code === 'SQL_SECURITY_REJECTED' || error.code === 'DATASOURCE_ACCESS_CHANGED') {
                             result = JSON.stringify({ errorCode: error.code, retryable: false });
                             append({ role: 'tool', tool_call_id: call.id, content: result });
@@ -280,6 +341,7 @@ export class AnalysisAgent {
                         }
                         throw error;
                     }
+                    reportFailure(error instanceof Error ? error.message : '工具参数不合法');
                     needsCorrection = true;
                     final = undefined;
                     result = JSON.stringify({

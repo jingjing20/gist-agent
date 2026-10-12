@@ -1,5 +1,5 @@
 <template>
-    <div v-if="renderedHTML" class="markdown-block" v-html="renderedHTML"></div>
+    <div class="markdown-block" :data-playing="playing" v-html="renderedHTML"></div>
 </template>
 
 <script setup lang="ts">
@@ -13,12 +13,13 @@ const props = defineProps<{ content?: string; isStreaming?: boolean }>();
 
 const displayedContent = ref('');
 let timer: ReturnType<typeof setTimeout> | undefined;
-let playing = false;
+const playing = ref(false);
 const playback = inject(textPlaybackKey, undefined);
 const playbackToken = Symbol('markdown-playback');
+playback?.setPlaying(playbackToken, false);
 
 function setPlaying(value: boolean) {
-    playing = value;
+    playing.value = value;
     playback?.setPlaying(playbackToken, value);
 }
 
@@ -29,10 +30,14 @@ function stop() {
 
 function advance() {
     timer = undefined;
+    if (playback?.canAdvance && !playback.canAdvance(playbackToken)) {
+        timer = setTimeout(advance, 16);
+        return;
+    }
     const target = props.content || '';
-    // Bound the backlog so large validated reports finish in a few seconds.
+    // Smooth bounded steps instead of a burst proportional to the entire backlog.
     const remaining = Array.from(target.slice(displayedContent.value.length));
-    const count = Math.max(1, Math.ceil(remaining.length / 80));
+    const count = Math.min(6, Math.max(1, Math.ceil(remaining.length / 80)));
     displayedContent.value += remaining.slice(0, count).join('');
     if (displayedContent.value !== target) timer = setTimeout(advance, 16);
     else setPlaying(false);
@@ -41,14 +46,14 @@ function advance() {
 watch(
     () => props.content || '',
     (content) => {
-        if (!props.isStreaming && !playing) {
+        if (!props.isStreaming && !playing.value) {
             stop();
             displayedContent.value = content;
             return;
         }
         if (!content.startsWith(displayedContent.value)) displayedContent.value = '';
         setPlaying(displayedContent.value !== content);
-        if (playing && timer === undefined) timer = setTimeout(advance, 16);
+        if (playing.value && timer === undefined) timer = setTimeout(advance, 16);
     },
     { immediate: true }
 );

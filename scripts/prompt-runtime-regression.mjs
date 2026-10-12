@@ -87,6 +87,11 @@ assert.throws(() => validateFinish({ ...finish(), body: 'extra' }));
     assert.match(h.messages.find((m) => m.role === 'tool').content, /尚未/);
 }
 {
+    const h = harness([[call('list_schema')], [call('finish_analysis', finish())], ending('awaiting_clarification')], ['list_schema']);
+    assert.equal((await h.run()).status, 'awaiting_clarification');
+    assert.match(h.messages.find((m) => m.role === 'tool' && m.content.includes('尚未'))?.content || '', /尚未向用户交付内容/, '补充的过程说明不能当作最终回答提前结束');
+}
+{
     const state = call('update_analysis_state'),
         query = call('execute_sql_query', { sql: 'SELECT 1' });
     query.tool_calls[0].index = 1;
@@ -105,8 +110,19 @@ assert.throws(() => validateFinish({ ...finish(), body: 'extra' }));
 }
 {
     const h = harness([[call('display_query_table', { queryArtifactId: 'a' })], [call('finish_analysis', finish())]], ['display_query_table']);
+    h.options.messages[1].content = '只展示表格';
     assert.deepEqual((await h.run()).blocks, []);
-    assert.ok(!h.events.some((e) => e.type === 'text_chunk'));
+    assert.match(h.events.find((e) => e.type === 'text_chunk')?.content || '', /展示查询结果/, '仅展示表格的静默调用也有过程说明');
+}
+{
+    const h = harness([[call('display_query_table', { queryArtifactId: 'a' })], [call('finish_analysis', finish())], ending()], ['display_query_table']);
+    assert.equal((await h.run()).status, 'complete');
+    assert.equal(h.rounds(), 3, '图表和表格不能替代默认需要的最终结论');
+    assert.equal(h.executions.length, 1, '补充结论不能重复执行工具');
+    assert.deepEqual(
+        h.definitions[2].map((t) => t.function.name),
+        ['finish_analysis']
+    );
 }
 {
     const h = harness([[call('generate_chart', { queryArtifactId: 'unseen' })], ending('partial')], ['generate_chart']);

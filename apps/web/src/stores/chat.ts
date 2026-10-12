@@ -75,12 +75,20 @@ export const useChatStore = defineStore('chat', () => {
                 sequence: Number(message.generation_sequence) || 0,
             };
         }
+        const existing = new Map(conv.messages.map((m) => [m.id, m]));
         const live = new Map(
             conv.messages.filter((m) => Object.values(generations.value).some((g) => g.messageId === m.id && ['pending', 'running'].includes(g.status))).map((m) => [m.id, m])
         );
-        conv.messages = data.map(
-            (m: any) => live.get(m.id) ?? { id: m.id, role: m.role, content: m.content || '', blocks: m.blocks || [], timestamp: new Date(m.created_at).getTime() }
-        );
+        conv.messages = data.map((m: any) => {
+            const previous = existing.get(m.id);
+            // Completion fetch must not replace the renderer's live text with a history mount.
+            if (live.has(m.id) || (previous && JSON.stringify(previous.blocks) === JSON.stringify(m.blocks || []))) return previous!;
+            if (previous) {
+                Object.assign(previous, { content: m.content || '', blocks: m.blocks || [] });
+                return previous;
+            }
+            return { id: m.id, role: m.role, content: m.content || '', blocks: m.blocks || [], timestamp: new Date(m.created_at).getTime() };
+        });
     }
 
     async function createConversation(): Promise<Conversation> {
@@ -223,7 +231,9 @@ export const useChatStore = defineStore('chat', () => {
         }
         if (event.type === 'text_chunk') {
             const last = message.blocks.at(-1);
-            last?.type === 'text' ? (last.content = (last.content || '') + (event.content || '')) : message.blocks.push({ type: 'text', content: event.content || '' });
+            last?.type === 'text' && !last.analysis
+                ? (last.content = (last.content || '') + (event.content || ''))
+                : message.blocks.push({ type: 'text', content: event.content || '' });
             return;
         }
         if (event.type === 'reasoning_chunk') {

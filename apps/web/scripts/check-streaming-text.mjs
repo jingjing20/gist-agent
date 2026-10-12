@@ -34,7 +34,7 @@ await writeFile(
 );
 const storeSource = (await readFile(new URL('../src/stores/chat.ts', import.meta.url), 'utf8'))
     .replace("import { useRouter } from 'vue-router';", 'const useRouter = () => ({ replace: async () => {} });')
-    .replace("import { apiFetch } from '../api';", 'const apiFetch = async () => ({ json: async () => [] });')
+    .replace("import { apiFetch } from '../api';", 'const apiFetch = async () => ({ json: async () => globalThis.__streamingMessages || [] });')
     .replace("import { useToastStore } from './toast';", 'const useToastStore = () => ({ error() {} });')
     .replace('        conversations,', '        applyEvent,\n        conversations,');
 await writeFile(storePath, ts.transpileModule(storeSource, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText);
@@ -122,9 +122,14 @@ try {
     const message = store.conversations[0].messages[0];
     assert.equal(store.generations.generation.status, 'completed');
     assert.equal(message.animateText, true, '同批 done 不能消除新文字的动画标记');
+
     const batchRoot = { children: [] };
     app = renderer.createApp({ render: () => h(Component, { content: message.blocks[0].content, isStreaming: !!message.animateText }) });
     app.mount(batchRoot);
+    globalThis.__streamingMessages = [{ id: message.id, role: 'assistant', blocks: JSON.parse(JSON.stringify(message.blocks)), created_at: new Date().toISOString() }];
+    await store.fetchMessages('conversation');
+    assert.equal(store.conversations[0].messages[0], message, '完成后回读历史必须保留实时消息对象');
+    delete globalThis.__streamingMessages;
     await nextTick();
     await tick();
     assert.ok(
@@ -152,6 +157,7 @@ try {
     const nodes = (node = integratedRoot) => [node, ...(node.children || []).flatMap((child) => nodes(child))];
     assert.ok(!nodes().some((node) => node.html?.includes(event.content)), '完成事件后结论仍在逐字播放');
     assert.ok(!nodes().some((node) => node.props?.['data-suggestions']), '结论播放完成前不能显示推荐问题');
+    assert.equal(nodes().filter((node) => node.props?.class === 'streaming-indicator').length, 1, '完成事件先到时仍保留原有末尾三点直到文字播放结束');
     for (let i = 0; i < 200 && timers.size; i++) await tick();
     await nextTick();
     assert.ok(
@@ -162,6 +168,7 @@ try {
         nodes().some((node) => node.props?.['data-suggestions']),
         '结论完整显示后才出现推荐问题'
     );
+    assert.equal(nodes().filter((node) => node.props?.class === 'streaming-indicator').length, 0, '显示完成后停止三点动画');
     app.unmount();
     app = undefined;
     message.animateText = true;
@@ -172,8 +179,8 @@ try {
                 outcome: {
                     kind: 'response',
                     blocks: [
-                        { type: 'markdown', content: '短结论' },
                         { type: 'markdown', content: '需要继续展示的较长结论。'.repeat(20) },
+                        { type: 'markdown', content: '短结论' },
                     ],
                 },
             },
@@ -186,10 +193,7 @@ try {
     message.animateText = false;
     await nextTick();
     for (let i = 0; i < 4; i++) await tick();
-    assert.ok(
-        nodes(nestedRoot).some((node) => node.html?.includes('短结论')),
-        '短文本已经播放完成'
-    );
+    assert.ok(!nodes(nestedRoot).some((node) => node.html?.includes('短结论')), '前面的长文本播放完成前不能播放后面的短文本');
     assert.ok(!nodes(nestedRoot).some((node) => node.props?.['data-suggestions']), '多个嵌套文本块必须全部播放完');
     for (let i = 0; i < 300 && timers.size; i++) await tick();
     await nextTick();

@@ -26,6 +26,7 @@ export function validateFinish(value: unknown): { status: AnalysisCompletionStat
     if (args.status !== 'complete' && !args.reason) throw new Error('非完整状态必须说明原因');
     if (!Array.isArray(args.missingItems) || args.missingItems.length > 20 || args.missingItems.some((s) => typeof s !== 'string' || !s.trim() || s.length > 500))
         throw new Error('缺失项格式错误');
-    if (args.status === 'complete' && (args.reason !== null || args.missingItems.length)) throw new Error('存在未完成事项时不能标记 complete');
+    if (args.status === 'complete' && (args.reason !== null || args.missingItems.length))
+        throw new Error('complete 必须使用 reason=null、missingItems=[]；不要将已完成的总结或可选延伸当作缺失项。若存在实际缺失，请使用非完整状态并说明原因。');
     return { status: args.status as AnalysisCompletionStatus, reason: args.reason as string | null, missingItems: args.missingItems as string[] };
 }

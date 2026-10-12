@@ -14,17 +14,19 @@
                 <div class="assistant-content">
                     <AnalysisProcessBlock v-if="hasAnalysisProcess" :blocks="msg.blocks" :is-streaming="isStreaming" :terminal-status="processTerminalStatus" />
                     <template v-for="(block, i) in visibleBlocks" :key="i">
-                        <component
-                            :is="block.analysis ? AnalysisBlock : block.type === 'chart' || block.type === 'table' ? ArtifactResult : blockComponent(block.type)"
-                            v-bind="blockProps(block)"
-                            @select="sendSuggestion"
-                        />
+                        <div class="stream-block">
+                            <component
+                                :is="block.analysis ? AnalysisBlock : block.type === 'chart' || block.type === 'table' ? ArtifactResult : blockComponent(block.type)"
+                                v-bind="blockProps(block)"
+                                @select="sendSuggestion"
+                            />
+                        </div>
                     </template>
                     <p v-if="terminalStatus" role="status">{{ terminalStatus }}</p>
                     <div v-if="canResume" class="terminal-actions">
                         <button type="button" :disabled="actionBusy" @click="restartAnalysis">重试原问题</button>
                     </div>
-                    <div v-if="isStreaming" class="streaming-indicator">
+                    <div v-if="isStreaming || playingTextCount > 0" class="streaming-indicator">
                         <span class="dot"></span>
                         <span class="dot"></span>
                         <span class="dot"></span>
@@ -58,10 +60,15 @@ const props = defineProps<{
 
 const chat = useChatStore();
 const playingRenderers = new Set<symbol>();
+const rendererOrder = new Map<symbol, number>();
 const playingTextCount = ref(0);
 provide(textPlaybackKey, {
     isPlaying: computed(() => playingTextCount.value > 0),
+    canAdvance(token) {
+        return ![...playingRenderers].some((other) => rendererOrder.get(other)! < rendererOrder.get(token)!);
+    },
     setPlaying(token, playing) {
+        if (!rendererOrder.has(token)) rendererOrder.set(token, rendererOrder.size);
         if (playing) playingRenderers.add(token);
         else playingRenderers.delete(token);
         playingTextCount.value = playingRenderers.size;
@@ -86,7 +93,7 @@ const terminalStatus = computed(() => {
 const analysisWorkflow = computed(() =>
     props.msg.blocks.some((block) => (block.type === 'analysis_activity' && !!block.activity) || (block.type === 'log' && /^分析步骤 \d+$/.test(block.title || '')))
 );
-const hasAnalysisProcess = computed(() => analysisWorkflow.value);
+const hasAnalysisProcess = computed(() => props.isStreaming || analysisWorkflow.value);
 const hasAnalysisResult = computed(() => props.msg.blocks.some((block) => !!block.analysis));
 const reportCharts = computed(() => props.msg.blocks.filter((block) => block.type === 'chart' && !!block.chartData));
 const visibleBlocks = computed(() =>
@@ -230,6 +237,10 @@ async function restartAnalysis() {
     display: flex;
     flex-direction: column;
     gap: 16px;
+}
+
+.stream-block:has([data-playing='true']) ~ .stream-block {
+    display: none;
 }
 
 .terminal-actions {

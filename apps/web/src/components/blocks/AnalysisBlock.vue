@@ -4,7 +4,7 @@
         <ul v-if="showFollowup && outcome.missingItems.length" class="list-disc pl-5 text-sm text-muted-foreground">
             <li v-for="item in outcome.missingItems" :key="item">{{ item }}</li>
         </ul>
-        <template v-for="(block, index) in outcome.blocks" :key="index">
+        <div v-for="(block, index) in outcome.blocks" :key="index" class="report-stream-block">
             <MarkdownBlock v-if="block.type === 'markdown'" :is-streaming="isStreaming" :content="block.content" />
             <ArtifactResult
                 v-else-if="block.type === 'table'"
@@ -12,7 +12,7 @@
                 :conversation-id="analysis.state.conversationId"
             />
             <ArtifactResult v-else-if="chartFor(block.chartArtifactId)" :block="chartFor(block.chartArtifactId)!" :conversation-id="analysis.state.conversationId" />
-        </template>
+        </div>
         <section v-if="showFollowup && usedMemories.length" class="flex flex-col gap-2 rounded-lg border border-border p-4" aria-label="本次采用的业务口径">
             <h4 class="text-sm font-medium">本次采用的业务口径</h4>
             <details v-for="memory in usedMemories" :key="`${memory.id}-${memory.version}`" class="text-sm">
@@ -131,3 +131,9 @@ watch(
     { immediate: true }
 );
 </script>
+
+<style scoped>
+.report-stream-block:has([data-playing='true']) ~ .report-stream-block {
+    display: none;
+}
+</style>

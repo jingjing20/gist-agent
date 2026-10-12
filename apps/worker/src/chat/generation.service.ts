@@ -7,6 +7,7 @@ import type OpenAI from 'openai';
 import { DatabaseService, type QueryRow } from '../database/database.service';
 import type { SSEEvent, SSEEmitter } from './tools/base-tool';
 import { GenerationExecutionError } from './generation-errors';
+import { TextEventBuffer } from './text-event-buffer';
 
 export interface GenerationIdentity {
     id: string;
@@ -51,6 +52,7 @@ export class GenerationService implements OnModuleDestroy {
     private readonly redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', { maxRetriesPerRequest: null, commandTimeout: 5_000 });
     private readonly prefix = process.env.EVENT_KEY_PREFIX || 'gist-agent';
     private readonly retentionMs = 24 * 60 * 60 * 1000;
+    private readonly textBuffers = new Map<string, TextEventBuffer>();
     private readonly queues = new Map<string, Promise<void>>();
 
     constructor(private readonly db: DatabaseService) {}
@@ -188,20 +190,28 @@ export class GenerationService implements OnModuleDestroy {
     }
 
     emitter(identity: GenerationIdentity): SSEEmitter {
-        return {
-            send: (event) => {
+        let buffer = this.textBuffers.get(identity.id);
+        if (!buffer) {
+            buffer = new TextEventBuffer((event) => {
                 const prior = this.queues.get(identity.id) ?? Promise.resolve();
-                this.queues.set(
-                    identity.id,
-                    prior.then(() => this.publish(identity, event))
-                );
-            },
-        };
+                const next = prior.then(() => this.publish(identity, event));
+                // drain remains the error boundary, including while tokens arrive.
+                void next.catch(() => undefined);
+                this.queues.set(identity.id, next);
+            });
+            this.textBuffers.set(identity.id, buffer);
+        }
+        return { send: (event) => buffer.send(event) };
     }
 
     async drain(identity: GenerationIdentity): Promise<void> {
-        await (this.queues.get(identity.id) ?? Promise.resolve());
-        this.queues.delete(identity.id);
+        this.textBuffers.get(identity.id)?.flush();
+        this.textBuffers.delete(identity.id);
+        try {
+            await (this.queues.get(identity.id) ?? Promise.resolve());
+        } finally {
+            this.queues.delete(identity.id);
+        }
     }
 
     async finalize(

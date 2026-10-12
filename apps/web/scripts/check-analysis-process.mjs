@@ -84,8 +84,11 @@ try {
     };
     const pill = () => nodes().find((node) => node.props?.class?.includes('activity-pill'));
     const summary = () => nodes().find((node) => node.props?.class?.includes('process-summary'));
-    assert.equal(summary().props['aria-expanded'], true, '执行中默认展开动作列表');
-    assert.ok(pill(), '默认显示动作列表');
+    assert.equal(summary().props['aria-expanded'], false, '执行中默认收起，避免与正文旁白重复');
+    assert.equal(pill(), undefined);
+    assert.ok(!nodes().some((node) => node.props?.class === 'process-progress'), '等待反馈复用现有三点，不额外添加进度和计时行');
+    summary().props.onClick();
+    await nextTick();
     assert.equal(pill().props['aria-expanded'], false, '执行中详情应保持收起，避免完成后瞬间收起');
     assert.ok(
         nodes().some((node) => node.props?.class?.includes('activity-loading')),
@@ -136,12 +139,31 @@ try {
     assert.ok(pill(), '完成后允许手动查看步骤');
     props.isStreaming = true;
     await nextTick();
-    assert.equal(summary().props['aria-expanded'], true, '重新开始分析默认展开');
+    assert.equal(summary().props['aria-expanded'], false, '重新开始分析默认收起');
     app.unmount();
     props.isStreaming = false;
     app = renderer.createApp({ render: () => h(Component, props) });
     app.mount(root);
     assert.equal(summary().props['aria-expanded'], false, '历史已完成消息默认收起');
+    for (const withNarrative of [false, true]) {
+        props.blocks = [];
+        props.isStreaming = true;
+        await nextTick();
+        assert.equal(summary().props['aria-expanded'], false, '每轮请求默认收起卡片');
+        for (let round = 1; round <= 10; round++) {
+            props.blocks.push({ type: 'log', title: `分析步骤 ${round}`, content: '正在评估下一步行动...' });
+            if (withNarrative) props.blocks.push({ type: 'text', content: '正在核对数据。' });
+            props.blocks.push({ type: 'analysis_activity', activity: { ...activity, id: `round-${round}` } });
+            await nextTick();
+            assert.ok(!nodes().some((node) => node.props?.class === 'process-progress'), '有无旁白均不额外显示阶段行');
+            assert.equal(summary().props['aria-expanded'], false, '连续步骤不自动展开卡片');
+            props.blocks.at(-1).activity.status = 'completed';
+            await nextTick();
+        }
+        props.isStreaming = false;
+        await nextTick();
+        assert.equal(summary().props['aria-expanded'], false);
+    }
     app.unmount();
     const { default: ChatMessage } = await import(chatModulePath.href);
     const message = reactive({ id: 'message', role: 'assistant', blocks: [], content: '', timestamp: 0 });
@@ -163,7 +185,7 @@ try {
     const chatRoot = { children: [] };
     app.mount(chatRoot);
     const hasProcess = (node = chatRoot) => node.props?.class === 'process-probe' || !!node.children?.some((child) => hasProcess(child));
-    assert.equal(hasProcess(), false, '无事件时还没有过程卡片');
+    assert.equal(hasProcess(), true, '无事件和无旁白时，请求开始就必须显示进度');
     message.blocks.push({ type: 'log', title: '分析步骤 1', content: '正在评估下一步行动...' });
     await nextTick();
     assert.equal(hasProcess(), true, '首条日志到达就应挂载过程卡片，不必等工具执行完');

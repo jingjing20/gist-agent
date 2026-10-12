@@ -3,7 +3,7 @@
         <button class="process-summary" type="button" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
             <span class="summary-icon" :class="summaryTone"><i :class="summaryIcon"></i></span>
             <span class="summary-label">{{ summaryLabel }}</span>
-            <span v-if="!isStreaming" class="summary-meta">{{ summaryMeta }}</span>
+            <span class="summary-meta">{{ summaryMeta }}</span>
             <i class="fas fa-chevron-down toggle" :class="{ expanded: !collapsed }"></i>
         </button>
 
@@ -122,19 +122,18 @@ interface ArtifactView {
 
 const props = defineProps<{ blocks: MessageBlock[]; isStreaming: boolean; terminalStatus?: 'completed' | 'failed' | 'cancelled' }>();
 const chat = useChatStore();
-const collapsed = ref(!props.isStreaming);
+const collapsed = ref(true);
 const expanded = ref(new Set<string>());
 const resultOpen = ref(new Set<string>());
 const sqlOpen = ref(new Set<string>());
 const artifacts = ref<Record<string, ArtifactView>>({});
 const hasFormalResult = computed(() => props.blocks.some((block) => block.type === 'text' && !!block.analysis));
-
-// Show incoming steps throughout generation; collapse once the generation ends.
+// Keep tool details compact alongside the streamed narrative.
 // Step updates do not override the user's manual toggle.
 watch(
     () => props.isStreaming,
     (streaming) => {
-        collapsed.value = !streaming;
+        collapsed.value = true;
         if (!streaming) expanded.value = new Set();
     }
 );
@@ -263,13 +262,14 @@ const queryCount = computed(() => activities.value.filter((item) => item.kind ==
 const chartCount = computed(() => activities.value.filter((item) => item.kind === 'generate_chart' && item.status !== 'running').length);
 const hasWarnings = computed(() => activities.value.some((item) => item.status === 'warning'));
 const summaryLabel = computed(() => {
-    if (props.isStreaming) return hasFormalResult.value ? '正在完成分析' : activities.value.at(-1)?.label || '正在分析';
+    if (props.isStreaming) return hasFormalResult.value ? '正在完成分析' : '正在分析';
     if (props.terminalStatus === 'failed') return '分析未完成';
     if (props.terminalStatus === 'cancelled') return '分析已停止';
     return '分析完成';
 });
 const summaryMeta = computed(() => {
-    const parts = [`${activities.value.length} 个动作`];
+    const completed = activities.value.filter((activity) => activity.status !== 'running').length;
+    const parts = [props.isStreaming ? `${completed} / ${activities.value.length} 个动作` : `${activities.value.length} 个动作`];
     if (queryCount.value) parts.push(`${queryCount.value} 次查询`);
     if (chartCount.value) parts.push(`${chartCount.value} 张图表`);
     return parts.join(' · ');

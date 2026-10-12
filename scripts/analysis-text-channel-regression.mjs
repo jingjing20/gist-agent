@@ -78,7 +78,7 @@ assert.equal(
         .filter((e) => e.type === 'text_chunk')
         .map((e) => e.content)
         .join(''),
-    answer,
+    '我先查看数据目录，找到与问题相关的数据表。\n\n' + answer,
     '工具轮英文旁白不能泄漏到正文'
 );
 const english = 'The activation rate is about half of all registered users and varies across customer segments.';
@@ -121,7 +121,50 @@ assert.equal(
         .filter((e) => e.type === 'text_chunk')
         .map((e) => e.content)
         .join(''),
-    answer,
+    '我先查看数据目录，找到与问题相关的数据表。\n\n' + answer,
     '英文按小分片到达也不得泄漏'
 );
 console.log('PASS: live Chinese narration and answers, withheld English, language retry, explicit English and SQL');
+
+const closing = await run('首周激活率是多少？', [
+    [{ content: answer }],
+    [
+        { content: '分析已完整交付，但状态要求说明未完成项。' },
+        { tool_calls: [{ index: 0, id: 'closing', function: { name: 'finish_analysis', arguments: JSON.stringify({ status: 'complete', reason: null, missingItems: [] }) } }] },
+    ],
+]);
+assert.equal(
+    closing.events
+        .filter((e) => e.type === 'text_chunk')
+        .map((e) => e.content)
+        .join(''),
+    answer,
+    '状态确认轮不能追加内部收尾文案'
+);
+assert.equal(closing.outcome.blocks[0].content, answer, '状态确认文案不能进入持久化正文');
+const repairedFinish = await run('首周激活率是多少？', [
+    [
+        { content: answer },
+        {
+            tool_calls: [
+                { index: 0, id: 'bad-finish', function: { name: 'finish_analysis', arguments: JSON.stringify({ status: 'complete', reason: '已经交付', missingItems: [] }) } },
+            ],
+        },
+    ],
+    [
+        { content: '我检查一下是否存在待展示的图表未消费等问题。' },
+        {
+            tool_calls: [
+                { index: 0, id: 'fixed-finish', function: { name: 'finish_analysis', arguments: JSON.stringify({ status: 'complete', reason: null, missingItems: [] }) } },
+            ],
+        },
+    ],
+]);
+assert.equal(
+    repairedFinish.events
+        .filter((e) => e.type === 'text_chunk')
+        .map((e) => e.content)
+        .join(''),
+    answer,
+    '修正完成状态参数时不能流出内部收尾分析'
+);
