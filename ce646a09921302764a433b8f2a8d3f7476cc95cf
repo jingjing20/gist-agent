@@ -1,0 +1,108 @@
+apps/web/src/components/blocks/MemoryNoticeBlock.vue
+  35ca37279f977c37 1-19
+packages/contracts/src/index.ts
+  35ca37279f977c37 255
+apps/worker/src/analysis/prepare-conversation-memory.ts
+  35ca37279f977c37 1-33
+README.md
+  131dfe8d626c71be 21
+packages/contracts/src/analysis.ts
+  35ca37279f977c37 6
+apps/worker/src/analysis/analysis-runtime-adapter.ts
+  35ca37279f977c37 22,92-128,263
+packages/contracts/src/memory.ts
+  35ca37279f977c37 28-40
+apps/worker/src/analysis/analysis-prompt.ts
+  35ca37279f977c37 12-13
+  131dfe8d626c71be 14
+apps/web/src/components/blocks/AnalysisBlock.vue
+  35ca37279f977c37 17-23,29-32,34,36-41,56,58,72-75,83,113,119
+  131dfe8d626c71be 3-4,16,24-27,33,35,46,57,63-69,76-82
+package.json
+  131dfe8d626c71be 26,32-33
+scripts/memory-workflow-regression.mjs
+  131dfe8d626c71be 1-77
+apps/web/src/stores/chat.ts
+  35ca37279f977c37 279
+  131dfe8d626c71be 98-102
+apps/worker/src/chat/tools/base-tool.ts
+  35ca37279f977c37 20
+apps/web/src/components/ChatMessageItem.vue
+  35ca37279f977c37 43,111,119
+  131dfe8d626c71be 63
+scripts/memory-regression.mjs
+  131dfe8d626c71be 219-220
+  35ca37279f977c37 4,80-81,216-218,221-274
+apps/web/src/views/MemoriesView.vue
+  131dfe8d626c71be 56
+  35ca37279f977c37 19-21,52,55,57-61,95,120-132,141-150,197-199,205,208,287-289,291-309
+packages/database/src/memory-repository.ts
+  35ca37279f977c37 3,14-18,34,108-113,170,175-176,216-220,255,258-263,273,276-284
+  131dfe8d626c71be 228
+docs/agent-refactor/05-delivery-and-validation.md
+  131dfe8d626c71be 31
+apps/api/src/memory/memory.module.ts
+  35ca37279f977c37 40-47,75-91
+scripts/migrate-memory-provenance.mjs
+  131dfe8d626c71be 1-14
+packages/database/src/memory-schema.ts
+  131dfe8d626c71be 1-21,41-42,53,65
+docs/agent-refactor/03-datasource-memory-and-state.md
+  131dfe8d626c71be 9-21,29-30
+apps/web/src/components/MemoryCandidateCard.vue
+  35ca37279f977c37 1-3,5-10,12-13,15-34,37-40
+  131dfe8d626c71be 4,11,14,35-36
+apps/web/package.json
+  131dfe8d626c71be 12-13
+apps/web/src/utils/text-playback.ts
+  131dfe8d626c71be 1,4
+apps/web/scripts/check-conversation-deletion.mjs
+  131dfe8d626c71be 1-53
+packages/database/src/index.ts
+  35ca37279f977c37 208
+packages/database/src/memory-policy.ts
+  131dfe8d626c71be 45-47,52,59
+  35ca37279f977c37 1-44,48-51,53-58,60-68
+apps/web/src/types/index.ts
+  35ca37279f977c37 1,3,29,45,72
+apps/web/src/components/MemoryEditor.vue
+  131dfe8d626c71be 6,10,14,19,24,30-31,36,45-54,63-64,70,76,91,96,103,112,114,120,125
+  35ca37279f977c37 1-5,7-9,11-13,15-18,20-23,25-29,32-35,37-44,55-62,65-69,71-75,77-90,92-95,97-102,104-111,113,115-119,121-124,126-134
+apps/web/scripts/check-result-reading.mjs
+  131dfe8d626c71be 153-154,157-161,169-173,176,178,181-196,198-205,211-234,236-322,376,407
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "bzl_git_version": "0.1.35",
+  "base_commit_sha": "ce646a09921302764a433b8f2a8d3f7476cc95cf",
+  "prompts": {
+    "131dfe8d626c71be": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a12dd9-6047-7392-ae48-3b789f60b808",
+        "model": "gpt-6.1-sol",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/12/rollout-2026-10-12T10-03-03-01a12dd9-6047-7392-ae48-3b789f60b808.jsonl",
+      "total_additions": 479,
+      "total_deletions": 105,
+      "accepted_lines": 419,
+      "overriden_lines": 0
+    },
+    "35ca37279f977c37": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a12dd9-6047-7392-ae48-3b789f60b808",
+        "model": "gpt-6-astra",
+        "ide": "codex-desktop"
+      },
+      "human_author": "wangzhihao",
+      "transcript_path": "/Users/admin/.codex/sessions/2026/10/12/rollout-2026-10-12T10-03-03-01a12dd9-6047-7392-ae48-3b789f60b808.jsonl",
+      "total_additions": 611,
+      "total_deletions": 162,
+      "accepted_lines": 533,
+      "overriden_lines": 0
+    }
+  }
+}
