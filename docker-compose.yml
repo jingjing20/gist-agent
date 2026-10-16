@@ -1,112 +1,127 @@
+x-runtime-environment: &runtime-environment
+    NODE_ENV: production
+    DB_HOST: postgres
+    DB_PORT: 5432
+    DB_USER: ${DB_USER:-postgres}
+    DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+    DB_NAME: ${DB_NAME:-gist_agent}
+    AGENT_DB_USER: ${AGENT_DB_USER:?AGENT_DB_USER is required}
+    AGENT_DB_PASSWORD: ${AGENT_DB_PASSWORD:?AGENT_DB_PASSWORD is required}
+    AGENT_DB_POOL_MAX: ${AGENT_DB_POOL_MAX:-4}
+    REDIS_URL: redis://redis:6379
+    EVENT_KEY_PREFIX: ${EVENT_KEY_PREFIX:-gist-agent}
+    OPENAI_API_KEY: ${OPENAI_API_KEY}
+    OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.openai.com/v1}
+    OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o}
+    LLM_THINKING_CONTROL: ${LLM_THINKING_CONTROL:-auto}
+    LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-}
+    MAX_CONTEXT_TOKENS: ${MAX_CONTEXT_TOKENS:-}
+    ANALYSIS_TIMEZONE: ${ANALYSIS_TIMEZONE:-Asia/Shanghai}
+    LANGSMITH_TRACING: ${LANGSMITH_TRACING:-false}
+    LANGSMITH_API_KEY: ${LANGSMITH_API_KEY:-}
+    LANGSMITH_PROJECT: ${LANGSMITH_PROJECT:-gist-agent}
+    GENERATION_PENDING_TIMEOUT_MS: ${GENERATION_PENDING_TIMEOUT_MS:-600000}
+
 services:
-  postgres:
-    image: postgres:17-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME:-gist_agent}
-    ports:
-      - "127.0.0.1:15432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+    postgres:
+        image: postgres:17-alpine
+        restart: unless-stopped
+        environment:
+            POSTGRES_USER: ${DB_USER:-postgres}
+            POSTGRES_PASSWORD: ${DB_PASSWORD}
+            POSTGRES_DB: ${DB_NAME:-gist_agent}
+        ports:
+            - '127.0.0.1:15432:5432'
+        volumes:
+            - postgres_data:/var/lib/postgresql/data
+        healthcheck:
+            test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}']
+            interval: 10s
+            timeout: 5s
+            retries: 10
 
-  redis:
-    image: redis:7-alpine
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:16379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 3s
-      retries: 10
+    redis:
+        image: redis:7-alpine
+        command: ['redis-server', '--appendonly', 'yes']
+        volumes:
+            - redis_data:/data
+        restart: unless-stopped
+        ports:
+            - '127.0.0.1:16379:6379'
+        healthcheck:
+            test: ['CMD', 'redis-cli', 'ping']
+            interval: 5s
+            timeout: 3s
+            retries: 10
 
-  api:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-    restart: unless-stopped
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME:-gist_agent}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
-      OPENAI_MODEL: ${OPENAI_MODEL}
-      JWT_SECRET: ${JWT_SECRET}
-      SERVER_PORT: 3000
-      REDIS_URL: redis://redis:6379
-      EVENT_KEY_PREFIX: ${EVENT_KEY_PREFIX:-gist-agent}
-      SMTP_HOST: ${SMTP_HOST}
-      SMTP_PORT: ${SMTP_PORT}
-      SMTP_SECURE: ${SMTP_SECURE}
-      SMTP_USER: ${SMTP_USER}
-      SMTP_PASS: ${SMTP_PASS}
-      SMTP_FROM: ${SMTP_FROM}
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    api:
+        build:
+            context: .
+            dockerfile: apps/api/Dockerfile
+        restart: unless-stopped
+        environment:
+            <<: *runtime-environment
+            JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required}
+            APP_ORIGIN: ${APP_ORIGIN:-http://localhost:8080}
+            SERVER_PORT: 3000
+            USER_GENERATION_CONCURRENCY_LIMIT: ${USER_GENERATION_CONCURRENCY_LIMIT:-5}
+            SMTP_HOST: ${SMTP_HOST:-}
+            SMTP_PORT: ${SMTP_PORT:-465}
+            SMTP_SECURE: ${SMTP_SECURE:-true}
+            SMTP_USER: ${SMTP_USER:-}
+            SMTP_PASS: ${SMTP_PASS:-}
+            SMTP_FROM: ${SMTP_FROM:-}
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
 
-  worker:
-    build:
-      context: .
-      dockerfile: apps/worker/Dockerfile
-    restart: unless-stopped
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME:-gist_agent}
-      REDIS_URL: redis://redis:6379
-      EVENT_KEY_PREFIX: ${EVENT_KEY_PREFIX:-gist-agent}
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
-      OPENAI_MODEL: ${OPENAI_MODEL}
-      JWT_SECRET: ${JWT_SECRET}
-      WORKER_HEALTH_PORT: 3001
-    depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
+    worker:
+        build:
+            context: .
+            dockerfile: apps/worker/Dockerfile
+        restart: unless-stopped
+        environment:
+            <<: *runtime-environment
+            WORKER_HEALTH_PORT: 3001
+            WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-5}
+            USER_GENERATION_CONCURRENCY_LIMIT: ${USER_GENERATION_CONCURRENCY_LIMIT:-5}
+            GENERATION_GLOBAL_CONCURRENCY: ${GENERATION_GLOBAL_CONCURRENCY:-20}
+            GENERATION_PROVIDER_CONCURRENCY: ${GENERATION_PROVIDER_CONCURRENCY:-10}
+            GENERATION_HEARTBEAT_INTERVAL_MS: ${GENERATION_HEARTBEAT_INTERVAL_MS:-5000}
+            GENERATION_LEASE_TTL_MS: ${GENERATION_LEASE_TTL_MS:-20000}
+            GENERATION_SEMAPHORE_WAIT_MS: ${GENERATION_SEMAPHORE_WAIT_MS:-2000}
+            CHAT_TIMEOUT_MS: ${CHAT_TIMEOUT_MS:-120000}
+        depends_on:
+            postgres:
+                condition: service_healthy
+            redis:
+                condition: service_healthy
 
-  web:
-    build:
-      context: .
-      dockerfile: apps/web/Dockerfile
-    restart: unless-stopped
-    ports:
-      - "127.0.0.1:8080:80"
-    depends_on:
-      - api
+    web:
+        build:
+            context: .
+            dockerfile: apps/web/Dockerfile
+        restart: unless-stopped
+        ports:
+            - '127.0.0.1:8080:80'
+        depends_on:
+            - api
 
-  init-db:
-    build:
-      context: .
-      dockerfile: apps/api/Dockerfile
-      target: builder
-    command: ["pnpm", "--filter", "@gist/api", "init-db"]
-    profiles: ["tools"]
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME:-gist_agent}
-    depends_on:
-      postgres:
-        condition: service_healthy
+    init-db:
+        build:
+            context: .
+            dockerfile: apps/api/Dockerfile
+            target: builder
+        command: ['pnpm', '--filter', '@gist/api', 'init-db']
+        profiles: ['tools']
+        environment:
+            <<: *runtime-environment
+        depends_on:
+            postgres:
+                condition: service_healthy
 
 volumes:
-  postgres_data:
+    postgres_data:
+    redis_data:

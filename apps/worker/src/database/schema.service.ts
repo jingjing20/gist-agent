@@ -1,46 +1,11 @@
+import { assertDatasourceAccess, getDatasourceColumnPolicies, type AgentColumnPolicy } from '@gist/database';
 import { Injectable } from '@nestjs/common';
 import { DatabaseService } from './database.service';
-import { getAgentVisibleCatalogTables, type DataSourceTableCatalogEntry } from '@gist/database';
+import { getAgentVisibleCatalogTables } from '@gist/database';
 import { resolveCatalogDatasourceId } from '@gist/database';
 import type { SchemaCatalogSummaryV1, SchemaDetailV1 } from '@gist/contracts';
 
-export interface AgentColumnPolicy {
-    tableName: string;
-    columnName: string;
-    access: 'allow' | 'mask' | 'deny';
-    maskType: 'redact' | 'last4' | 'hash' | null;
-}
-
-function searchTerms(value: string): Set<string> {
-    const normalized = value.toLowerCase();
-    const terms = new Set((normalized.match(/[a-z0-9]+/g) ?? []).flatMap((term) => term.split('_')).filter((term) => term.length >= 2));
-    for (const sequence of normalized.match(/[\u3400-\u9fff]+/g) ?? []) {
-        for (let size = 2; size <= 3; size++) {
-            for (let index = 0; index <= sequence.length - size; index++) terms.add(sequence.slice(index, index + size));
-        }
-    }
-    return terms;
-}
-
-/** Deterministic lexical ranker. It never grants access; it only ranks an already-authorized catalog. */
-export function rankSchemaCatalog(query: string, tables: DataSourceTableCatalogEntry[]): DataSourceTableCatalogEntry[] {
-    const queryText = query.toLowerCase();
-    const queryTerms = searchTerms(query);
-    return tables
-        .map((table, index) => {
-            const tableName = table.table_name.toLowerCase();
-            const searchable = `${table.table_name} ${table.display_name} ${table.description ?? ''} ${table.dataset_key ?? ''}`;
-            const catalogTerms = searchTerms(searchable);
-            let score = queryText.includes(tableName) ? 1000 : 0;
-            for (const term of queryTerms) {
-                if (!catalogTerms.has(term)) continue;
-                score += tableName.includes(term) ? 20 : 4;
-            }
-            return { table, score, index };
-        })
-        .sort((left, right) => right.score - left.score || left.index - right.index)
-        .map(({ table }) => table);
-}
+export type { AgentColumnPolicy } from '@gist/database';
 
 /**
  * 管理数据库 Schema 可见性及 AI 提示词生成。
@@ -57,30 +22,11 @@ export class SchemaService {
     }
 
     async getColumnPolicies(datasourceId: number | null, userId: number): Promise<AgentColumnPolicy[]> {
-        await this.assertDatasourceAccess(datasourceId, userId);
-        const resolved = await resolveCatalogDatasourceId(this.db, datasourceId);
-        if (resolved == null) return [];
-        const rows = await this.db.query<any[]>(
-            `SELECT p.table_name,p.column_name,p.agent_access,p.mask_type
-             FROM datasource_column_policy p
-             JOIN datasource_table_catalog t ON t.datasource_id=p.datasource_id
-               AND t.schema_name=p.schema_name AND t.table_name=p.table_name
-             WHERE p.datasource_id=? AND p.schema_name=current_schema() AND t.is_agent_visible=TRUE`,
-            [resolved]
-        );
-        return rows.map((row) => ({ tableName: row.table_name, columnName: row.column_name, access: row.agent_access, maskType: row.mask_type }));
+        return getDatasourceColumnPolicies(this.db, datasourceId, userId);
     }
 
     async assertDatasourceAccess(datasourceId: number | null, userId: number): Promise<void> {
-        const resolved = await resolveCatalogDatasourceId(this.db, datasourceId);
-        if (resolved == null) throw new Error('DATASOURCE_ACCESS_CHANGED: 数据源不存在');
-        const rows = await this.db.query<any[]>(
-            `SELECT 1 FROM data_source d
-             LEFT JOIN datasource_permission p ON p.datasource_id=d.id AND p.user_id=?
-             WHERE d.id=? AND (d.created_by IS NULL OR d.created_by=? OR p.user_id IS NOT NULL)`,
-            [userId, resolved, userId]
-        );
-        if (!rows.length) throw new Error('DATASOURCE_ACCESS_CHANGED: 数据源权限已被撤销');
+        await assertDatasourceAccess(this.db, datasourceId, userId);
     }
 
     /**
@@ -121,7 +67,6 @@ export class SchemaService {
                 display_name: string;
                 isUploaded: boolean;
                 sourceType?: string;
-                datasetKey?: string | null;
                 fields: any[];
             }
         >();
@@ -136,7 +81,6 @@ export class SchemaService {
                     display_name: catalogByName.get(tableName)?.display_name || row.TABLE_COMMENT || tableName,
                     isUploaded: catalogByName.get(tableName)?.source_type === 'uploaded',
                     sourceType: catalogByName.get(tableName)?.source_type,
-                    datasetKey: catalogByName.get(tableName)?.dataset_key,
                     fields: [],
                 });
             }

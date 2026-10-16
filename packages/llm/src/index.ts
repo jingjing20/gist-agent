@@ -23,7 +23,6 @@ export class LlmClient {
     }
 
     async chat(systemPrompt: string, userPrompt: string, temperature = 0): Promise<string> {
-        if (process.env.LLM_PROVIDER === 'mock') return '[]';
         const response = await this.client.chat.completions.create({
             model: this.model,
             temperature,
@@ -46,42 +45,6 @@ export class LlmClient {
         tools: OpenAI.Chat.Completions.ChatCompletionTool[],
         options: { signal?: AbortSignal; reasoningEnabled?: boolean } = {}
     ): Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>> {
-        if (process.env.LLM_PROVIDER === 'mock') {
-            const finish = tools.some((tool) => tool.function.name === 'finish_analysis');
-            return Promise.resolve(
-                (async function* () {
-                    if (!finish) {
-                        yield { choices: [{ delta: { content: '[]' } }] } as OpenAI.Chat.Completions.ChatCompletionChunk;
-                        return;
-                    }
-                    yield { choices: [{ delta: { content: '这是独立 Worker 的协议测试响应。请提供要分析的指标与时间范围。' } }] } as OpenAI.Chat.Completions.ChatCompletionChunk;
-                    yield {
-                        choices: [
-                            {
-                                delta: {
-                                    tool_calls: [
-                                        {
-                                            index: 0,
-                                            id: 'mock-finish',
-                                            type: 'function',
-                                            function: {
-                                                name: 'finish_analysis',
-                                                arguments: JSON.stringify({
-                                                    status: 'awaiting_clarification',
-                                                    reason: '需要分析指标与时间范围',
-                                                    missingItems: ['指标', '时间范围'],
-                                                }),
-                                            },
-                                        },
-                                    ],
-                                },
-                            },
-                        ],
-                    } as OpenAI.Chat.Completions.ChatCompletionChunk;
-                })()
-            );
-        }
-
         const payload = createStreamRequest({
             model: this.model,
             messages,

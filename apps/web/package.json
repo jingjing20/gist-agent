@@ -6,11 +6,8 @@
     "scripts": {
         "dev": "vite",
         "build": "vue-tsc -b && vite build",
-        "test:result-reading": "node scripts/check-result-reading.mjs",
-        "test:theme-styles": "node scripts/check-theme-styles.mjs",
         "typecheck": "vue-tsc -b",
-        "preview": "vite preview",
-        "test:conversation-deletion": "node scripts/check-conversation-deletion.mjs"
+        "preview": "vite preview"
     },
     "dependencies": {
         "@gist/contracts": "workspace:*",

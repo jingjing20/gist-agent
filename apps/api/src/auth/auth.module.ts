@@ -1,3 +1,4 @@
+import { jwtSecret } from '@gist/config';
 import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -12,7 +13,7 @@ import { DatabaseModule } from '../database/database.module';
         DatabaseModule,
         PassportModule.register({ defaultStrategy: 'jwt' }),
         JwtModule.register({
-            secret: process.env.JWT_SECRET || 'default-secret',
+            secret: jwtSecret(),
             signOptions: { expiresIn: '7d' },
         }),
     ],

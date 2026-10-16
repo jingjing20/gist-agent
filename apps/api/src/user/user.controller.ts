@@ -22,8 +22,8 @@ export class UserController {
 
     @UseGuards(JwtAuthGuard)
     @Put('password')
-    async updatePassword(@CurrentUser() user: User, @Body('password') password: string) {
-        await this.userService.updatePassword(user.id, password);
+    async updatePassword(@CurrentUser() user: User, @Body('password') password: string, @Body('currentPassword') currentPassword: string) {
+        await this.userService.updatePassword(user.id, password, currentPassword);
         return { success: true };
     }
 }

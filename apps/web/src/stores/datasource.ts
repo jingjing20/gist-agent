@@ -19,7 +19,6 @@ export interface DataSourceTable {
     table_name: string;
     display_name: string;
     description?: string | null;
-    dataset_key?: string | null;
     source_type: 'preset' | 'uploaded' | 'external';
     is_agent_visible: boolean;
     created_by?: number | null;

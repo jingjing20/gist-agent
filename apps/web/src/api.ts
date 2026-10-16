@@ -12,7 +12,7 @@ export async function apiFetch(url: string, init?: RequestInit): Promise<Respons
     const res = await fetch(`${API_BASE}${url}`, { ...init, headers });
     if (res.status === 401 && !url.includes('/auth/')) {
         localStorage.removeItem('auth_token');
-        window.location.hash = '#/login';
+        window.location.assign('/login');
     }
     return res;
 }

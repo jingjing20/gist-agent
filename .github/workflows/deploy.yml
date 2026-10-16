@@ -1,68 +1,78 @@
 name: Deploy
 
 on:
-  push:
-    branches: [main]
-  workflow_dispatch:
+    push:
+        branches: [main]
+    workflow_dispatch:
+
+concurrency:
+    group: production-deploy
+    cancel-in-progress: false
 
 jobs:
-  # ========================
-  # 1️⃣ 构建 & 校验阶段（CI）
-  # ========================
-  build:
-    runs-on: ubuntu-latest
+    # ========================
+    # 1️⃣ 构建 & 校验阶段（CI）
+    # ========================
+    build:
+        runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+        steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
+            - name: Setup Node
+              uses: actions/setup-node@v4
+              with:
+                  node-version: 22
 
-      - name: Enable pnpm
-        run: corepack enable
+            - name: Enable pnpm
+              run: corepack enable
 
-      - name: Install deps
-        run: pnpm install
+            - name: Install deps
+              run: pnpm install
 
-      - name: Type check
-        run: pnpm typecheck
+            - name: Type check
+              run: pnpm typecheck
 
-      - name: Build
-        run: pnpm build
+            - name: Build
+              run: pnpm build
 
-  # ========================
-  # 2️⃣ 部署阶段（CD）
-  # ========================
-  deploy:
-    runs-on: ubuntu-latest
-    needs: build   # 🚨 关键：build 成功才会 deploy
+    # ========================
+    # 2️⃣ 部署阶段（CD）
+    # ========================
+    deploy:
+        runs-on: ubuntu-latest
+        needs: build # 🚨 关键：build 成功才会 deploy
 
-    steps:
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.SERVER_HOST }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SERVER_PORT || '22' }}
-          script: |
-            set -e
+        steps:
+            - name: Deploy via SSH
+              uses: appleboy/ssh-action@v1.0.3
+              with:
+                  host: ${{ secrets.SERVER_HOST }}
+                  username: ${{ secrets.SERVER_USER }}
+                  key: ${{ secrets.SSH_PRIVATE_KEY }}
+                  port: ${{ secrets.SERVER_PORT || '22' }}
+                  script: |
+                      set -e
 
-            cd ${{ secrets.DEPLOY_PATH || '/home/ai-data-analysis' }}
+                      cd ${{ secrets.DEPLOY_PATH || '/home/ai-data-analysis' }}
 
-            echo "📦 Pull latest code"
-            git pull
+                      echo "📦 Pull latest code"
+                      git pull
 
-            echo "🐳 Build docker images"
-            docker compose build
+                      echo "🐳 Build docker images"
+                      docker compose build
 
-            echo "🧩 Run init job"
-            docker compose up -d postgres redis
-            docker compose stop api worker web
-            docker compose --profile tools run --rm --build init-db
+                      echo "🧩 Run init job"
+                      docker compose up -d --wait postgres redis
+                      docker compose stop api worker web
+                      umask 077
+                      mkdir -p backups
+                      backup_path="backups/pre-deploy-$(date -u +%Y%m%dT%H%M%SZ).sql"
+                      docker compose exec -T postgres sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > "$backup_path"
+                      chmod 600 "$backup_path"
+                      docker compose --profile tools run --rm --build init-db pnpm migrate:database
+                      docker compose --profile tools run --rm init-db
 
-            echo "🚀 Start services"
-            docker compose up -d api worker web
+                      echo "🚀 Start services"
+                      docker compose up -d api worker web

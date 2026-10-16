@@ -70,3 +70,6 @@ dist-h5/
 
 .idea/
 .history
+
+# Database backups
+backups/

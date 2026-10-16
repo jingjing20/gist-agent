@@ -6,10 +6,7 @@
         "dev": "nest start --watch",
         "build": "nest build",
         "typecheck": "tsc --noEmit -p tsconfig.json",
-        "init-db": "tsx scripts/init-db.ts",
-        "test:init-db": "tsx --test scripts/demo-data.test.ts",
-        "benchmark:analytics": "tsx scripts/validate-analytics-benchmark.ts",
-        "benchmark:analytics:update": "tsx scripts/validate-analytics-benchmark.ts --update"
+        "init-db": "tsx scripts/init-db.ts"
     },
     "dependencies": {
         "@gist/config": "workspace:*",

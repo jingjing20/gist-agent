@@ -78,16 +78,17 @@ export const useAuthStore = defineStore('auth', () => {
         }
     }
 
-    async function updatePassword(password: string) {
+    async function updatePassword(password: string, currentPassword: string) {
         const res = await fetch(`${API_BASE}/users/password`, {
             method: 'PUT',
             headers: authHeaders(),
-            body: JSON.stringify({ password }),
+            body: JSON.stringify({ password, currentPassword }),
         });
         const data = await res.json();
         if (!res.ok) {
             throw new Error(data.message || '修改密码失败');
         }
+        logout();
     }
 
     function logout() {

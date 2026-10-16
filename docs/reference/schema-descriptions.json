@@ -1,0 +1,203 @@
+{
+  "app_user": {
+    "purpose": "保存平台账号的邮箱、显示名和密码摘要，供注册、登录、身份验证及资料修改使用。JWT 校验还依赖当前密码摘要的版本，因此修改密码会使旧凭证失效。",
+    "design": "../design/data-model.md#10-账号推荐与执行观测",
+    "evidence": [
+      "apps/api/src/auth/auth.service.ts#AuthService.register",
+      "apps/api/src/auth/auth.service.ts#AuthService.login",
+      "apps/api/src/auth/auth.service.ts#AuthService.findById"
+    ]
+  },
+  "data_source": {
+    "purpose": "定义用户选择的逻辑数据源及其所有者，是目录、共享权限、Memory 和分析任务的范围入口。当前不保存远程数据库连接信息，同一个源通过目录关联平台库中的物理表。",
+    "design": "../design/data-model.md#8-数据源目录共享与字段策略",
+    "evidence": [
+      "apps/api/src/datasource/datasource.service.ts#DataSourceService.create",
+      "apps/api/src/datasource/datasource.service.ts#DataSourceService.canAccess"
+    ]
+  },
+  "datasource_table_catalog": {
+    "purpose": "把物理表登记到逻辑数据源，记录表名、显示名称、来源分类和 Agent 可见性。Schema 发现与 SQL 授权据此确定可分析的表范围，未登记表不会自动进入目录。",
+    "design": "../design/data-model.md#8-数据源目录共享与字段策略",
+    "evidence": [
+      "apps/api/src/datasource/datasource.service.ts#DataSourceService.uploadTable",
+      "packages/database/src/index.ts#getAgentVisibleCatalogTables"
+    ]
+  },
+  "datasource_permission": {
+    "purpose": "记录数据源所有者向其他用户授予的访问许可，使被授权用户能读取和分析该源。它没有读写角色字段，修改资料、上传表删除和 Memory 写入仍各自检查业务权限。",
+    "design": "../design/data-model.md#8-数据源目录共享与字段策略",
+    "evidence": [
+      "apps/api/src/datasource/datasource.service.ts#DataSourceService.grant",
+      "apps/api/src/datasource/datasource.service.ts#DataSourceService.revoke",
+      "packages/database/src/schema-access.ts#assertDatasourceAccess"
+    ]
+  },
+  "datasource_suggestions": {
+    "purpose": "按数据源与用户缓存首页推荐问题，避免相同语言、Schema 内容和 Prompt 版本反复调用模型。回答结束后的追问推荐保存于消息块，属于另一条链路。",
+    "design": "../design/data-model.md#10-账号推荐与执行观测",
+    "evidence": [
+      "apps/api/src/datasource/suggestion.service.ts#SuggestionService.getSuggestions",
+      "apps/api/src/datasource/suggestion.service.ts#SuggestionService.invalidateAndRegenerate"
+    ]
+  },
+  "password_reset_token": {
+    "purpose": "保存找回密码链接对应的凭据摘要、到期时间和使用状态，支持十五分钟有效且一次性使用的重置流程。重置成功或用户主动改密时，该用户其他未使用的重置凭据也会失效。",
+    "design": "../design/data-model.md#10-账号推荐与执行观测",
+    "evidence": [
+      "apps/api/src/auth/auth.service.ts#AuthService.requestReset",
+      "apps/api/src/auth/auth.service.ts#AuthService.resetPassword",
+      "apps/api/src/user/user.service.ts#UserService.updatePassword"
+    ]
+  },
+  "conversation": {
+    "purpose": "保存会话归属、标题和默认数据源，为会话列表、消息读取、分析任务创建及删除提供边界。会话只属于一个用户，数据源共享不会同时共享会话。",
+    "design": "../design/data-model.md#3-会话消息与-turn同一回答的不同表示",
+    "evidence": [
+      "apps/api/src/conversation/conversation.service.ts#ConversationService.create",
+      "apps/api/src/conversation/conversation.service.ts#ConversationService.findAll",
+      "apps/api/src/chat/generation.service.ts#GenerationService.createTurn"
+    ]
+  },
+  "message": {
+    "purpose": "保存用户原始问题和 assistant 展示快照，供历史会话及断流恢复读取。content、blocks 和 llm_messages 分别承载正文、展示块和模型工具协议，运行中 checkpoint 不等于最终正文已经提交。",
+    "design": "../design/data-model.md#3-会话消息与-turn同一回答的不同表示",
+    "evidence": [
+      "apps/api/src/chat/generation.service.ts#GenerationService.createTurn",
+      "apps/worker/src/chat/generation.service.ts#GenerationService.checkpointMessage",
+      "apps/worker/src/chat/generation.service.ts#GenerationService.finalize",
+      "apps/api/src/conversation/conversation.service.ts#ConversationService.getMessages"
+    ]
+  },
+  "generation": {
+    "purpose": "保存一次异步分析的身份、执行状态、幂等信息、写入权和上下文锚点，连接 API 提交、队列、Worker、事件与结果。它的 completed 表示执行正常终结，业务分析仍可能为 partial 或 awaiting_clarification。",
+    "design": "../design/data-model.md#4-generation-与-attempt执行身份与写入权",
+    "evidence": [
+      "apps/api/src/chat/generation.service.ts#GenerationService.createTurn",
+      "apps/worker/src/chat/generation.service.ts#GenerationService.claim",
+      "apps/worker/src/chat/generation.service.ts#GenerationService.finalize"
+    ]
+  },
+  "outbox_event": {
+    "purpose": "保存已经随数据库事务提交、尚需投到 BullMQ 或 Redis Streams 的工作请求，使暂时投递失败可以重试。它记录投递锁、退避与死信状态，不是浏览器事件回放的事实主表。",
+    "design": "../design/data-model.md#5-generation_event-与-outbox_event事实与投递工作",
+    "evidence": [
+      "apps/api/src/chat/generation.service.ts#GenerationService.createTurn",
+      "packages/database/src/generation-events.ts#enqueueGenerationEvent",
+      "apps/api/src/chat/outbox-relay.service.ts#OutboxRelayService.dispatch"
+    ]
+  },
+  "generation_attempt": {
+    "purpose": "记录 Worker 成功领取 generation 后的执行尝试，包括 writer、是否收到首个模型 delta 以及终态。它与 BullMQ 的投递重试计数、用户界面的重新提问不是同一个概念。",
+    "design": "../design/data-model.md#4-generation-与-attempt执行身份与写入权",
+    "evidence": [
+      "apps/worker/src/chat/generation.service.ts#GenerationService.claim",
+      "apps/worker/src/chat/generation.service.ts#GenerationService.markFirstDelta",
+      "apps/worker/src/chat/generation.service.ts#GenerationService.finalize"
+    ]
+  },
+  "generation_event": {
+    "purpose": "按 generation 内递增序号保存执行事件，是 SSE 跳号补洞和历史回放的数据库依据。写事件时同步推进 generation.last_sequence 并创建 Outbox，事件已保存与浏览器已收到是两个时点。",
+    "design": "../design/data-model.md#5-generation_event-与-outbox_event事实与投递工作",
+    "evidence": [
+      "packages/database/src/generation-events.ts#enqueueGenerationEvent",
+      "apps/api/src/chat/generation.service.ts#GenerationService.history"
+    ]
+  },
+  "conversation_turn": {
+    "purpose": "把一轮问题、assistant 消息和 generation 组织为有序问答，并保存成功终结的 final_answer。Agent 的近期历史从 completed Turn 读取，失败或取消的部分展示不会因此进入成功问答历史。",
+    "design": "../design/data-model.md#3-会话消息与-turn同一回答的不同表示",
+    "evidence": [
+      "apps/api/src/chat/generation.service.ts#GenerationService.createTurn",
+      "apps/worker/src/chat/generation.service.ts#GenerationService.finalize",
+      "apps/worker/src/analysis/analysis-state.repository.ts#AnalysisStateRepository.history"
+    ]
+  },
+  "query_artifact": {
+    "purpose": "保存一次成功查询的 SQL、规范化且脱敏后的行、质量提示和分析条件快照，作为模型回读、历史复用、表格和图表共同依赖的证据。它保存已返回的有界结果，不保证是数据源中的完整总体。",
+    "design": "../design/data-model.md#7-query-与-chart-artifact证据和展示定义",
+    "evidence": [
+      "apps/worker/src/chat/artifact.repository.ts#ArtifactRepository.createQueryArtifact",
+      "apps/worker/src/chat/artifact.repository.ts#ArtifactRepository.readQueryArtifact",
+      "apps/worker/src/chat/artifact.repository.ts#ArtifactRepository.listAnalysisEvidence"
+    ]
+  },
+  "chart_artifact": {
+    "purpose": "保存图表类型、坐标字段、系列及排序定义，并通过 query_artifact_id 引用查询证据。图表数值由程序从证据读取，不在该表重复保存一套模型提供的数据行。",
+    "design": "../design/data-model.md#7-query-与-chart-artifact证据和展示定义",
+    "evidence": [
+      "apps/worker/src/chat/artifact.repository.ts#ArtifactRepository.createChartArtifact",
+      "apps/worker/src/chat/tools/generate-chart.tool.ts#GenerateChartTool.execute"
+    ]
+  },
+  "datasource_column_policy": {
+    "purpose": "记录已登记物理列的 Agent 访问和脱敏政策，供 Schema 过滤、SQL 校验及结果脱敏使用。classification 是分类元数据，真正执行的规则来自 agent_access 与 mask_type。",
+    "design": "../design/data-model.md#8-数据源目录共享与字段策略",
+    "evidence": [
+      "packages/database/src/schema-access.ts#getDatasourceColumnPolicies",
+      "apps/worker/src/chat/tools/sql-executor.ts#SqlExecutor.validate",
+      "apps/api/src/datasource/datasource.service.ts#DataSourceService.deleteTable"
+    ]
+  },
+  "generation_metric": {
+    "purpose": "按 generation 汇总 LLM、工具和 SQL 调用次数及输入输出 token 估算，辅助执行成本与行为排查。这里的 token 是程序估算，不是模型服务商结算的 usage。",
+    "design": "../design/data-model.md#10-账号推荐与执行观测",
+    "evidence": [
+      "apps/worker/src/chat/generation.service.ts#GenerationService.recordExecutionMetrics",
+      "apps/worker/src/chat/chat.service.ts#ChatService.runGeneration"
+    ]
+  },
+  "generation_trace_span": {
+    "purpose": "保存某次执行观测的名称、状态、耗时与元数据，用于故障定位。当前主要写 generation.error，并未构成覆盖全部模型、工具和 SQL 步骤的完整 Trace。",
+    "design": "../design/data-model.md#10-账号推荐与执行观测",
+    "evidence": [
+      "apps/worker/src/chat/generation.service.ts#GenerationService.recordSpan",
+      "apps/worker/src/chat/chat.service.ts#ChatService.runGeneration"
+    ]
+  },
+  "datasource_memory": {
+    "purpose": "保存数据源正式记忆的身份、当前版本、活动状态和规范化标题，是跨会话复用业务口径的主记录。正文在版本表中，删除采用增加版本的软删除，活动标题同源唯一。",
+    "design": "../design/data-model.md#9-memory-主记录revision-和-candidate",
+    "evidence": [
+      "packages/database/src/memory-repository.ts#MemoryRepository.list",
+      "packages/database/src/memory-repository.ts#MemoryRepository.snapshot",
+      "packages/database/src/memory-repository.ts#MemoryRepository.save"
+    ]
+  },
+  "datasource_memory_revision": {
+    "purpose": "追加保存正式记忆每个版本的完整正文、状态、来源和确认人，使编辑与删除后仍能追溯旧口径。对话来源 UUID 作为来源信息保留，没有 message 外键，因此删除会话不会删除已保存的正式知识。",
+    "design": "../design/data-model.md#9-memory-主记录revision-和-candidate",
+    "evidence": [
+      "packages/database/src/memory-repository.ts#MemoryRepository.save",
+      "packages/database/src/memory-repository.ts#MemoryRepository.get",
+      "packages/database/src/memory-repository.ts#MemoryRepository.rememberFromConversation"
+    ]
+  },
+  "datasource_memory_candidate": {
+    "purpose": "保存 Agent 提出的待确认记忆内容和可选替换目标，将模型提议与正式知识写入分开。所属 generation completed 后才可见及确认，接受时同事务写正式版本并记录确认结果，失败候选不会自动成为知识。",
+    "design": "../design/data-model.md#9-memory-主记录revision-和-candidate",
+    "evidence": [
+      "packages/database/src/memory-repository.ts#MemoryRepository.propose",
+      "packages/database/src/memory-repository.ts#MemoryRepository.candidates",
+      "packages/database/src/memory-repository.ts#MemoryRepository.decide"
+    ]
+  },
+  "analysis_state": {
+    "purpose": "保存每个会话最新已提交的分析任务、条件、采用的记忆版本和业务 outcome，供下一轮同源分析继承。只在 generation completed 的终结事务中从草稿提升，不保存每次工具修改的完整状态历史。",
+    "design": "../design/data-model.md#6-analysis_state-与-draft正式状态和当前工作区",
+    "evidence": [
+      "apps/worker/src/analysis/analysis-state.repository.ts#AnalysisStateRepository.begin",
+      "packages/database/src/analysis-state-schema.ts#promoteAnalysisDraft",
+      "apps/worker/src/chat/generation.service.ts#GenerationService.finalize"
+    ]
+  },
+  "analysis_state_draft": {
+    "purpose": "保存当前 generation 可更新的分析工作区、本轮固定 Memory 快照和上下文选择报告，避免运行中或失败条件覆盖正式状态。base_revision 与 revision 用于草稿并发修改和最终提交冲突检查，完成后草稿仍保留供诊断。",
+    "design": "../design/data-model.md#6-analysis_state-与-draft正式状态和当前工作区",
+    "evidence": [
+      "apps/worker/src/analysis/analysis-state.repository.ts#AnalysisStateRepository.begin",
+      "apps/worker/src/analysis/analysis-state.repository.ts#AnalysisStateRepository.save",
+      "apps/worker/src/analysis/analysis-state.repository.ts#AnalysisStateRepository.report"
+    ]
+  }
+}

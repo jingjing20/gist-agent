@@ -47,7 +47,13 @@ export class ChatService {
             token: writerToken,
         });
         if (!permit) throw new GenerationExecutionError('GENERATION_CAPACITY_UNAVAILABLE', '生成容量暂时不可用');
-        const generation = await this.generations.claim(generationId, writerToken);
+        let generation: GenerationIdentity | null;
+        try {
+            generation = await this.generations.claim(generationId, writerToken);
+        } catch (error) {
+            await this.reliability.release(permit);
+            throw error;
+        }
         if (!generation) {
             await this.reliability.release(permit);
             return;
@@ -57,9 +63,13 @@ export class ChatService {
         let ownershipLost = false;
         const heartbeat = setInterval(
             () =>
-                void Promise.all([this.generations.heartbeat(generationId, writerToken), this.reliability.renew(permit!)]).then(([databaseOwned, redisOwned]) => {
-                    ownershipLost = !databaseOwned || !redisOwned;
-                }),
+                void Promise.all([this.generations.heartbeat(generationId, writerToken), this.reliability.renew(permit!)])
+                    .then(([databaseOwned, redisOwned]) => {
+                        ownershipLost = !databaseOwned || !redisOwned;
+                    })
+                    .catch(() => {
+                        ownershipLost = true;
+                    }),
             environment.heartbeatIntervalMs
         );
         heartbeat.unref();
@@ -74,6 +84,10 @@ export class ChatService {
         }
     }
 
+    async failQueued(generationId: string, error: string): Promise<void> {
+        await this.generations.failQueued(generationId, error);
+    }
+
     private async runGeneration(generation: GenerationIdentity, message: string, datasourceId: number | null, ownershipLost: () => boolean): Promise<void> {
         const { conversationId, userId } = generation;
         const controller = new AbortController();
@@ -84,7 +98,11 @@ export class ChatService {
         let timedOut = false;
         const cancelPoll = setInterval(() => {
             if (ownershipLost()) controller.abort(new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '生成任务写入权已丢失'));
-            else void this.generations.isCancelRequested(generation.id).then((cancelled) => cancelled && controller.abort(new GenerationExecutionError('CANCELLED', '已取消')));
+            else
+                void this.generations
+                    .isCancelRequested(generation.id)
+                    .then((cancelled) => cancelled && controller.abort(new GenerationExecutionError('CANCELLED', '已取消')))
+                    .catch(() => controller.abort(new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '无法确认任务写入权')));
         }, 500);
         const timeout = setTimeout(
             () => {

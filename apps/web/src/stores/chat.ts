@@ -5,7 +5,7 @@ import type { ChatMessage, Conversation, MessageBlock, SSEEvent } from '../types
 import { apiFetch } from '../api';
 import { useToastStore } from './toast';
 
-type GenerationStatus = 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+import type { GenerationStatus } from '@gist/contracts';
 interface GenerationState {
     id: string;
     conversationId: string;
@@ -37,7 +37,7 @@ export const useChatStore = defineStore('chat', () => {
 
     const activeConversation = computed(() => conversations.value.find((c) => c.id === activeConversationId.value));
     const activeGeneration = computed(() =>
-        Object.values(generations.value).find((g) => g.conversationId === activeConversationId.value && ['pending', 'running'].includes(g.status))
+        Object.values(generations.value).find((g) => g.conversationId === activeConversationId.value && ['pending', 'starting', 'running', 'cancel_requested'].includes(g.status))
     );
     const isLoading = computed(() => !!activeGeneration.value);
 
@@ -66,7 +66,7 @@ export const useChatStore = defineStore('chat', () => {
         for (const message of data) {
             if (!message.generation_id) continue;
             const rawStatus = String(message.generation_status || 'completed');
-            const status: GenerationStatus = rawStatus === 'cancel_requested' || rawStatus === 'starting' ? 'running' : (rawStatus as GenerationStatus);
+            const status = rawStatus as GenerationStatus;
             generations.value[message.generation_id] = {
                 id: message.generation_id,
                 conversationId,
@@ -77,7 +77,9 @@ export const useChatStore = defineStore('chat', () => {
         }
         const existing = new Map(conv.messages.map((m) => [m.id, m]));
         const live = new Map(
-            conv.messages.filter((m) => Object.values(generations.value).some((g) => g.messageId === m.id && ['pending', 'running'].includes(g.status))).map((m) => [m.id, m])
+            conv.messages
+                .filter((m) => Object.values(generations.value).some((g) => g.messageId === m.id && ['pending', 'starting', 'running', 'cancel_requested'].includes(g.status)))
+                .map((m) => [m.id, m])
         );
         conv.messages = data.map((m: any) => {
             const previous = existing.get(m.id);
@@ -101,7 +103,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     async function deleteConversation(id: string) {
-        const running = Object.values(generations.value).find((g) => g.conversationId === id && ['pending', 'running'].includes(g.status));
+        const running = Object.values(generations.value).find((g) => g.conversationId === id && ['pending', 'starting', 'running', 'cancel_requested'].includes(g.status));
         if (running) await cancelGeneration(running.id);
         const response = await apiFetch(`/conversations/${id}`, { method: 'DELETE' });
         if (!response.ok) {
@@ -174,7 +176,7 @@ export const useChatStore = defineStore('chat', () => {
         state.sequence = event.sequence;
         if (event.type === 'done') state.status = event.status ?? 'completed';
         else if (event.type === 'error') state.status = event.content === '已取消' ? 'cancelled' : 'failed';
-        else state.status = 'running';
+        else if (state.status !== 'cancel_requested') state.status = 'running';
         generations.value[event.generationId] = state;
         const conv = conversations.value.find((c) => c.id === event.conversationId);
         if (!conv) return 'applied';
@@ -368,7 +370,9 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     async function cancelGeneration(id: string) {
-        await apiFetch(`/chat/generations/${id}/cancel`, { method: 'POST' });
+        const response = await apiFetch(`/chat/generations/${id}/cancel`, { method: 'POST' });
+        if (!response.ok) throw new Error('取消请求失败');
+        if (generations.value[id]) generations.value[id].status = 'cancel_requested';
     }
     async function retryGeneration(id: string): Promise<boolean> {
         try {
@@ -393,7 +397,7 @@ export const useChatStore = defineStore('chat', () => {
         }
     }
     function abortStream() {
-        if (activeGeneration.value) void cancelGeneration(activeGeneration.value.id);
+        if (activeGeneration.value) void cancelGeneration(activeGeneration.value.id).catch((error) => toast.error(error.message));
     }
     function clear() {
         conversations.value = [];

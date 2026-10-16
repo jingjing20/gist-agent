@@ -1,3 +1,4 @@
+import { jwtSecret } from '@gist/config';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
@@ -6,6 +7,7 @@ import { AuthService } from './auth.service';
 export interface JwtPayload {
     sub: number;
     email: string;
+    credentialsVersion: string;
 }
 
 @Injectable()
@@ -14,12 +16,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         super({
             jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: process.env.JWT_SECRET || 'default-secret',
+            secretOrKey: jwtSecret(),
         });
     }
 
     async validate(payload: JwtPayload) {
-        const user = await this.authService.findById(payload.sub);
+        if (typeof payload.credentialsVersion !== 'string') throw new UnauthorizedException('请重新登录');
+        const user = await this.authService.findById(payload.sub, payload.credentialsVersion);
         if (!user) {
             throw new UnauthorizedException();
         }

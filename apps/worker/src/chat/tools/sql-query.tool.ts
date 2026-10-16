@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type OpenAI from 'openai';
 import { requireNonEmptyString, requireRecord, type Tool, type ToolContext, type ToolExecutionResult, type SSEEvent } from './base-tool';
-import { SqlExecutorAgent } from '../agents/sql-executor';
+import { SqlExecutor } from './sql-executor';
 import type { QueryExpectedShape, QueryPlanV1 } from '@gist/contracts';
 import { ArtifactRepository } from '../artifact.repository';
 import { GenerationExecutionError } from '../generation-errors';
@@ -46,7 +46,7 @@ export class SqlQueryTool implements Tool {
     };
 
     constructor(
-        private readonly sqlExecutor: SqlExecutorAgent,
+        private readonly sqlExecutor: SqlExecutor,
         private readonly artifacts: ArtifactRepository
     ) {}
 

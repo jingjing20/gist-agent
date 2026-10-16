@@ -6,7 +6,7 @@ import { GenerationService } from './generation.service';
 import { GenerationWorkerService } from './generation-worker.service';
 import { GenerationReliabilityService } from './generation-reliability.service';
 import { ZombieGenerationMonitorService } from './zombie-generation-monitor.service';
-import { SqlExecutorAgent } from './agents/sql-executor';
+import { SqlExecutor } from './tools/sql-executor';
 import { GenerateChartTool } from './tools/generate-chart.tool';
 import { SqlQueryTool } from './tools/sql-query.tool';
 import { ArtifactRepository } from './artifact.repository';
@@ -20,7 +20,7 @@ import { ArtifactRepository } from './artifact.repository';
         GenerationWorkerService,
         GenerationReliabilityService,
         ZombieGenerationMonitorService,
-        SqlExecutorAgent,
+        SqlExecutor,
         ArtifactRepository,
         SqlQueryTool,
         GenerateChartTool,

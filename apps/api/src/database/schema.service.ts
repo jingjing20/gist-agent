@@ -1,10 +1,12 @@
-import { Injectable } from '@nestjs/common';
+import { assertDatasourceAccess, getDatasourceColumnPolicies } from '@gist/database';
+import { Injectable, ForbiddenException } from '@nestjs/common';
 import { DatabaseService } from './database.service';
 import { getAgentVisibleCatalogTables, type DataSourceTableCatalogEntry } from '@gist/database';
 
 interface SchemaCacheEntry {
     prompt: string;
     timestamp: number;
+    policyFingerprint: string;
 }
 
 const CACHE_TTL_MS = 60 * 1000; // 1 分钟缓存
@@ -24,9 +26,12 @@ export class SchemaService {
      * 包含权限控制：仅列出目录中明确对 Agent 开放的表。
      */
     async getDatabaseSchemaPrompt(datasourceId: number | null, userId: number): Promise<string> {
+        await this.assertAccess(datasourceId, userId);
+        const policies = await getDatasourceColumnPolicies(this.db, datasourceId, userId);
+        const policyFingerprint = JSON.stringify(policies);
         const cacheKey = `${datasourceId || 'local'}_${userId}`;
         const cached = this.cache.get(cacheKey);
-        if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        if (cached && cached.policyFingerprint === policyFingerprint && Date.now() - cached.timestamp < CACHE_TTL_MS) {
             return cached.prompt;
         }
 
@@ -38,12 +43,22 @@ export class SchemaService {
         }
 
         const rows = await this.fetchRawSchemaRows(allowedTables);
-        const prompt = rows.length > 0 ? this.formatSchemaRows(rows, catalogTables) : '当前数据源中没有可用的业务表。';
+        const visible = rows.filter((row) => !policies.some((p) => p.tableName === row.TABLE_NAME && p.columnName === row.COLUMN_NAME && p.access === 'deny'));
+        const prompt = visible.length > 0 ? this.formatSchemaRows(visible, catalogTables) : '当前数据源中没有可用的业务表。';
 
         if (prompt) {
-            this.cache.set(cacheKey, { prompt, timestamp: Date.now() });
+            this.cache.set(cacheKey, { prompt, timestamp: Date.now(), policyFingerprint });
         }
         return prompt;
+    }
+
+    private async assertAccess(datasourceId: number | null, userId: number): Promise<void> {
+        try {
+            await assertDatasourceAccess(this.db, datasourceId, userId);
+        } catch (error) {
+            if (error instanceof Error && error.message.startsWith('DATASOURCE_ACCESS_CHANGED:')) throw new ForbiddenException('无权访问此数据源');
+            throw error;
+        }
     }
 
     clearUserCache(datasourceId: number | null, userId: number): void {
@@ -59,6 +74,7 @@ export class SchemaService {
     }
 
     async getAllowedTableNames(datasourceId: number | null, userId: number): Promise<string[]> {
+        await this.assertAccess(datasourceId, userId);
         const catalogTables = await getAgentVisibleCatalogTables(this.db, datasourceId);
         return catalogTables.map((table) => table.table_name);
     }
@@ -84,6 +100,8 @@ export class SchemaService {
     }
 
     async getStructuredSchema(datasourceId: number | null, userId: number): Promise<any[]> {
+        await this.assertAccess(datasourceId, userId);
+        const policies = await getDatasourceColumnPolicies(this.db, datasourceId, userId);
         const catalogTables = await getAgentVisibleCatalogTables(this.db, datasourceId);
         const allowedTables = catalogTables.map((table) => table.table_name);
         const catalogByName = new Map(catalogTables.map((table) => [table.table_name, table]));
@@ -98,20 +116,20 @@ export class SchemaService {
                 display_name: string;
                 isUploaded: boolean;
                 sourceType?: string;
-                datasetKey?: string | null;
                 fields: any[];
             }
         >();
 
         for (const row of rows) {
             const tableName = row.TABLE_NAME;
+            const policy = policies.find((p) => p.tableName === tableName && p.columnName === row.COLUMN_NAME);
+            if (policy?.access === 'deny') continue;
             if (!tablesMap.has(tableName)) {
                 tablesMap.set(tableName, {
                     tableName,
                     display_name: catalogByName.get(tableName)?.display_name || row.TABLE_COMMENT || tableName,
                     isUploaded: catalogByName.get(tableName)?.source_type === 'uploaded',
                     sourceType: catalogByName.get(tableName)?.source_type,
-                    datasetKey: catalogByName.get(tableName)?.dataset_key,
                     fields: [],
                 });
             }
@@ -120,6 +138,7 @@ export class SchemaService {
                 name: row.COLUMN_NAME,
                 type: row.COLUMN_TYPE,
                 comment: row.COLUMN_COMMENT || '',
+                masked: policy?.access === 'mask',
             });
         }
 
@@ -155,7 +174,6 @@ export class SchemaService {
         for (const [tableName, info] of tablesMap.entries()) {
             const label = info.catalog?.source_type === 'uploaded' ? ' [用户上传]' : '';
             promptLines.push(`表名: ${tableName}${label}`);
-            if (info.catalog?.dataset_key) promptLines.push(`数据集: ${info.catalog.dataset_key}`);
             promptLines.push(`说明: ${info.catalog?.description || info.comment}`);
             promptLines.push(`字段:\n${info.columns.join('\n')}`);
             promptLines.push('');

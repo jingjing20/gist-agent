@@ -1,6 +1,5 @@
 import { Client } from 'pg';
 import { loadWorkspaceEnv } from '@gist/config';
-import { initializeDemoData } from './demo-data';
 import { applyCurrentSchema } from '@gist/database';
 
 loadWorkspaceEnv();
@@ -23,13 +22,9 @@ async function initDB() {
     const db = new Client({ ...common, database });
     await db.connect();
     await applyCurrentSchema(db);
-    await db.query(
-        `INSERT INTO data_source (name, host, port, "user", password, database_name, is_local, description)
-      SELECT '本地默认库', $1, $2, $3, $4, $5, 1, '系统默认 PostgreSQL 数据库'
-      WHERE NOT EXISTS (SELECT 1 FROM data_source WHERE is_local = 1)`,
-        [common.host, common.port, common.user, common.password, database]
-    );
-    await initializeDemoData(db);
+    await db.query(`INSERT INTO data_source (name,is_local,description)
+        SELECT '本地默认库',1,'系统默认 PostgreSQL 数据库'
+        WHERE NOT EXISTS (SELECT 1 FROM data_source WHERE is_local=1)`);
     await configureAgentReadOnlyRole(db);
     await db.end();
     console.log(`PostgreSQL database ${database} initialized successfully.`);

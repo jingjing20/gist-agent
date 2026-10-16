@@ -1,0 +1,278 @@
+{
+  "GET /api/analysis-artifacts/:id": {
+    "purpose": "查看一次分析查询的证据说明，包括查询目的、原始与执行 SQL、列定义、行数、分析上下文和质量标记；同时核验会话归属、数据源访问权、有效期及当前目录与字段权限指纹。",
+    "group": "分析证据",
+    "evidence": ["apps/api/src/analysis-artifact/analysis-artifact.module.ts#AnalysisArtifactController.read", "apps/web/src/components/blocks/QueryEvidence.vue#load"],
+    "guide": "../guides/sql-and-artifacts.md"
+  },
+  "GET /api/analysis-artifacts/:id/rows": {
+    "purpose": "按存储行偏移量分页读取查询证据中已保存、已脱敏的结果行，供表格展开和加载更多使用；不会重新执行 SQL，权限与有效期检查和证据元数据接口相同。",
+    "group": "分析证据",
+    "evidence": ["apps/api/src/analysis-artifact/analysis-artifact.module.ts#AnalysisArtifactController.read", "apps/web/src/components/blocks/AnalysisArtifactTable.vue#load"],
+    "guide": "../guides/sql-and-artifacts.md"
+  },
+  "POST /api/auth/register": {
+    "purpose": "注册邮箱账号，保存密码哈希并返回用户资料与登录 JWT；邮箱按小写和首尾空白归一化，同邮箱不能重复注册。",
+    "group": "认证与账号",
+    "evidence": ["apps/api/src/auth/auth.service.ts#AuthService.register", "apps/web/src/stores/auth.ts#register"],
+    "guide": "../guides/development.md"
+  },
+  "POST /api/auth/login": {
+    "purpose": "校验邮箱和密码，返回用户资料与登录 JWT；JWT 包含凭据版本，后续请求会检查密码是否已变更。",
+    "group": "认证与账号",
+    "evidence": ["apps/api/src/auth/auth.service.ts#AuthService.login", "apps/api/src/auth/auth.service.ts#AuthService.findById"],
+    "guide": "../guides/development.md"
+  },
+  "POST /api/auth/forgot-password": {
+    "purpose": "为已注册邮箱创建限时密码重置凭据并发送重置邮件；未注册邮箱也返回通用提示，实际邮件发送失败仍可能导致请求报错。",
+    "group": "认证与账号",
+    "evidence": ["apps/api/src/auth/auth.service.ts#AuthService.requestReset", "apps/web/src/views/ForgotPasswordPage.vue#handleSubmit"],
+    "guide": "../guides/development.md"
+  },
+  "POST /api/auth/reset-password": {
+    "purpose": "使用未过期、未使用的邮件重置凭据设置新密码，并将该用户尚未使用的重置凭据一并作废；旧登录 JWT 随密码凭据版本变化而失效。",
+    "group": "认证与账号",
+    "evidence": ["apps/api/src/auth/auth.service.ts#AuthService.resetPassword", "apps/api/src/auth/auth.service.ts#AuthService.findById"],
+    "guide": "../guides/development.md"
+  },
+  "POST /api/auth/me": {
+    "purpose": "读取经过 JWT 和当前凭据版本校验的登录用户资料，供页面刷新时恢复账号状态；此接口不签发或刷新 Token。",
+    "group": "认证与账号",
+    "evidence": ["apps/api/src/auth/auth.service.ts#AuthService.findById", "apps/web/src/stores/auth.ts#fetchUser"],
+    "guide": "../guides/development.md"
+  },
+  "POST /api/chat": {
+    "purpose": "提交会话中的用户问题，原子创建用户消息、助手占位消息、Generation、Turn 和入队 Outbox，返回四个标识；实际 Agent 分析由独立 Worker 异步执行，并受幂等键、会话活动任务和用户并发限制约束。",
+    "group": "分析任务与流式通信",
+    "evidence": ["apps/api/src/chat/chat.service.ts#ChatService.startChat", "apps/api/src/chat/generation.service.ts#GenerationService.createTurn"],
+    "guide": "../guides/generation-lifecycle.md"
+  },
+  "GET /api/chat/sync": {
+    "purpose": "恢复实时订阅前取得用户 Redis 事件游标、所有活动 Generation 快照，以及客户端已知 Generation 的状态快照；用于对齐任务状态，和单任务事件补洞接口分工不同。",
+    "group": "分析任务与流式通信",
+    "evidence": ["apps/api/src/chat/generation.service.ts#GenerationService.sync", "apps/web/src/stores/chat.ts#startRealtime"],
+    "guide": "../guides/frontend-streaming.md"
+  },
+  "GET /api/chat/events": {
+    "purpose": "从给定 Redis Stream 游标持续订阅当前用户各会话的实时 SSE 事件，包含增量文本、工具过程和任务结束通知；连接空闲时发送心跳，Generation 逻辑序号缺口另由历史接口补齐。",
+    "group": "分析任务与流式通信",
+    "evidence": ["apps/api/src/chat/generation.service.ts#GenerationService.stream", "apps/web/src/stores/chat.ts#startRealtime"],
+    "guide": "../guides/frontend-streaming.md"
+  },
+  "GET /api/chat/generations/:id/events": {
+    "purpose": "按 Generation 逻辑序号读取 PostgreSQL 中持久化的后续事件，用于客户端发现事件缺口后的补洞；事件不连续或缺少所需终态事件时返回消息与任务状态快照。",
+    "group": "分析任务与流式通信",
+    "evidence": ["apps/api/src/chat/generation.service.ts#GenerationService.history", "apps/web/src/stores/chat.ts#resync"],
+    "guide": "../guides/frontend-streaming.md"
+  },
+  "POST /api/chat/generations/:id/cancel": {
+    "purpose": "将本人活动 Generation 标记为 cancel_requested，交由 Worker 轮询后中断执行并落定终态；接口返回时不代表模型、SQL 或任务已同步停止。",
+    "group": "分析任务与流式通信",
+    "evidence": ["apps/api/src/chat/generation.service.ts#GenerationService.cancel", "apps/web/src/stores/chat.ts#cancelGeneration"],
+    "guide": "../guides/generation-lifecycle.md"
+  },
+  "POST /api/chat/generations/:id/retry": {
+    "purpose": "读取本人 failed 或 cancelled Generation 的原问题、会话、数据源和推理开关，重新提交为新的 Generation 和消息；重新执行整个任务，不从旧检查点续跑。",
+    "group": "分析任务与流式通信",
+    "evidence": ["apps/api/src/chat/generation.service.ts#GenerationService.retry", "apps/api/src/chat/chat.service.ts#ChatService.startChat"],
+    "guide": "../guides/generation-lifecycle.md"
+  },
+  "GET /api/conversations": {
+    "purpose": "列出当前用户的会话，按最近更新时间倒序返回标题、数据源关联等信息，供侧边栏切换历史分析。",
+    "group": "会话与历史消息",
+    "evidence": ["apps/api/src/conversation/conversation.service.ts#ConversationService.findAll", "apps/web/src/stores/chat.ts#fetchConversations"],
+    "guide": "../guides/frontend-streaming.md"
+  },
+  "POST /api/conversations": {
+    "purpose": "创建属于当前用户的空会话并返回会话记录，供首次提交问题前获取 conversationId；创建会话本身不触发 Agent 执行。",
+    "group": "会话与历史消息",
+    "evidence": ["apps/api/src/conversation/conversation.service.ts#ConversationService.create", "apps/web/src/stores/chat.ts#createConversation"],
+    "guide": "../guides/frontend-streaming.md"
+  },
+  "DELETE /api/conversations/:id": {
+    "purpose": "删除本人会话，在事务中清理关联 Generation 的 Outbox，并由外键级联删除消息与相关执行记录；正式 Memory 的历史来源标识独立保留。",
+    "group": "会话与历史消息",
+    "evidence": ["apps/api/src/conversation/conversation.service.ts#ConversationService.remove", "packages/database/src/memory-schema.ts#DATASOURCE_MEMORY_SCHEMA_SQL"],
+    "guide": "../guides/database-persistence.md"
+  },
+  "GET /api/conversations/:id/messages": {
+    "purpose": "读取本人会话按时间排序的持久化消息，以及助手消息对应的 Generation 状态和最后序号，恢复历史文本、表格、图表与执行过程；会话不存在或不属于本人时返回空数组。",
+    "group": "会话与历史消息",
+    "evidence": ["apps/api/src/conversation/conversation.service.ts#ConversationService.getMessages", "apps/web/src/stores/chat.ts#fetchMessages"],
+    "guide": "../guides/frontend-streaming.md"
+  },
+  "GET /api/datasources": {
+    "purpose": "列出当前用户可访问的公共、自建及被授权数据源，供分析输入和数据源管理页选择；数据源是平台表目录的归属空间。",
+    "group": "数据源与表管理",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.findAllForUser", "apps/web/src/stores/datasource.ts#fetchAll"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "GET /api/datasources/:id/tables": {
+    "purpose": "读取可访问数据源中登记的表目录及展示名称、来源、上传者和 Agent 可见标记，用于管理表；这份目录包含 Agent 不可见的登记表，与 schema 接口的可见结构结果不同。",
+    "group": "数据源与表管理",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.listTables", "apps/web/src/stores/datasource.ts#listTables"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "GET /api/datasources/:id/tables/:tableId/column-comments": {
+    "purpose": "读取目标物理表当前字段名称、类型和正式 PostgreSQL 注释，作为注释审核的原始基线；仅允许仍可访问该数据源的创建者或表上传人使用。",
+    "group": "Schema 与业务语义",
+    "evidence": ["apps/api/src/datasource/schema-enrichment.service.ts#SchemaEnrichmentService.inspect", "apps/web/src/components/datasource/SchemaEnrichmentModal.vue#refreshOriginals"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "POST /api/datasources/:id/tables/:tableId/column-comments/suggestions": {
+    "purpose": "基于所选字段的原注释和受限样本调用模型，生成待审核的字段业务说明、依据和待核实项；受限制字段值不发送给模型，此步骤不写入正式注释。",
+    "group": "Schema 与业务语义",
+    "evidence": ["apps/api/src/datasource/schema-enrichment.service.ts#SchemaEnrichmentService.generate", "apps/web/src/components/datasource/SchemaEnrichmentModal.vue#generate"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "PATCH /api/datasources/:id/tables/:tableId/column-comments": {
+    "purpose": "将用户审核后的字段说明批量写入 PostgreSQL 正式列注释，并清理 Schema 与推荐问题缓存；逐项核对 originalComment，原注释已被他人修改时整批拒绝保存。",
+    "group": "Schema 与业务语义",
+    "evidence": ["apps/api/src/datasource/schema-enrichment.service.ts#SchemaEnrichmentService.save", "apps/web/src/components/datasource/SchemaEnrichmentModal.vue#save"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "POST /api/datasources/:id/tables": {
+    "purpose": "将 CSV 或 Excel 中选定的表清洗后导入平台 PostgreSQL，在一个事务中创建物理表、插入行、写入初始注释并登记表目录；需要数据源访问权，默认本地数据源（is_local=1）禁止上传。",
+    "group": "数据源与表管理",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.uploadTables", "apps/api/src/datasource/datasource.service.ts#DataSourceService.uploadTable"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "DELETE /api/datasources/:id/tables/:tableId": {
+    "purpose": "删除指定用户上传表的物理表、目录和列策略，清理 Schema 与推荐问题缓存；只允许仍可访问数据源的表上传人或数据源创建者操作，预置及 external 目录表不可通过此接口删除。",
+    "group": "数据源与表管理",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.deleteTable", "apps/web/src/stores/datasource.ts#deleteTable"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "GET /api/datasources/:id/suggestions": {
+    "purpose": "根据当前可见 Schema 和请求语言读取或生成首页推荐分析问题；缓存按用户、Schema 哈希与 Prompt 版本区分，不读取业务行或正式 Memory 来生成这些问题。",
+    "group": "Schema 与业务语义",
+    "evidence": ["apps/api/src/datasource/suggestion.service.ts#SuggestionService.getSuggestions", "apps/web/src/stores/datasource.ts#fetchSuggestions"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "GET /api/datasources/:id/schema": {
+    "purpose": "读取当前用户可访问且对 Agent 开放的表结构，返回展示名、字段类型、正式注释与脱敏标记；deny 字段被过滤，用于前端结构浏览和分析语义理解。",
+    "group": "Schema 与业务语义",
+    "evidence": ["apps/api/src/database/schema.service.ts#SchemaService.getStructuredSchema", "apps/web/src/stores/datasource.ts#fetchSchema"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "GET /api/datasources/:id": {
+    "purpose": "核验用户对数据源的访问权并返回其名称、描述、默认本地源标记和创建者等信息；不返回远程数据库连接参数。",
+    "group": "数据源与表管理",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.findOne", "apps/api/src/datasource/datasource.service.ts#DataSourceService.canAccess"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "POST /api/datasources": {
+    "purpose": "创建当前用户拥有的数据源名称与描述记录，并登记创建者的访问权限；不建立远程数据库连接，也不自动创建分析数据表。",
+    "group": "数据源与表管理",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.create", "apps/web/src/stores/datasource.ts#create"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "POST /api/datasources/:id/grant": {
+    "purpose": "由数据源创建者为指定用户登记访问授权，重复授权不新增重复记录；授权提供数据源访问能力，不把对方变为创建者或赋予正式 Memory 写权限。",
+    "group": "数据源授权",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.grant", "packages/database/src/memory-repository.ts#MemoryRepository.authorize"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "POST /api/datasources/:id/revoke": {
+    "purpose": "由数据源创建者移除指定用户的显式访问授权；公共数据源可见性和创建者身份本身的访问权不由该授权记录决定。",
+    "group": "数据源授权",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.revoke", "apps/api/src/datasource/datasource.service.ts#DataSourceService.canAccess"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "GET /api/datasources/:id/permissions": {
+    "purpose": "由数据源创建者查看显式授权用户的 ID、邮箱和名称，供授权管理弹窗选择撤销对象；这是权限记录列表，不是所有可见用户的枚举。",
+    "group": "数据源授权",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.listPermissionUsers", "apps/web/src/stores/datasource.ts#listPermissions"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "PATCH /api/datasources/:id": {
+    "purpose": "由数据源创建者修改名称和描述并返回更新后的数据源信息；更新不修改物理表、表目录或数据库连接。",
+    "group": "数据源与表管理",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.update", "apps/web/src/stores/datasource.ts#update"],
+    "guide": "../guides/datasource-and-schema.md"
+  },
+  "DELETE /api/datasources/:id": {
+    "purpose": "由创建者删除非默认数据源，在事务内删除其 uploaded 物理表及数据源记录，并级联清理依附实体；默认本地数据源禁止删除。",
+    "group": "数据源与表管理",
+    "evidence": ["apps/api/src/datasource/datasource.service.ts#DataSourceService.remove", "apps/web/src/stores/datasource.ts#remove"],
+    "guide": "../guides/database-persistence.md"
+  },
+  "GET /api/memories": {
+    "purpose": "按数据源分页读取当前有效正式 Memory 的最新版本，可按名称和说明文本搜索；可访问数据源的用户可读，不包含已删除记忆或待审核候选。",
+    "group": "正式业务记忆",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.list", "apps/web/src/views/MemoriesView.vue#load"],
+    "guide": "../guides/memory.md"
+  },
+  "GET /api/memories/:id": {
+    "purpose": "读取一条正式 Memory 的当前版本或指定历史版本，供编辑前核对与历史追溯；当前已软删除时仍可在有访问权的前提下读取历史内容，但状态标记为 deleted。",
+    "group": "正式业务记忆",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.get", "apps/web/src/views/MemoriesView.vue#readHistory"],
+    "guide": "../guides/memory.md"
+  },
+  "POST /api/memories/related": {
+    "purpose": "将准备保存的名称和说明与当前有效正式 Memory 做同名及文本相似度匹配，返回相关项供人工核对潜在重复或口径冲突；不判断语义矛盾，也不写入或自动合并记忆。",
+    "group": "正式业务记忆",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.related", "packages/database/src/memory-policy.ts#relatedMemories"],
+    "guide": "../guides/memory.md"
+  },
+  "POST /api/memories": {
+    "purpose": "由数据源创建者直接创建一条正式业务记忆，保存名称、说明和首个不可变修订；同数据源内有效记忆的归一化名称必须唯一。",
+    "group": "正式业务记忆",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.create", "packages/database/src/memory-repository.ts#MemoryRepository.save"],
+    "guide": "../guides/memory.md"
+  },
+  "PATCH /api/memories/:id": {
+    "purpose": "由数据源创建者修改正式 Memory 的名称或说明，核对 expectedVersion 后追加新修订并推进当前版本；保留旧版本，版本已变化时拒绝覆盖。",
+    "group": "正式业务记忆",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.update", "packages/database/src/memory-repository.ts#MemoryRepository.save"],
+    "guide": "../guides/memory.md"
+  },
+  "DELETE /api/memories/:id": {
+    "purpose": "由数据源创建者核对 expectedVersion 后软删除正式 Memory，并追加删除修订；后续有效记忆列表和新分析快照排除它，历史修订仍保留。",
+    "group": "正式业务记忆",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.update", "packages/database/src/memory-repository.ts#MemoryRepository.save"],
+    "guide": "../guides/memory.md"
+  },
+  "GET /api/memory-candidates": {
+    "purpose": "由数据源创建者查看本人待审核的 Memory 候选，可限定来源会话；仅展示所属 Generation 已 completed 的候选，候选本身尚未进入正式 Memory。",
+    "group": "记忆候选审核",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.candidates", "apps/web/src/components/blocks/AnalysisBlock.vue#loadCandidates"],
+    "guide": "../guides/memory.md"
+  },
+  "POST /api/memory-candidates/:id/confirm": {
+    "purpose": "由数据源创建者确认 completed Generation 的候选，可先修改内容，再创建正式 Memory 或更新目标 Memory；事务核对候选版本，有替换目标时再核对目标记忆版本，保存修订并将候选标记为 accepted。",
+    "group": "记忆候选审核",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.decide", "apps/web/src/components/MemoryEditor.vue#save"],
+    "guide": "../guides/memory.md"
+  },
+  "POST /api/memory-candidates/:id/reject": {
+    "purpose": "由数据源创建者核对候选版本后放弃 completed Generation 的候选，将状态改为 rejected 并推进候选版本；不会创建、更新或删除正式 Memory。",
+    "group": "记忆候选审核",
+    "evidence": ["packages/database/src/memory-repository.ts#MemoryRepository.decide", "apps/web/src/views/MemoriesView.vue#decide"],
+    "guide": "../guides/memory.md"
+  },
+  "GET /api/users/search": {
+    "purpose": "按邮箱片段查找用户 ID、邮箱和名称，供数据源授权时选择目标用户；搜索内容不足两个字符时返回空数组，最多返回 20 人。",
+    "group": "认证与账号",
+    "evidence": ["apps/api/src/user/user.service.ts#UserService.searchByEmail", "apps/web/src/views/DataSourceView.vue#debouncedSearch"],
+    "guide": "../guides/development.md"
+  },
+  "PUT /api/users/profile": {
+    "purpose": "修改当前登录用户的展示名称；只更新本人资料，不修改邮箱、密码或其他用户。",
+    "group": "认证与账号",
+    "evidence": ["apps/api/src/user/user.service.ts#UserService.updateProfile", "apps/web/src/stores/auth.ts#updateProfile"],
+    "guide": "../guides/development.md"
+  },
+  "PUT /api/users/password": {
+    "purpose": "校验当前密码后为登录用户设置新密码，并作废其未使用的重置凭据；密码更新后凭据版本改变，旧登录 JWT 无法继续通过校验。",
+    "group": "认证与账号",
+    "evidence": ["apps/api/src/user/user.service.ts#UserService.updatePassword", "apps/api/src/auth/auth.service.ts#AuthService.findById"],
+    "guide": "../guides/development.md"
+  },
+  "GET /health": {
+    "purpose": "在 Worker 自身 HTTP 端口返回固定的进程存活响应；不检查 PostgreSQL、Redis、模型或队列是否可用，也不代表执行系统已就绪。",
+    "group": "Worker 运维",
+    "evidence": ["apps/worker/src/health.controller.ts#HealthController.health"],
+    "guide": "../guides/development.md"
+  }
+}

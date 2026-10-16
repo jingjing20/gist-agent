@@ -18,6 +18,7 @@ export class GenerationService implements OnModuleDestroy {
         const responseMessageId = randomUUID();
         const limit = Number(process.env.USER_GENERATION_CONCURRENCY_LIMIT) || 5;
         return this.db.withTransaction(async (tx) => {
+            await tx.query('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [`generation-user:${userId}`]);
             await tx.query('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [conversationId]);
             const [existing] = await tx.query<QueryRow[]>(
                 'SELECT id,conversation_id,request_message_id,response_message_id,request_hash FROM generation WHERE user_id=? AND idempotency_key=?',
@@ -121,7 +122,7 @@ export class GenerationService implements OnModuleDestroy {
 
     async cancel(userId: number, id: string): Promise<void> {
         const result = await this.db.execute(
-            "UPDATE generation SET status='cancel_requested',cancel_requested_at=NOW(),updated_at=NOW() WHERE id=? AND user_id=? AND status IN ('pending','starting','running') RETURNING id",
+            "UPDATE generation SET status='cancel_requested',cancel_requested_at=COALESCE(cancel_requested_at,NOW()),updated_at=NOW() WHERE id=? AND user_id=? AND status IN ('pending','starting','running','cancel_requested') RETURNING id",
             [id, userId]
         );
         if (!result.rows.length) throw new NotFoundException('活动生成任务不存在');
@@ -143,6 +144,7 @@ export class GenerationService implements OnModuleDestroy {
     }
 
     async sync(userId: number, knownIds: string[] = []) {
+        const cursor = (await this.redis.xrevrange(this.keys(userId).user, '+', '-', 'COUNT', 1))[0]?.[0] ?? '0-0';
         const active = await this.db.query<QueryRow[]>(
             `SELECT g.id AS generation_id,g.conversation_id,g.response_message_id AS message_id,g.status,g.last_sequence,m.content,m.blocks
              FROM generation g JOIN message m ON m.id=g.response_message_id WHERE g.user_id=? AND g.status IN ('pending','starting','running','cancel_requested') ORDER BY g.created_at`,
@@ -155,7 +157,6 @@ export class GenerationService implements OnModuleDestroy {
                   [userId, ...knownIds]
               )
             : [];
-        const cursor = (await this.redis.xrevrange(this.keys(userId).user, '+', '-', 'COUNT', 1))[0]?.[0] ?? '0-0';
         return { eventCursor: cursor, activeGenerations: active, reconciledGenerations: reconciled };
     }
 
@@ -165,11 +166,15 @@ export class GenerationService implements OnModuleDestroy {
             [generationId, userId]
         );
         if (!generation.length) throw new NotFoundException('生成任务不存在');
-        const rows = await this.redis.xrange(this.keys(userId, generationId).generation, `(${after}-0`, '+');
-        const events = rows.map(([streamId, fields]) => ({ ...JSON.parse(fields[1]), streamId }));
-        const contiguous = events.every((event, index) => event.sequence === after + index + 1);
+        const persisted = await this.db.query<QueryRow[]>('SELECT payload FROM generation_event WHERE generation_id=? AND user_id=? AND sequence>? ORDER BY sequence', [
+            generationId,
+            userId,
+            after,
+        ]);
+        const events = persisted.map((row) => row.payload);
+        const contiguous = events.every((event: any, index) => event.sequence === after + index + 1);
         const terminal = ['completed', 'failed', 'cancelled'].includes(generation[0].status);
-        const hasTerminalEvent = events.some((event) => event.type === 'done');
+        const hasTerminalEvent = events.some((event: any) => event.type === 'done');
         if (contiguous && (events.length || after === Number(generation[0].last_sequence)) && (!terminal || hasTerminalEvent)) {
             return { mode: 'events', events, lastSequence: events.at(-1)?.sequence ?? after };
         }

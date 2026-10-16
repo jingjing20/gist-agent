@@ -69,7 +69,7 @@ async function handleSubmit() {
     loading.value = true;
     error.value = '';
     try {
-        const res = await apiFetch('/auth/request-reset', {
+        const res = await apiFetch('/auth/forgot-password', {
             method: 'POST',
             body: JSON.stringify({
                 email: email.value,

@@ -52,7 +52,12 @@ export class ConversationService {
         const conv = await this.findOne(id, userId);
         if (!conv) throw new NotFoundException('对话不存在或无权删除');
 
-        await this.db.execute('DELETE FROM conversation WHERE id = ?', [id]);
+        await this.db.withTransaction(async (tx) => {
+            await tx.query('SELECT pg_advisory_xact_lock(hashtextextended(?, 0))', [id]);
+            await tx.query('SELECT id FROM generation WHERE conversation_id=? AND user_id=? FOR UPDATE', [id, userId]);
+            await tx.execute('DELETE FROM outbox_event WHERE aggregate_id IN (SELECT id FROM generation WHERE conversation_id=? AND user_id=?)', [id, userId]);
+            await tx.execute('DELETE FROM conversation WHERE id=? AND user_id=?', [id, userId]);
+        });
     }
 
     async getMessages(conversationId: string, userId: number): Promise<Message[]> {

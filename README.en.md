@@ -1,56 +1,63 @@
 # Gist Agent
 
-An experimental data analysis agent: upload CSV / Excel files, ask questions, and inspect the SQL, results, and evidence behind its answers.
+Upload CSV / Excel files, analyze data with natural-language questions, and inspect query results, SQL and supporting evidence.
 
 English · [简体中文](README.md)
 
-## Architecture
+## Capabilities
 
-Vue 3 / Pinia / ECharts frontend, NestJS API, separate BullMQ / Redis Worker, PostgreSQL storage, and an OpenAI-compatible model adapter.
+Datasource permissions, multi-sheet uploads, a single tool-using analysis agent, charts and tables, versioned datasource memories, schema-comment suggestions, background tasks, cancellation and SSE recovery.
 
-The single analysis agent explicitly updates task state, reads datasource memories and schema details, executes authorized SELECT queries, streams natural-language answers and records an explicit completion status. Recoverable SQL errors return to the main loop. Charts reference stored query artifacts.
+The Vue 3 / Pinia / ECharts frontend connects to a NestJS API. A separate BullMQ / Redis Worker executes analysis; PostgreSQL stores application state and query artifacts. Models use an OpenAI-compatible Chat Completions endpoint with streaming and tool calls.
 
-Explicit "remember" requests save datasource memories directly; model-proposed memories require user confirmation. The previous memory engine and hidden SQL repair loop are retired; old conversations and database schemas are not supported.
+Datasources are logical workspaces in the same PostgreSQL database. External database connections are not implemented. Query artifacts support inspection; natural-language conclusions are not automatically checked number by number. Clear Chinese “记住：” instructions may save memories directly; model-proposed candidates require confirmation.
 
 ## Local setup
 
-Use Node.js 22 and pnpm 9.15.9 to match the containers. The dependency containers use PostgreSQL 17 and Redis 7.
+Use Node.js 22 and pnpm 9.15.9. Containers use PostgreSQL 17 and Redis 7.
 
 ```bash
 pnpm install
 cp .env.example .env
 ```
 
-Preserve an existing .env. Set model credentials and an available model name, database credentials, JWT secret, and AGENT_DB_USER / AGENT_DB_PASSWORD.
+Preserve an existing `.env`. Set model credentials and an available model name, database credentials, JWT_SECRET, and AGENT_DB_USER / AGENT_DB_PASSWORD.
 
-For containerized dependencies with applications on the host:
+Start dependency containers:
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-Set DB_HOST=127.0.0.1, DB_PORT=15432, and REDIS_URL=redis://127.0.0.1:16379 in .env. Existing local services may use other ports.
+For applications running on the host, set DB_HOST=127.0.0.1, DB_PORT=15432 and REDIS_URL=redis://127.0.0.1:16379.
 
 ```bash
-pnpm --filter @gist/api... build
+pnpm --filter @gist/api... --filter @gist/worker... build
 pnpm init-db
 pnpm dev
 ```
 
-Initialization writes the current schema and synthetic data. Web runs at http://localhost:5173; API at http://localhost:3000. Individual processes use dev:api, dev:worker, and dev:web.
+Initialization creates application tables, the default datasource and the configured read-only database role. It does not seed business data. Register an account, create a datasource and upload files; uploads to the default datasource are disabled.
 
-## Documentation and validation
+Web runs at [localhost:5173](http://localhost:5173); API at [localhost:3000](http://localhost:3000). Both API and Worker must run to execute analysis. Use `pnpm typecheck` and `pnpm build` for static checks and compilation.
+
+## Documentation
 
 Detailed documentation is maintained in Chinese:
 
+- [Project overview](docs/overview.md)
+- [Product](docs/product.md)
+- [System architecture](docs/architecture.md)
+- [Agent, state, memory and evidence](docs/agent.md)
+- [Three-turn walkthrough](docs/walkthrough.md)
+- [Core contracts](docs/contracts.md)
+- [Core workflows](docs/workflows.md)
+- [Frontend](docs/frontend.md)
+- [Backend and API](docs/backend.md)
+- [Database](docs/database.md)
+- [Capabilities and operating limits](docs/limitations.md)
 - [Deployment](DEPLOY.md)
-- [Design](docs/agent-refactor/README.md)
-- [Delivery and validation](docs/agent-refactor/05-delivery-and-validation.md)
-- [Benchmark](benchmarks/saas-growth/README.md)
-- [Acceptance walkthrough](benchmarks/saas-growth/acceptance-walkthrough.md)
 
-Fast mock checks do not establish real-model accuracy or completed interaction acceptance. Check the validation record before treating a capability as verified.
+Password recovery uses SMTP and the configured APP_ORIGIN. Password changes require the current password and invalidate old JWT credentials on subsequent requests. Deployment settings and database state must be checked in the deployed environment.
 
 [MIT license](LICENSE)
-
-Prompt and schema-comment workflow: [implementation and acceptance checklist](docs/prompt-refactor.md).

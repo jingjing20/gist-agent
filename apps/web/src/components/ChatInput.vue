@@ -24,7 +24,9 @@
                 @keydown.enter.exact="handleSubmit"
                 @input="autoResize"
             />
-            <button v-if="chatStore.isLoading" class="send-btn stop-btn" @click="chatStore.abortStream()"><i class="fas fa-stop"></i> 停止分析</button>
+            <button v-if="chatStore.isLoading" class="send-btn stop-btn" :disabled="chatStore.activeGeneration?.status === 'cancel_requested'" @click="chatStore.abortStream()">
+                <i class="fas fa-stop"></i> {{ chatStore.activeGeneration?.status === 'cancel_requested' ? '正在停止' : '停止分析' }}
+            </button>
             <button v-else class="send-btn" :disabled="!inputText.trim()" @click="handleSubmit">发送 <i class="fas fa-arrow-right text-xs"></i></button>
         </div>
     </div>

@@ -2,36 +2,24 @@
 
 <img src="./apps/web/public/gist-agent-banner.png" width="600" alt="Gist Agent" />
 
-用自然语言分析 CSV / Excel 数据，查看 SQL、查询结果和结论依据。
+用自然语言分析 CSV / Excel 数据，查看查询结果、SQL 和分析依据。
 
 [English](README.en.md) · 简体中文
 
-## 项目定位
+## 项目能力
 
-Gist Agent 是用于学习和验证 Agent 工程的数据分析项目。模型在权限和执行预算内选择工具，围绕同一问题连续查询、验证解释，并通过证据引用回答。
+- 数据源管理、CSV / Excel 多 Sheet 上传与共享授权。
+- 单 Agent 按需读取 Schema、业务记忆，执行只读 SQL，流式输出文字、表格和图表。
+- 多会话、后台任务、显式取消、失败重试及 SSE 重连恢复。
+- 数据源文本记忆、候选确认、编辑与版本历史。
+- 字段注释建议预览、人工应用及推荐问题。
+- JWT 注册登录、个人设置及邮件找回；修改密码需要当前密码，并使旧令牌在后续鉴权中失效。
 
-当前仅使用新分析核心，不提供旧对话、旧记忆或旧数据库结构兼容。代码实现、快速验证与真实业务验收分别记录，见[交付与验收状态](docs/agent-refactor/05-delivery-and-validation.md)。
-
-## 当前能力
-
-| 能力 | 实现方式 |
-| --- | --- |
-| 数据接入 | CSV / Excel、多 Sheet 选择、字段推断及 PostgreSQL 参数化批量 INSERT |
-| 单 Agent 分析 | 显式更新状态，按需读取 Schema 与记忆，查询、验证并结构化提交结果 |
-| 数据源记忆 | 文本记忆；明确口径直接保存、混合请求和相似口径转候选、编辑确认、相似提示与版本追溯 |
-| 多轮状态 | 保存问题、时间、筛选、粒度、临时口径和假设；条件变化后检查证据适用性 |
-| 查询安全 | 单条 SELECT、AST 校验、表字段权限、行数限制、只读连接和查询超时 |
-| 显式 SQL 纠错 | 可修正错误返回主循环，修正后重新校验；执行器内部不调用模型 |
-| 可追溯结果 | 结论关联证据，可展开口径、SQL、条件、结果和质量限制；图表引用 Artifact |
-| 上下文管理 | 按固定优先级选择状态、定义、完整工具交互和历史，记录选择与省略原因 |
-| 后台执行与 SSE | API 接收请求，Worker 执行任务；支持事件恢复和显式取消 |
-| 外围功能 | JWT 登录、SMTP 密码找回、数据源管理、授权、推荐问题及 Schema 注释增强 |
-
-Schema 自动注释是模型推断的线索，不等于用户确认的业务事实。证据可追溯也不等于结论已经被证明正确。
+数据源是同一 PostgreSQL 数据库中的逻辑工作空间，当前没有外部数据库连接功能。图表和表格引用保存的查询结果；自然语言结论没有逐数字自动核验。模型建议的字段注释不能代替已确认的业务口径。
 
 ## 快速启动
 
-推荐与 Docker / CI 对齐使用 Node.js 22、pnpm 9.15.9；容器数据库和队列版本为 PostgreSQL 17、Redis 7。
+使用 Node.js 22、pnpm 9.15.9。依赖 PostgreSQL 和 Redis；Compose 使用 PostgreSQL 17、Redis 7。
 
 ### 1. 安装与配置
 
@@ -40,17 +28,17 @@ pnpm install
 cp .env.example .env
 ```
 
-已有 .env 时保留原文件。填写模型 Key、Base URL、可用模型名、数据库凭据、JWT_SECRET 及独立查询账号 AGENT_DB_USER / AGENT_DB_PASSWORD。示例模型名需要按供应商实际支持情况调整。
+已有 `.env` 时保留原文件。填写模型 Key、Base URL、可用模型名、数据库凭据、有效 JWT_SECRET（生产至少 32 字符）、APP_ORIGIN 和独立查询账号 AGENT_DB_USER / AGENT_DB_PASSWORD。模型需要支持 Chat Completions 工具调用和流式输出。
 
-### 2. 准备数据库和 Redis
+### 2. 启动数据库和 Redis
 
-已有本地服务时使用实际地址；也可以仅通过 Compose 启动依赖：
+已有服务可使用实际地址，也可以启动容器依赖：
 
 ```bash
 docker compose up -d postgres redis
 ```
 
-使用此方式时，本机开发进程的 .env 需要设置：
+本机运行应用时，在 `.env` 中设置：
 
 ```dotenv
 DB_HOST=127.0.0.1
@@ -58,59 +46,71 @@ DB_PORT=15432
 REDIS_URL=redis://127.0.0.1:16379
 ```
 
-Compose 内部使用 postgres:5432 和 redis:6379，不要与宿主机映射端口混淆。
+容器之间使用 postgres:5432 和 redis:6379。
 
 ### 3. 构建依赖并初始化
 
 ```bash
-pnpm --filter @gist/api... build
+pnpm --filter @gist/api... --filter @gist/worker... build
 pnpm init-db
 ```
 
-初始化创建当前应用表、合成业务样例及已配置的只读查询账号，会写入数据库。旧开发库的处理方式见[部署指南](DEPLOY.md)。
+初始化创建应用表、默认数据源及配置的只读查询账号，不预置业务数据。首次使用时注册账号、创建自己的数据源并上传文件；默认本地源禁止上传。初始化和迁移会写库，现有库操作见[部署指南](DEPLOY.md)。
 
-### 4. 启动
+### 4. 启动应用
 
 ```bash
 pnpm dev
 ```
 
-Web 默认 http://localhost:5173，API 默认 http://localhost:3000。也可分别运行 pnpm dev:api、pnpm dev:worker 和 pnpm dev:web。仅启动 API 不会执行分析任务。
+Web 默认 [localhost:5173](http://localhost:5173)，API 默认 [localhost:3000](http://localhost:3000)。API 和 Worker 必须同时运行才能执行分析。
 
-## 架构与代码入口
+## 工程结构与命令
 
-```text
-apps/api            HTTP、鉴权、任务创建、Outbox 和 SSE
-apps/worker         队列消费、Agent、工具、状态与证据
-apps/web            Vue 3、Pinia、ECharts、多会话和证据展示
-packages/contracts  共享协议与领域类型
-packages/config     环境配置
-packages/database   PostgreSQL 客户端、表结构与记忆仓库
-packages/llm        OpenAI-compatible 模型适配
-```
+| 目录 | 职责 |
+| --- | --- |
+| apps/web | Vue 3、Pinia、ECharts，页面与结果展示 |
+| apps/api | NestJS REST、鉴权、任务创建、Outbox 与 SSE |
+| apps/worker | BullMQ 消费、Agent、工具、状态与证据 |
+| packages/contracts | 共享协议与领域类型 |
+| packages/config | 环境配置 |
+| packages/database | PostgreSQL 客户端、DDL 与记忆仓库 |
+| packages/llm | OpenAI-compatible 模型适配与提示词 |
+| scripts | 数据库迁移 |
 
-后端使用 NestJS，队列使用 BullMQ / Redis。详见[运行时设计](docs/agent-refactor/02-agent-runtime.md)。
+| 命令 | 用途 |
+| --- | --- |
+| pnpm dev | 同时启动 API、Worker、Web |
+| pnpm dev:api / dev:worker / dev:web | 分别启动进程 |
+| pnpm typecheck | 工作区类型检查 |
+| pnpm build | 构建工作区 |
+| pnpm init-db | 初始化数据库、默认源与查询账号 |
+| pnpm migrate:database | 运行现有结构升级脚本 |
+| pnpm migrate:memory-provenance | 升级记忆来源关联约束 |
 
-## 演示与验证
+## 项目文档
 
-以下视频可能包含历史界面，当前能力以代码及设计文档为准：
+以下是一套当前实现说明；功能变更时同步更新对应页面。实现说明以源码、共享契约和 DDL 为依据，部署配置与线上数据需要在实际环境核对。
 
-- [演示一](https://github.com/user-attachments/assets/47fd3e74-0748-4505-822a-447fb07f992d)
-- [演示二](https://github.com/user-attachments/assets/c6252c3d-237f-4809-92f0-3e850702a8b5)
-- [演示三](https://github.com/user-attachments/assets/04861aa2-b6cb-4767-a96d-6f4a49a4cfe6)
+| 文档 | 主要回答的问题 |
+| --- | --- |
+| [整体介绍](docs/overview.md) | 项目是什么、工程怎样组织、业务对象如何区分、应该怎样阅读 |
+| [产品](docs/product.md) | 用户功能、业务规则、权限和场景之间的关系 |
+| [系统架构](docs/architecture.md) | 进程职责、通信、存储、事务和执行边界 |
+| [Agent机制](docs/agent.md) | 模型上下文、工具循环、分析状态、记忆版本和证据复用 |
+| [三轮对话实例](docs/walkthrough.md) | 用具体参数和状态变化理解查询、追问与证据复用 |
+| [核心契约](docs/contracts.md) | 创建、同步、历史、SSE、工具与前端块的字段和衔接 |
+| [核心业务流程](docs/workflows.md) | 七条从用户动作到页面、服务、数据和反馈的完整链路 |
+| [前端](docs/frontend.md) | 页面与Store、流式事件、结果阅读及修改入口 |
+| [服务端](docs/backend.md) | API参数与权限、业务服务、后台任务和契约 |
+| [数据库](docs/database.md) | 六组应用实体、核心关系、状态与版本、删除和迁移 |
+| [能力与运行边界](docs/limitations.md) | 代码保证、模型要求、实际环境未知及维护注意事项 |
+| [部署与运维](DEPLOY.md) | 配置、容器部署、迁移及故障排查 |
 
-快速检查与真实服务验收的边界见[验证说明](docs/agent-refactor/05-delivery-and-validation.md)。[固定合成数据与标准答案](benchmarks/saas-growth/README.md)不代表真实公司数据或通用准确率。
+第一次阅读建议：整体介绍 → 产品 → 系统架构 → 三轮对话实例 → Agent机制。修改功能时按对应前端、服务端和数据库章节定位，能力与运行边界用于判断保证范围。文档按主题维护，不重复堆积重构过程或历史方案。
 
-## 文档导航
-
-- [部署与运维](DEPLOY.md)
-- [设计入口](docs/agent-refactor/README.md)
-- [业务验收步骤](benchmarks/saas-growth/acceptance-walkthrough.md)
-- [项目亮点](docs/career/resume-highlights.md)
-- [面试参考](docs/career/agent-interview.md)
+文档更新范围与核对顺序见[维护约定](docs/overview.md#9-文档维护约定)。
 
 ## 许可证
 
 [MIT](LICENSE)
-
-提示词与字段注释增强的当前实现、接口和人工验收清单见[重构说明](docs/prompt-refactor.md)。

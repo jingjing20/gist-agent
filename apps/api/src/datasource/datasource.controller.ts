@@ -129,10 +129,16 @@ export class DataSourceController {
             throw new BadRequestException('表配置格式错误');
         }
 
+        if (
+            !Array.isArray(tableConfigs) ||
+            tableConfigs.some((config) => !config || typeof config.displayName !== 'string' || (config.sheetName !== undefined && typeof config.sheetName !== 'string'))
+        )
+            throw new BadRequestException('表配置格式错误');
         if (!tableConfigs.length) throw new BadRequestException('请选择至少一个要上传的表');
 
         const ext = file.originalname.split('.').pop()?.toLowerCase();
-        const results: any[] = [];
+        if (!['csv', 'xlsx', 'xls'].includes(ext || '')) throw new BadRequestException('仅支持 CSV / Excel 文件');
+        const prepared: Parameters<DataSourceService['uploadTables']>[2] = [];
 
         let workbook: XLSX.WorkBook | null = null;
         if (ext === 'xlsx' || ext === 'xls') {
@@ -142,7 +148,7 @@ export class DataSourceController {
         for (const config of tableConfigs) {
             let rawRows: Record<string, unknown>[] = [];
             const displayName = config.displayName.trim();
-            if (!displayName) continue;
+            if (!displayName) throw new BadRequestException('表名称不能为空');
 
             if (ext === 'csv') {
                 rawRows = await new Promise((resolve, reject) => {
@@ -164,7 +170,7 @@ export class DataSourceController {
             } else if (workbook) {
                 const sheetName = config.sheetName || workbook.SheetNames[0];
                 const sheet = workbook.Sheets[sheetName];
-                if (!sheet) continue;
+                if (!sheet) throw new BadRequestException(`Sheet「${sheetName}」不存在`);
                 rawRows = XLSX.utils.sheet_to_json(sheet, {
                     defval: null,
                     raw: true,
@@ -174,7 +180,7 @@ export class DataSourceController {
                 }
             }
 
-            if (!rawRows.length) continue;
+            if (!rawRows.length) throw new BadRequestException(`表「${displayName}」不包含可上传的数据`);
 
             const colNames = Object.keys(rawRows[0]);
             const normalizedRows = rawRows.map((row) => {
@@ -198,10 +204,11 @@ export class DataSourceController {
                 return cleaned;
             });
 
-            const result = await this.datasourceService.uploadTable(datasourceId, user.id, displayName, columns, cleanRows);
-            results.push(result);
+            prepared.push({ displayName, columns, rows: cleanRows });
         }
 
+        if (!prepared.length) throw new BadRequestException('文件中没有可上传的数据');
+        const results = await this.datasourceService.uploadTables(datasourceId, user.id, prepared);
         if (results.length > 0) {
             this.suggestionService.invalidateAndRegenerate(datasourceId, user.id);
         }
@@ -210,8 +217,8 @@ export class DataSourceController {
     }
 
     @Delete(':id/tables/:tableId')
-    async deleteTable(@CurrentUser() user: User, @Param('tableId', ParseIntPipe) tableId: number) {
-        const dsId = await this.datasourceService.deleteTable(tableId, user.id);
+    async deleteTable(@CurrentUser() user: User, @Param('id', ParseIntPipe) id: number, @Param('tableId', ParseIntPipe) tableId: number) {
+        const dsId = await this.datasourceService.deleteTable(id, tableId, user.id);
         if (dsId) this.suggestionService.invalidateAndRegenerate(dsId, user.id);
         return { ok: true };
     }

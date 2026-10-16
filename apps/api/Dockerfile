@@ -14,6 +14,7 @@ RUN --mount=type=cache,id=gist-pnpm-store,target=/pnpm/store \
     pnpm install --frozen-lockfile --store-dir /pnpm/store
 COPY packages/ ./packages/
 COPY apps/api/ ./apps/api/
+COPY scripts/ ./scripts/
 RUN pnpm --filter @gist/api... build
 
 FROM node:22-alpine

@@ -1,8 +1,7 @@
-import { promoteAnalysisDraft } from '@gist/database';
-import { Injectable, OnModuleDestroy } from '@nestjs/common';
+import { promoteAnalysisDraft, enqueueGenerationEvent } from '@gist/database';
+import { Injectable } from '@nestjs/common';
 import type { GenerationErrorCode, GenerationStatus } from '@gist/contracts';
 import { randomUUID } from 'crypto';
-import Redis from 'ioredis';
 import type OpenAI from 'openai';
 import { DatabaseService, type QueryRow } from '../database/database.service';
 import type { SSEEvent, SSEEmitter } from './tools/base-tool';
@@ -32,26 +31,9 @@ export interface GenerationExecutionMetrics {
     outputTokensEstimated: number;
 }
 
-const PUBLISH_SCRIPT = `
-local sequence = redis.call('INCR', KEYS[1])
--- Preserve the JSON body: Lua cjson converts empty arrays into objects.
--- ARGV[1] is a JSON.stringify object with sequence omitted by the caller.
-local event = string.sub(ARGV[1], 1, -2) .. ',"sequence":' .. tostring(sequence) .. '}'
-local generation_id = tostring(sequence) .. '-0'
-redis.call('XADD', KEYS[2], generation_id, 'event', event)
-local user_id = redis.call('XADD', KEYS[3], '*', 'event', event)
-redis.call('PEXPIRE', KEYS[1], ARGV[2])
-redis.call('PEXPIRE', KEYS[2], ARGV[2])
-redis.call('PEXPIRE', KEYS[3], ARGV[2])
-return { tostring(sequence), user_id }
-`;
-
 /** Worker 独占的 generation 写入仓库与 Redis 事件发布器。 */
 @Injectable()
-export class GenerationService implements OnModuleDestroy {
-    private readonly redis = new Redis(process.env.REDIS_URL || 'redis://127.0.0.1:6379', { maxRetriesPerRequest: null, commandTimeout: 5_000 });
-    private readonly prefix = process.env.EVENT_KEY_PREFIX || 'gist-agent';
-    private readonly retentionMs = 24 * 60 * 60 * 1000;
+export class GenerationService {
     private readonly textBuffers = new Map<string, TextEventBuffer>();
     private readonly queues = new Map<string, Promise<void>>();
 
@@ -253,98 +235,70 @@ export class GenerationService implements OnModuleDestroy {
                 error ?? null,
                 identity.id,
             ]);
-            await transaction.execute("INSERT INTO outbox_event (aggregate_id,type,payload) VALUES (?,'generation.terminal',?::jsonb)", [
-                identity.id,
-                JSON.stringify({
-                    version: 1,
-                    kind: 'generation.terminal',
-                    generationId: identity.id,
-                    userId: identity.userId,
-                    conversationId: identity.conversationId,
-                    messageId: identity.messageId,
-                    event: terminal,
-                }),
-            ]);
+            await enqueueGenerationEvent(transaction, identity, terminal);
             return true;
         });
     }
 
-    async failStale(timeoutMs: number): Promise<number> {
-        return this.db.withTransaction(async (transaction) => {
-            const [updated] = await transaction.execute(
-                `UPDATE generation
-          SET status='failed',error='生成进程意外中断，已保留收到的部分内容',error_code='WORKER_LOST',completed_at=NOW(),updated_at=NOW(),writer_token=NULL
-          WHERE status IN ('starting','running') AND writer_token IS NOT NULL
-            AND writer_heartbeat_at < NOW() - (? * INTERVAL '1 millisecond')
-          RETURNING id,user_id,conversation_id,response_message_id`,
-                [timeoutMs]
+    async failQueued(id: string, error: string): Promise<void> {
+        await this.db.withTransaction(async (tx) => {
+            const [updated] = await tx.execute(
+                `UPDATE generation SET status='failed',error=?,error_code='GENERATION_CAPACITY_UNAVAILABLE',completed_at=NOW(),updated_at=NOW()
+                WHERE id=? AND status='pending' AND writer_token IS NULL RETURNING id,user_id,conversation_id,response_message_id`,
+                [error, id]
             );
             for (const row of updated.rows) {
-                await transaction.execute("UPDATE generation_attempt SET status='failed',error='WORKER_LOST',completed_at=NOW() WHERE generation_id=? AND completed_at IS NULL", [
+                await tx.execute("UPDATE conversation_turn SET status='failed',completed_at=NOW() WHERE generation_id=? AND status='pending'", [row.id]);
+                await enqueueGenerationEvent(
+                    tx,
+                    { id: row.id, userId: row.user_id, conversationId: row.conversation_id, messageId: row.response_message_id },
+                    { type: 'done', status: 'failed', error, errorCode: 'GENERATION_CAPACITY_UNAVAILABLE' }
+                );
+            }
+        });
+    }
+
+    async failStale(timeoutMs: number): Promise<number> {
+        const pendingTimeoutMs = Math.max(timeoutMs, Number(process.env.GENERATION_PENDING_TIMEOUT_MS) || 600_000);
+        return this.db.withTransaction(async (tx) => {
+            const [updated] = await tx.execute(
+                `UPDATE generation SET
+                status=CASE WHEN status='cancel_requested' THEN 'cancelled' ELSE 'failed' END,
+                error=CASE WHEN status='cancel_requested' THEN '已取消' ELSE '生成进程意外中断或排队超时，已保留收到的部分内容' END,
+                error_code=CASE WHEN status='cancel_requested' THEN 'CANCELLED' ELSE 'WORKER_LOST' END,
+                completed_at=NOW(),updated_at=NOW(),writer_token=NULL
+                WHERE (status IN ('starting','running','cancel_requested') AND writer_token IS NOT NULL AND writer_heartbeat_at < NOW() - (? * INTERVAL '1 millisecond'))
+                   OR (status='cancel_requested' AND writer_token IS NULL AND cancel_requested_at < NOW() - (? * INTERVAL '1 millisecond'))
+                   OR (status='pending' AND writer_token IS NULL AND created_at < NOW() - (? * INTERVAL '1 millisecond'))
+                RETURNING id,user_id,conversation_id,response_message_id,status,error,error_code`,
+                [timeoutMs, timeoutMs, pendingTimeoutMs]
+            );
+            for (const row of updated.rows) {
+                await tx.execute('UPDATE generation_attempt SET status=?,error=?,completed_at=NOW() WHERE generation_id=? AND completed_at IS NULL', [
+                    row.status,
+                    row.error_code,
                     row.id,
                 ]);
-                await transaction.execute("UPDATE conversation_turn SET status='failed',completed_at=NOW() WHERE generation_id=? AND status='pending'", [row.id]);
-                await transaction.execute("INSERT INTO outbox_event (aggregate_id,type,payload) VALUES (?,'generation.terminal',?::jsonb)", [
-                    row.id,
-                    JSON.stringify({
-                        version: 1,
-                        kind: 'generation.terminal',
-                        generationId: row.id,
-                        userId: row.user_id,
-                        conversationId: row.conversation_id,
-                        messageId: row.response_message_id,
-                        event: { type: 'done', status: 'failed', error: '生成进程意外中断，已保留收到的部分内容', errorCode: 'WORKER_LOST' },
-                    }),
-                ]);
+                await tx.execute("UPDATE conversation_turn SET status=?,completed_at=NOW() WHERE generation_id=? AND status='pending'", [row.status, row.id]);
+                await enqueueGenerationEvent(
+                    tx,
+                    { id: row.id, userId: row.user_id, conversationId: row.conversation_id, messageId: row.response_message_id },
+                    { type: 'done', status: row.status, error: row.error, errorCode: row.error_code }
+                );
             }
             return updated.rows.length;
         });
     }
 
-    private keys(userId: number, generationId: string) {
-        const namespace = `${this.prefix}:{${userId}}`;
-        return {
-            user: `${namespace}:user`,
-            sequence: `${namespace}:gen:${generationId}:seq`,
-            generation: `${namespace}:gen:${generationId}`,
-        };
-    }
-
     private async publish(identity: GenerationIdentity, event: SSEEvent): Promise<void> {
-        await this.db.withTransaction(async (transaction) => {
-            const [owned] = await transaction.query<QueryRow[]>("SELECT 1 FROM generation WHERE id=? AND writer_token=? AND status IN ('starting','running') FOR UPDATE", [
+        await this.db.withTransaction(async (tx) => {
+            const [owned] = await tx.query("SELECT 1 FROM generation WHERE id=? AND writer_token=? AND status IN ('starting','running') FOR UPDATE", [
                 identity.id,
                 identity.writerToken,
             ]);
             if (!owned.length) throw new GenerationExecutionError('WRITER_OWNERSHIP_LOST', '生成任务写入权已丢失');
-            const keys = this.keys(identity.userId, identity.id);
-            const payload = {
-                ...event,
-                eventId: randomUUID(),
-                streamId: '0-0',
-                generationId: identity.id,
-                conversationId: identity.conversationId,
-                messageId: identity.messageId,
-                sequence: undefined, // Assigned atomically by Lua without re-encoding the body.
-                occurredAt: new Date().toISOString(),
-            };
-            const result = (await this.redis.eval(PUBLISH_SCRIPT, 3, keys.sequence, keys.generation, keys.user, JSON.stringify(payload), String(this.retentionMs))) as [
-                string,
-                string,
-            ];
-            const sequence = Number(result[0]);
-            await transaction.execute('UPDATE generation SET last_sequence=?,updated_at=NOW() WHERE id=? AND writer_token=? AND last_sequence < ?', [
-                sequence,
-                identity.id,
-                identity.writerToken,
-                sequence,
-            ]);
+            await enqueueGenerationEvent(tx, identity, event);
         });
-    }
-
-    async onModuleDestroy(): Promise<void> {
-        if (this.redis.status === 'ready') await this.redis.quit();
-        else this.redis.disconnect();
     }
 }
 
