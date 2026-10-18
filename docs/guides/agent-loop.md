@@ -189,3 +189,21 @@ flowchart TD
 | 工具执行中被取消或权限变化 | 看统一 signal、writer 检查、原错误 code 及 generation 终态 | [执行生命周期](generation-lifecycle.md) |
 
 Loop 没有独立固定的最大轮数；全局超时、上下文预算、响应大小、重复动作和工具安全边界共同限制运行。新增工具时应同时更新其定义、参数解析、执行包装、事件/持久化和共享类型。单改 Prompt 不会产生新的确定性保证，单改工具描述也不等于实现支持。
+
+## 回答后的推荐问题
+
+完整或部分完成后，Worker 使用 `buildFollowUpContext` 传入最终正文、分析条件，以及本轮读取过的最多 6 张表的授权字段与说明。再次读取结构时重新检查数据源访问权和列策略；上下文不包含样本行或 SQL。字段按字符预算压缩并标记截断，避免大结构直接导致推荐被跳过。
+
+`follow-up-v3` 要求模型评估尚未回答且数据可支持的探索方向。`complete` 或空的待解决问题列表不意味着不能继续探索；`partial` 也不应推荐通过换个问法获取不存在的数据。模型返回 `{questions: string[], emptyReason: string | null}`，空列表必须说明原因。最终消息协议仍为 `suggestions`，只含过滤后的最多 3 条问题；前端展示条件不变。
+
+每次尝试在 `generation_trace_span` 的 `follow_up_suggestions` 中记录耗时、Prompt 版本和 hash、候选数、过滤数、结果数及状态。状态区分 `generated`、`empty`、`filtered`、`context_too_large`；调用或解析失败记录 `error`。诊断写入失败不会撤销已完成的回答。
+
+验证命令（先构建 Worker；数据库端口按本地环境配置）：
+
+```bash
+pnpm --filter @gist/worker... build
+node --test tests/follow-up-suggestions.test.cjs
+DB_PORT=15432 node scripts/verify-follow-up.cjs <conversation-id> --expect-nonempty
+```
+
+重放脚本读取该对话最近一次已完成分析，重新检查字段权限后调用当前配置的模型，并输出推荐及诊断；不修改历史消息，也不重新执行分析 SQL。`--expect-nonempty` 仅用于已知应有推荐的回归案例，不能当作所有分析都必须给出推荐的规则。

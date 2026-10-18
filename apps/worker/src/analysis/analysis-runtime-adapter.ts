@@ -1,7 +1,7 @@
 import { createHash } from 'crypto';
 import { Injectable, Logger } from '@nestjs/common';
 import { PROMPT_METADATA } from '@gist/llm';
-import { generateSuggestions } from './follow-up-suggestions';
+import { buildFollowUpContext, generateSuggestions, type SuggestionDiagnostic } from './follow-up-suggestions';
 import type OpenAI from 'openai';
 import { ANALYSIS_RUNTIME_VERSIONS, type AnalysisRunSnapshot } from '@gist/contracts';
 import { MemoryRepository } from '@gist/database';
@@ -361,34 +361,26 @@ export class AnalysisRuntimeAdapter {
         // Recommendations share this response's event ordering and persisted blocks.
         // An optional generation failure must not discard the completed analysis.
         if (outcome.status === 'complete' || outcome.status === 'partial') {
+            const startedAt = Date.now();
+            let diagnostic: SuggestionDiagnostic | undefined;
+            let failure: string | undefined;
             try {
+                // Recheck access and column policies; only inspect tables used this turn.
+                const details = [];
+                for (const table of [...session.loadedSchema.keys()].slice(0, 6)) {
+                    if (signal.aborted) throw signal.reason ?? new Error('推荐生成已取消');
+                    const detail = await this.schema.getSchemaDetail(g.datasourceId, g.userId, table);
+                    if (detail) details.push(detail);
+                }
                 const items = await generateSuggestions({
                     llm: this.llm,
                     question: input.message,
-                    context: {
-                        state: {
-                            question: session.state.question.slice(0, 1000),
-                            timeRange: session.state.timeRange,
-                            comparisonRange: session.state.comparisonRange,
-                            grain: session.state.grain,
-                            filters: session.state.filters,
-                            temporaryNotes: session.state.temporaryNotes.slice(0, 5),
-                            openQuestions: session.state.openQuestions.slice(0, 5),
-                            hypotheses: session.state.hypotheses.slice(0, 5),
-                        },
-                        status: outcome.status,
-                        missingItems: outcome.missingItems,
-                        reason: outcome.reason,
-                        schema: catalog.tables.slice(0, 20).map((t) => ({ name: t.name, displayName: t.displayName })),
-                        text: input.blocks
-                            .filter((b) => b.type === 'text' && !b.analysis)
-                            .map((b) => b.content)
-                            .join('\n')
-                            .slice(-6_000),
-                        artifacts: [...session.observed.values()].slice(-10).map((a) => ({ title: a.title, plan: a.plan, columns: a.columns.slice(0, 20) })),
-                    },
+                    context: buildFollowUpContext({ state: session.state, outcome, schema: details, blocks: input.blocks }),
                     signal,
                     metrics: input.metrics,
+                    onDiagnostic: (result) => {
+                        diagnostic = result;
+                    },
                 });
                 if (items.length && !signal.aborted) {
                     await input.assertWritable();
@@ -396,7 +388,21 @@ export class AnalysisRuntimeAdapter {
                     await input.checkpoint();
                 }
             } catch (error) {
-                this.logger.warn(`Recommendations skipped: ${error instanceof Error ? error.message : 'unknown error'}`);
+                failure = signal.aborted ? 'cancelled' : error instanceof Error ? error.message.slice(0, 300) : 'unknown error';
+                this.logger.warn(`Recommendations skipped for generation ${g.id}: ${failure}`);
+            } finally {
+                // Metadata contains counts/reasons only, never raw prompts, answers or rows.
+                try {
+                    await this.db.execute(`INSERT INTO generation_trace_span(generation_id,name,status,duration_ms,metadata) VALUES (?,?,?,?,?::jsonb)`, [
+                        g.id,
+                        'follow_up_suggestions',
+                        failure ? 'error' : 'ok',
+                        Math.max(0, Date.now() - startedAt),
+                        JSON.stringify({ ...diagnostic, ...(failure ? { status: 'error', error: failure } : {}), prompt: PROMPT_METADATA.followUp }),
+                    ]);
+                } catch {
+                    this.logger.warn(`Could not persist recommendation diagnostic for generation ${g.id}`);
+                }
             }
         }
     }

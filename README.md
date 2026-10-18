@@ -30,40 +30,22 @@ cp .env.example .env
 
 已有 `.env` 时保留原文件。填写模型 Key、Base URL、可用模型名、数据库凭据、有效 JWT_SECRET（生产至少 32 字符）、APP_ORIGIN 和独立查询账号 AGENT_DB_USER / AGENT_DB_PASSWORD。模型需要支持 Chat Completions 工具调用和流式输出。
 
-### 2. 启动数据库和 Redis
+### 2. 一键启动（任选一种）
 
-已有服务可使用实际地址，也可以启动容器依赖：
+已有 `.env` 后，在项目根目录执行一条命令即可。
 
-```bash
-docker compose up -d postgres redis
-```
+| 方式 | 启动命令 | 访问地址 | 停止 |
+| --- | --- | --- | --- |
+| 本机数据库 + 应用热更新 | `pnpm dev:local` | http://localhost:5173 | 终端按 `Ctrl+C`，同时停止应用和 Homebrew 数据库 |
+| Docker 数据库 + 本机应用热更新 | `pnpm dev:docker` | http://localhost:5173 | 终端按 `Ctrl+C`，同时停止应用和容器数据库，保留数据卷 |
 
-本机运行应用时，在 `.env` 中设置：
+本机模式要求 macOS / Homebrew、Node.js 22 和 pnpm 9.15.9。脚本会补装缺少的 PostgreSQL 17 / Redis、安装项目依赖、构建、启动数据库、初始化账号和表，再启动 Web / API / Worker。初始化使用本机系统用户对应的 PostgreSQL 管理员，日常应用使用 `.env` 中的独立账号。仅支持本地数据库地址。
 
-```dotenv
-DB_HOST=127.0.0.1
-DB_PORT=15432
-REDIS_URL=redis://127.0.0.1:16379
-```
+当前电脑的 `.env` 已配置好 PostgreSQL `5433`、Redis `6380`，避开既有 Docker 容器。其他电脑请确保 `.env` 地址与 Homebrew 服务的实际监听端口一致（新安装默认 `5432` / `6379`）；脚本不会更改服务端口或覆盖密钥。
 
-容器之间使用 postgres:5432 和 redis:6379。
+Docker 数据库模式要求 Docker Desktop 已启动，本机已安装 Node.js 22 和 pnpm 9.15.9。脚本会安装项目依赖、构建、只启动 PostgreSQL / Redis 容器，然后在本机初始化数据库并启动 Web / API / Worker，支持应用热更新。无需手动安装依赖或初始化，也无需修改 `.env`：脚本仅为本次运行覆盖 DB_HOST=127.0.0.1、DB_PORT=15432、REDIS_URL=redis://127.0.0.1:16379、APP_ORIGIN=http://localhost:5173，密钥仍从原 `.env` 加载。`pnpm stop:docker` 可单独停止这两个数据库容器；完整停止使用启动终端的 `Ctrl+C`。
 
-### 3. 构建依赖并初始化
-
-```bash
-pnpm --filter @gist/api... --filter @gist/worker... build
-pnpm init-db
-```
-
-初始化创建应用表、默认数据源及配置的只读查询账号，不预置业务数据。首次使用时注册账号、创建自己的数据源并上传文件；默认本地源禁止上传。初始化和迁移会写库，现有库操作见[部署指南](DEPLOY.md)。
-
-### 4. 启动应用
-
-```bash
-pnpm dev
-```
-
-Web 默认 [localhost:5173](http://localhost:5173)，API 默认 [localhost:3000](http://localhost:3000)。API 和 Worker 必须同时运行才能执行分析。
+两种方式的数据库独立，数据不会自动同步。初始化保留已有业务数据，不导入旧电脑的数据。首次使用时注册账号、创建数据源并上传文件；默认本地源禁止上传。已有数据库的迁移与运维见[部署指南](DEPLOY.md)。
 
 ## 工程结构与命令
 

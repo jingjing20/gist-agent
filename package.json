@@ -12,7 +12,10 @@
         "init-db": "pnpm --filter @gist/api init-db",
         "format": "prettier --write \"apps/**/*.{ts,vue,json}\" \"packages/**/*.{ts,json}\"",
         "migrate:database": "pnpm --filter @gist/database... build && node scripts/migrate-database.mjs",
-        "migrate:memory-provenance": "pnpm --filter @gist/database... build && node scripts/migrate-memory-provenance.mjs"
+        "migrate:memory-provenance": "pnpm --filter @gist/database... build && node scripts/migrate-memory-provenance.mjs",
+        "dev:local": "bash scripts/start-local.sh",
+        "dev:docker": "bash scripts/start-docker.sh",
+        "stop:docker": "docker compose stop postgres redis"
     },
     "devDependencies": {
         "@gist/config": "workspace:*",

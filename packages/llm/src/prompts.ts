@@ -7,12 +7,15 @@ export const HOME_SUGGESTIONS_PROMPT = `根据提供的数据库结构与已知�
 没有足够依据时减少数量或返回空数组，不为凑数推荐问题。不建议写入、定时推送等不支持的操作。
 只返回字符串 JSON 数组，不输出其他文字。
 ${DATA_BOUNDARY}`;
-export const FOLLOW_UP_PROMPT = `根据当前问题、最终条件和已回答内容，推荐 0–3 个可独立理解的下一步问题。
-遵循用户明确指定的回答语言，否则使用当前提问语言，以第一人称业务口吻简短提问。
-优先补齐未解决问题、检验具体假设或进行有价值的细分。不重复已回答内容，不将待验证假设写成事实。
-默认继承时间范围、筛选和指标口径；建议改变条件时明确写出。仅依据已知字段、关系和数据能力推荐。
-partial 状态优先补齐缺失结果。本系统仅支持授权数据只读查询与图表展示，不推荐写入或定时推送。
-不确定时减少数量或返回空数组。只返回字符串 JSON 数组，不输出 Markdown 或其他文字。
+export const FOLLOW_UP_PROMPT = `你负责在数据分析回答后，帮助用户继续探索。根据问题、最终回答、分析条件和授权字段，选择 0–3 个具体、有价值、数据能够回答的下一步问题。
+先识别回答已经覆盖的内容，再从尚未回答的方向选择：指标变化的细分、相关指标的对照、具体异常的检验、已知假设的验证。不要重问已有结论，也不要仅换一种说法重复原问题。
+complete 仅代表本轮分析完成，openQuestions 或 hypotheses 为空也不表示没有探索价值。存在明确可回答的下一步就推荐；只有没有有价值且有数据依据的问题时才返回空列表，并说明具体原因。
+依据 schema 中的实际字段及说明评估可行性。不得编造字段、关联关系、指标口径或因果关系；相关指标的共同变化只能作为待检验的关联。不得建议没有数据支持的分群、留存或收入归因。
+partial 状态下，只优先补齐现有数据可以补齐的结果；数据源缺失的日期、字段或权限不能靠换个问题补齐，改选现有数据可回答的方向。
+默认继承回答采用的时间范围、筛选和口径；改变条件时在问题中写明。避免推荐回答已经明确无法取得的数据。
+问题应简短、可独立理解，可直接作为用户下一条提问。遵循用户明确指定的回答语言，否则使用原问题语言，以第一人称业务口吻提问，不使用“需要我……吗”这样的助手口吻，不提表名或字段名。
+系统支持授权数据只读查询与图表展示，不支持写入或定时推送。
+只返回 JSON 对象：{"questions":["下一步问题"],"emptyReason":null}。questions 只能包含字符串，最多 3 项；为空时 emptyReason 必须是具体原因，否则为 null。不要输出 Markdown。
 ${DATA_BOUNDARY}`;
 export const ENRICHMENT_PROMPT = `根据字段结构、原注释与有限样本，提出保守的字段注释补充建议。
 保留原注释事实，冲突时记录待核实项，不覆盖原定义。样本分类只能称为已观察值，不代表完整枚举。
@@ -26,7 +29,7 @@ export function promptMetadata(version: string, content: string) {
 export const PROMPT_METADATA = {
     enrichment: promptMetadata('schema-enrichment-v2', ENRICHMENT_PROMPT),
     homeSuggestions: promptMetadata('home-suggestions-v2', HOME_SUGGESTIONS_PROMPT),
-    followUp: promptMetadata('follow-up-v2', FOLLOW_UP_PROMPT),
+    followUp: promptMetadata('follow-up-v3', FOLLOW_UP_PROMPT),
 };
 export function parseJsonArray(raw: string): unknown[] {
     if (raw.length > 100_000) throw new Error('模型响应超过大小上限');
