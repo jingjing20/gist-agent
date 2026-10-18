@@ -199,13 +199,15 @@ export class GenerationService implements OnModuleDestroy {
         const client = this.redis.duplicate();
         let cursor = /^\d+-\d+$/.test(after) ? after : '0-0';
         let closed = false;
-        request.once('close', () => {
+        const onClose = () => {
             closed = true;
             client.disconnect();
-        });
+        };
+        request.once('close', onClose);
         try {
             while (!closed) {
                 const result = await client.xread('COUNT', 100, 'BLOCK', 15000, 'STREAMS', this.keys(userId).user, cursor);
+                if (closed) break;
                 if (!result) {
                     response.write(': heartbeat\n\n');
                     continue;
@@ -217,7 +219,11 @@ export class GenerationService implements OnModuleDestroy {
                         cursor = streamId;
                     }
             }
+        } catch (error) {
+            // Disconnecting a page rejects its pending blocking Redis read.
+            if (!closed || !(error instanceof Error) || error.message !== 'Connection is closed.') throw error;
         } finally {
+            request.off('close', onClose);
             client.disconnect();
             if (!response.writableEnded) response.end();
         }
