@@ -13,6 +13,7 @@
 | [Agent Loop](agent-loop.md) | 模型具体看到什么；tool碎片如何组装；展示、结论、finish和错误修正如何决策 |
 | [SQL与Artifact](sql-and-artifacts.md) | 查询怎样授权/校验/执行/脱敏；同份结果如何变成模型输入、存储证据、表格和图表 |
 | [上下文与状态](context-and-state.md) | 追问怎样继承条件；版本、任务、Memory引用、预算和证据适用性怎样变化 |
+| [分析状态与草稿提交机制](analysis-state-and-draft.md) | 正式状态和草稿为何分离；表结构、版本、事务提交和串行约束如何实现 |
 | [数据库持久化链路](database-persistence.md) | 一轮分析在各表写入什么；事务边界与失败/取消/删除后哪些信息仍存在 |
 | [业务Memory](memory.md) | 直存和候选为何不同；确认、替换、冲突、软删除与固定快照如何协作 |
 | [数据源与Schema](datasource-and-schema.md) | 文件怎样变成物理表与目录；授权与字段政策如何生效；注释建议怎样经审核保存 |
