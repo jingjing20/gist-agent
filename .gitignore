@@ -73,3 +73,9 @@ dist-h5/
 
 # Database backups
 backups/
+
+# Reviewed local AgentScope SDK distribution (no secrets).
+!vendor/agentscope/*.tgz
+
+# Local runtime data and telemetry reports
+.local/
