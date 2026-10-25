@@ -1,3 +1,4 @@
+import { traceTool } from '@gist/telemetry';
 import type OpenAI from 'openai';
 import type { AnalysisOutcome } from '@gist/contracts';
 import { GenerationExecutionError } from '../chat/generation-errors';
@@ -293,7 +294,7 @@ export class AnalysisAgent {
                         if (activity) options.onEvent({ type: 'analysis_activity', activity });
                         let output;
                         try {
-                            output = await tool.execute(parsed, context);
+                            output = await traceTool(tool.name, () => tool.execute(parsed, context), context.signal);
                         } catch (error) {
                             removeActivity();
                             await check();

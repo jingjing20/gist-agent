@@ -1,3 +1,4 @@
+import { traceAgent } from '@gist/telemetry';
 import { AnalysisRuntimeAdapter } from '../analysis/analysis-runtime-adapter';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConversationService } from '../conversation/conversation.service';
@@ -76,7 +77,10 @@ export class ChatService {
         try {
             const request = await this.conversationService.getMessage(generation.requestMessageId, generation.conversationId, generation.userId);
             if (ownershipLost) throw new Error('WRITER_OWNERSHIP_LOST');
-            await this.runGeneration(generation, request?.content ?? '', generation.datasourceId, () => ownershipLost);
+            await traceAgent(generation.id, async (span) => {
+                const status = await this.runGeneration(generation, request?.content ?? '', generation.datasourceId, () => ownershipLost);
+                span?.end({ status: status === 'completed' ? 'success' : status === 'cancelled' ? 'canceled' : 'error' });
+            });
         } finally {
             clearInterval(heartbeat);
             await this.reliability.release(permit);
@@ -88,7 +92,7 @@ export class ChatService {
         await this.generations.failQueued(generationId, error);
     }
 
-    private async runGeneration(generation: GenerationIdentity, message: string, datasourceId: number | null, ownershipLost: () => boolean): Promise<void> {
+    private async runGeneration(generation: GenerationIdentity, message: string, datasourceId: number | null, ownershipLost: () => boolean): Promise<GenerationStatus> {
         const { conversationId, userId } = generation;
         const controller = new AbortController();
         const signal = controller.signal;
@@ -196,5 +200,6 @@ export class ChatService {
                 { blocks, llmMessages: turnMessages }
             );
         }
+        return finalStatus;
     }
 }

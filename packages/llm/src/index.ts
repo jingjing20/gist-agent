@@ -1,3 +1,4 @@
+import { traceModel, traceModelStream, modelUsage } from '@gist/telemetry';
 import { loadWorkspaceEnv } from '@gist/config';
 import OpenAI from 'openai';
 import { wrapOpenAI } from 'langsmith/wrappers';
@@ -23,17 +24,22 @@ export class LlmClient {
     }
 
     async chat(systemPrompt: string, userPrompt: string, temperature = 0): Promise<string> {
-        const response = await this.client.chat.completions.create({
-            model: this.model,
-            temperature,
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-            ],
+        return traceModel(this.model, async (span) => {
+            const response = await this.client.chat.completions.create({
+                model: this.model,
+                temperature,
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt },
+                ],
+            });
+            const usage = modelUsage(response.usage);
+            if (usage) span?.setUsage(usage);
+            if (response.choices[0]?.finish_reason) span?.setModel({ finishReason: response.choices[0].finish_reason });
+            const content = response.choices[0]?.message?.content?.trim();
+            if (!content) throw new Error('LLM returned empty response');
+            return content;
         });
-        const content = response.choices[0]?.message?.content?.trim();
-        if (!content) throw new Error('LLM returned empty response');
-        return content;
     }
 
     isReasoningActive(requested: boolean): boolean {
@@ -53,10 +59,15 @@ export class LlmClient {
             supportsThinkingControl: this.supportsThinkingControl,
             reasoningEffort: process.env.LLM_REASONING_EFFORT,
         });
-        return this.client.chat.completions.create(
-            payload as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
-            options.signal ? { signal: options.signal } : undefined
-        ) as unknown as Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>>;
+        return traceModelStream(
+            this.model,
+            () =>
+                this.client.chat.completions.create(
+                    payload as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
+                    options.signal ? { signal: options.signal } : undefined
+                ) as unknown as Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>>,
+            options.signal
+        );
     }
 }
 

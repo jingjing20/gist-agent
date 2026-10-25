@@ -1,3 +1,4 @@
+import { shutdownTelemetry } from '@gist/telemetry';
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { Worker } from 'bullmq';
 import { ChatService } from './chat.service';
@@ -31,6 +32,10 @@ export class GenerationWorkerService implements OnApplicationBootstrap, OnApplic
         });
     }
     async onApplicationShutdown() {
-        await this.worker?.close();
+        try {
+            await this.worker?.close();
+        } finally {
+            await shutdownTelemetry();
+        }
     }
 }

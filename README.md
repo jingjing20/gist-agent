@@ -19,7 +19,7 @@
 
 ## 快速启动
 
-使用 Node.js 22、pnpm 9.15.9。依赖 PostgreSQL 和 Redis；Compose 使用 PostgreSQL 17、Redis 7。
+使用 Node.js 22.17.0、pnpm 9.15.9。依赖 PostgreSQL 和 Redis；Compose 使用 PostgreSQL 17、Redis 7。
 
 ### 1. 安装与配置
 
@@ -96,3 +96,7 @@ Docker 数据库模式要求 Docker Desktop 已启动，本机已安装 Node.js 
 ## 许可证
 
 [MIT](LICENSE)
+
+## AgentScope 本机观测（可选）
+
+已提供默认关闭、固定不采集正文的 AgentScope 接入，覆盖 Worker 的 Agent、模型与工具步骤；原有 LangSmith 保留。配置、独立本地包安装和真实验证入口见 [接入指南](docs/guides/agentscope.md)。当前接入版本要求 Node 22.17.0；本机页面端口为 Gist 5173、AgentScope 5174。
