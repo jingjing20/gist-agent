@@ -15,7 +15,10 @@
         "migrate:memory-provenance": "pnpm --filter @gist/database... build && node scripts/migrate-memory-provenance.mjs",
         "dev:local": "bash scripts/start-local.sh",
         "dev:docker": "bash scripts/start-docker.sh",
-        "stop:docker": "docker compose stop postgres redis"
+        "stop:docker": "docker compose stop postgres redis",
+        "agentscope:local": "node scripts/agentscope-local.mjs",
+        "dev:agentscope": "node scripts/agentscope-local.mjs --dev",
+        "test:agentscope": "pnpm --filter @gist/worker... build && pnpm --filter @gist/telemetry test && node --test scripts/test-agentscope-agent.cjs"
     },
     "devDependencies": {
         "@gist/config": "workspace:*",

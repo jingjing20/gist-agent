@@ -1,46 +1,58 @@
-# AgentScope 接入与验证
+# AgentScope 本地接入与正文查看
 
-要求 Node 22.17.0、pnpm 9.15.9。SDK 使用该版本原生 require(ESM) 互操作，Gist 的 CommonJS 编译格式不变。SDK 和 contracts 的本地归档随仓库保存在 vendor/agentscope，完整性由 pnpm-lock.yaml 固定；无需链接另一仓库，安装时保留根 pnpm.overrides。
+要求 Node 22.17.0、pnpm 9.15.9。CommonJS 通过 Node 原生 require(ESM) 加载同一 SDK 实例。
+
+## 本地源码联调（推荐）
+
+首次在 Gist 根目录运行：
+
+```sh
+pnpm agentscope:local /path/to/agent-scope
+```
+
+脚本先构建 SDK/contracts，再将 telemetry 的依赖链接到源码目录，并检查真实加载路径。机器路径仅保存在忽略的 `.local/agentscope-link.json`，不提交到版本库；固定包的锁文件保留。此命令只设置链接，不启动服务。
+
+停掉已有的 Gist API/Worker 后运行：
+
+```sh
+pnpm dev:agentscope
+```
+
+此命令读取上次的本地路径（也可用 `AGENTSCOPE_SOURCE` 指定），构建 Gist API/Worker，监听 SDK/contracts 编译，并在 SDK 产物变化后自动重启 Gist API/Worker。已有 AgentScope API/Worker、PG/Redis 和两边 Web 需另行运行。不要同时运行另一份 Gist API/Worker。Gist 源码更改后仍需重新构建相应包，相关 dist 更新会触发服务重启；此命令主要服务 SDK 联调。停止命令会清理本命令创建的子进程，不停止 PG/Redis。
+
+只监听 SDK、不管理业务进程可用 `pnpm agentscope:local --watch`；此时业务服务需自行重启。`pnpm install` 可能恢复固定包，此后重新运行链接命令。不要把本机路径改入 package.json/锁文件。
 
 ## 配置
 
-.env.example 默认关闭：
-
 ```dotenv
-AGENTSCOPE_ENABLED=false
+AGENTSCOPE_ENABLED=true
+AGENTSCOPE_CAPTURE_CONTENT=true
 AGENTSCOPE_ENDPOINT=http://127.0.0.1:3100
-AGENTSCOPE_API_KEY=
+AGENTSCOPE_API_KEY=从项目采集密钥页取得，填写在本机 .env
 AGENTSCOPE_ENVIRONMENT=gist-development
 ```
 
-在 AgentScope 创建项目和采集密钥，填入本地 .env 后设置 AGENTSCOPE*ENABLED=true。该密钥仅供服务端，不加 VITE* 前缀，不放入网页、源码或版本库。本次已将本机密钥配置好；关闭只需设为 false 并重启 API/Worker。
+同时在 AgentScope 项目的「SDK 与采集」开启正文。本机已按用户确认启用双开关。示例配置仍默认关闭，部署时自行决定；密钥仅在服务端，不加 VITE\_ 前缀，不提交 `.env`。
 
-当前接入固定 captureContent=false，项目正文也关闭；即使设置同名 capture 环境变量也不会开启。记录步骤类型/状态/时间、模型和实际 usage（提供方有返回时）、TTFT、结束原因及 generation_id，不提交问题、模型回答、SQL/工具输入输出或异常正文。不把估算 Token 当实际用量，流式未提供 usage 时显示未知。原有应用数据库、日志及 LangSmith 策略不因此改变。
+- Agent 根步骤：用户问题、最终回答与显示块、状态；关联 conversation_id、request_message_id、generation_id。
+- LLM：实际请求消息、工具定义、非流响应或流式 Assistant 文本/工具调用；提供方实际返回的 usage、结束原因和 TTFT。流式块不预读、不重复消费。
+- 工具：所有模型发起的工具步骤，含 finish_analysis 和参数失败；调用 ID、原参数、返回结果和异常。
+- 取消/失败保留已收到的流式部分，并记录终态；不会改变业务原返回值或异常。未知用量/费用保持未知，估算值不冒充实际值。
 
-## 启动与使用
+SDK 过滤敏感对象键，并脱敏文本中的 Bearer、显式 api_key/password、常见模型密钥和数据库连接 URI；自然语言中的个人/业务敏感内容仍可能被采集。每个正文字段上限 32 KiB，流式结构使用更小的有界缓冲；超限明确标记截断，结构无法安全保存时显示摘要。旧记录无法补采，关闭也不删除已存正文。应用原日志和 LangSmith 策略独立。
 
-当前本机两边服务已经运行：Gist 页面 http://localhost:5173，AgentScope 页面 http://localhost:5174，API 分别 3000/3100。Gist 使用原有登录账号，AgentScope 新初始化的本机 admin 凭据保存在 AgentScope 仓库被忽略的 .local/admin-credentials.json（0600）。不要将其提交。
+## 查看与验证
 
-关闭现有进程后重启：先确保 PostgreSQL 5433、Gist Redis 6380、AgentScope Redis 6379 可用；在 Gist 根目录运行 pnpm install --frozen-lockfile、pnpm build、pnpm dev；AgentScope 根目录运行 pnpm db:migrate、pnpm dev。本机依赖首次启动细节见 AgentScope 的 docs/integrations/gist-agent.md。Gist 原有 pnpm dev:local 会管理 Homebrew PG，停止时也可能影响共用该 PG 服务的 AgentScope；两个应用数据库/账号保持独立。
+Gist 页面正常发起任务后，在 AgentScope 的 gist-agent 项目点击「最近 24 小时」，从输入/输出预览进入执行；可用对话 ID 筛选同一对话的多轮记录。左侧选择 Agent、模型或工具，右侧查看输入/输出/消息/异常/元数据。模型输入按角色展示消息并列出可用工具，支持折叠、复制和原始 JSON。列表只拉取最长 512 字符预览，详细正文按需加载。
 
-在 Gist 页面正常发起分析后，到 AgentScope 的 gist-agent 项目点击「最近 24 小时」更新窗口，再选择 Trace。根步骤反映实际生成成功/失败/取消；模型流及工具是子步骤，工具返回 succeeded=false 也会标失败。每次后台尝试各有一个 Trace，generation_id 可关联原任务。API 的非流模型调用建立独立 Trace。SIGTERM 停止 Worker 后会尝试有限时 flush；崩溃或断电仍可能丢失内存队列。
-
-## 验证
-
-普通检查不调用模型：
+快速检查：
 
 ```sh
-pnpm typecheck
 pnpm build
-pnpm --filter @gist/telemetry test
+pnpm typecheck
+pnpm test:agentscope
 ```
 
-真实模型验证必须显式执行（会产生模型费用）：
+可选 `node scripts/verify-agentscope.cjs --real-model` 会使用真实配置调用模型，最多四轮/60 秒；只执行合成工具，不读取业务表，不创建 Gist 对话。实际页面对话验收另记在 AgentScope 的 `docs/integrations/conversation-tracing.md`。不要将合成检查等同于业务 SQL 验收。
 
-```sh
-node scripts/verify-agentscope.cjs --real-model
-```
-
-该脚本运行生产 AnalysisAgent 与 LlmClient，使用合成只读工具 value=42，不访问业务表，不持久化 Gist 对话；关闭 LangSmith 外发，将遥测发往本机 AgentScope。最多 4 次逻辑模型调用、60 秒，输出 Trace ID/调用计数/接收数量，不打印请求、回答或密钥。HTTP 接收不等于 Worker 已投影。
-
-2026-10-25 已执行一次真实验证：1 次合成工具、2 次模型调用、8 个事件接收成功，查询得到 success/complete 和 4 个 Span，所有正文没有 value。Trace ID：30c8a674f152934a48a892caf7be5671；项目 ID：c9e31c9a-6389-4772-be0a-4722c9975a25。此验证不等于真实业务表分析或 GUI 交互验收；页面端到端交互待用户执行。
+固定部署包仍保存在 `vendor/agentscope`，随此次能力更新；在没有另一仓库的机器上可以正常构建。正式发布后宜改用固定版本的包仓库依赖。

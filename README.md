@@ -99,4 +99,4 @@ Docker 数据库模式要求 Docker Desktop 已启动，本机已安装 Node.js 
 
 ## AgentScope 本机观测（可选）
 
-已提供默认关闭、固定不采集正文的 AgentScope 接入，覆盖 Worker 的 Agent、模型与工具步骤；原有 LangSmith 保留。配置、独立本地包安装和真实验证入口见 [接入指南](docs/guides/agentscope.md)。当前接入版本要求 Node 22.17.0；本机页面端口为 Gist 5173、AgentScope 5174。
+已提供 AgentScope 对话链路接入，覆盖 Agent、模型消息、工具输入输出和异常。正文由 SDK 与项目双开关控制；本机已开启，可通过本地源码链接联调。原有 LangSmith 保留。配置、开发命令和真实验证入口见 [接入指南](docs/guides/agentscope.md)。当前接入版本要求 Node 22.17.0；本机页面端口为 Gist 5173、AgentScope 5174。
