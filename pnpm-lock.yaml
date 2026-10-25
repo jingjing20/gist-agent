@@ -349,11 +349,11 @@ importers:
 packages:
 
   '@agentscope/contracts@file:vendor/agentscope/agentscope-contracts-0.0.0.tgz':
-    resolution: {integrity: sha512-oOdE5nBHNladSnFrScCum25TtwzI6wuFZ40GXztljrdPJ5bzPhROvIzhJJh1C51fXQD4TQK/WnTTPrjqF7R9BQ==, tarball: file:vendor/agentscope/agentscope-contracts-0.0.0.tgz}
+    resolution: {integrity: sha512-Dyoo78qlTYNpG5RE7rGa46P95nf8jfq5BduBg6SHs8aSV35qylhW1ZDYGIJVGGWSUiZ/ctMZN1oDg7PXionGwg==, tarball: file:vendor/agentscope/agentscope-contracts-0.0.0.tgz}
     version: 0.0.0
 
   '@agentscope/sdk@file:vendor/agentscope/agentscope-sdk-0.0.0.tgz':
-    resolution: {integrity: sha512-xeck0fsk+iCGAHDNmuadgg9bWHwuLQtZS43ym2QqEmqHs3/vqLBlDfHmWBrAsmFYOaQMS9uRe4/dLGahzFQIcQ==, tarball: file:vendor/agentscope/agentscope-sdk-0.0.0.tgz}
+    resolution: {integrity: sha512-8jCqulrhqxRCNr1sfJ4xEcZXcvviN9YTUkYoAUBfPe0PQ25AtRXabOuKfx1cYhfAm+VolGALpJXvEsT+FyZVyA==, tarball: file:vendor/agentscope/agentscope-sdk-0.0.0.tgz}
     version: 0.0.0
 
   '@angular-devkit/core@17.3.11':

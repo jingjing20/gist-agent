@@ -13,11 +13,11 @@ test('disabled integration keeps callback value and original error without netwo
         (e) => e === error
     );
 });
-test('real SDK preserves concurrent parentage, tool failures, stream chunks/cancellation, and hard-disables every body', async () => {
+test('real SDK preserves concurrent parentage, tool failures, stream chunks/cancellation, and disables every body when opted out', async () => {
     process.env.AGENTSCOPE_ENABLED = 'true';
     process.env.AGENTSCOPE_ENDPOINT = 'http://localhost:3100';
     process.env.AGENTSCOPE_API_KEY = 'synthetic-test';
-    process.env.AGENTSCOPE_CAPTURE_CONTENT = 'true'; // Not an accepted override: privacy stays off.
+    process.env.AGENTSCOPE_CAPTURE_CONTENT = 'false';
     const original = globalThis.fetch;
     const events = [];
     globalThis.fetch = async (_url, init) => {

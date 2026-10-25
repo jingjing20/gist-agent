@@ -1,4 +1,4 @@
-import { traceAgent } from '@gist/telemetry';
+import { traceAgent, currentSpan } from '@gist/telemetry';
 import { AnalysisRuntimeAdapter } from '../analysis/analysis-runtime-adapter';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConversationService } from '../conversation/conversation.service';
@@ -77,10 +77,14 @@ export class ChatService {
         try {
             const request = await this.conversationService.getMessage(generation.requestMessageId, generation.conversationId, generation.userId);
             if (ownershipLost) throw new Error('WRITER_OWNERSHIP_LOST');
-            await traceAgent(generation.id, async (span) => {
-                const status = await this.runGeneration(generation, request?.content ?? '', generation.datasourceId, () => ownershipLost);
-                span?.end({ status: status === 'completed' ? 'success' : status === 'cancelled' ? 'canceled' : 'error' });
-            });
+            await traceAgent(
+                generation.id,
+                async (span) => {
+                    const status = await this.runGeneration(generation, request?.content ?? '', generation.datasourceId, () => ownershipLost);
+                    span?.end({ status: status === 'completed' ? 'success' : status === 'cancelled' ? 'canceled' : 'error' });
+                },
+                { conversationId: generation.conversationId, requestMessageId: generation.requestMessageId, input: request?.content ?? '' }
+            );
         } finally {
             clearInterval(heartbeat);
             await this.reliability.release(permit);
@@ -200,6 +204,12 @@ export class ChatService {
                 { blocks, llmMessages: turnMessages }
             );
         }
+        const answer = blocks
+            .filter((block) => block.type === 'text')
+            .map((block) => block.content ?? '')
+            .join('');
+        currentSpan()?.setOutput({ answer, status: finalStatus, blocks });
+        if (errorDetail && finalStatus === 'failed') currentSpan()?.recordError({ type: 'GenerationError', code: errorCode, message: errorDetail });
         return finalStatus;
     }
 }

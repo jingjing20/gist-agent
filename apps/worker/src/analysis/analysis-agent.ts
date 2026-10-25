@@ -1,4 +1,4 @@
-import { traceTool } from '@gist/telemetry';
+import { startTool } from '@gist/telemetry';
 import type OpenAI from 'openai';
 import type { AnalysisOutcome } from '@gist/contracts';
 import { GenerationExecutionError } from '../chat/generation-errors';
@@ -225,7 +225,8 @@ export class AnalysisAgent {
             const actions = [...new Set(batch.map((c) => actionLabels[c.function.name] ?? '执行分析工具'))].join('、');
             for (const call of batch) {
                 await check();
-                let result: string;
+                let result = '';
+                const toolSpan = startTool(call.function.name, { arguments: call.function.arguments, tool_call_id: call.id });
                 let activity: AnalysisActivityV1 | undefined;
                 let activityRemoved = false;
                 const reportFailure = (message: string, sql?: string) => {
@@ -294,7 +295,8 @@ export class AnalysisAgent {
                         if (activity) options.onEvent({ type: 'analysis_activity', activity });
                         let output;
                         try {
-                            output = await traceTool(tool.name, () => tool.execute(parsed, context), context.signal);
+                            output = await tool.execute(parsed, context);
+                            if (output.succeeded === false) toolSpan?.recordError({ type: 'ToolResultError', message: output.toolResult });
                         } catch (error) {
                             removeActivity();
                             await check();
@@ -325,6 +327,8 @@ export class AnalysisAgent {
                         }
                     }
                 } catch (error) {
+                    if (context.signal.aborted) toolSpan?.end({ status: 'canceled' });
+                    else toolSpan?.recordError(error);
                     await check();
                     if (error instanceof GenerationExecutionError) {
                         removeActivity();
@@ -350,6 +354,11 @@ export class AnalysisAgent {
                         message: error instanceof Error ? error.message : '工具参数不合法',
                         retryable: true,
                     });
+                } finally {
+                    if (toolSpan?.isRecording) {
+                        if (result) toolSpan.setOutput(result);
+                        toolSpan.end({ status: context.signal.aborted ? 'canceled' : 'success' });
+                    }
                 }
                 append({ role: 'tool', tool_call_id: call.id, content: result });
                 const action = `${call.function.name}:${call.function.arguments}`;

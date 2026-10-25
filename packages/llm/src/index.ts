@@ -24,22 +24,30 @@ export class LlmClient {
     }
 
     async chat(systemPrompt: string, userPrompt: string, temperature = 0): Promise<string> {
-        return traceModel(this.model, async (span) => {
-            const response = await this.client.chat.completions.create({
-                model: this.model,
-                temperature,
-                messages: [
-                    { role: 'system', content: systemPrompt },
-                    { role: 'user', content: userPrompt },
-                ],
-            });
-            const usage = modelUsage(response.usage);
-            if (usage) span?.setUsage(usage);
-            if (response.choices[0]?.finish_reason) span?.setModel({ finishReason: response.choices[0].finish_reason });
-            const content = response.choices[0]?.message?.content?.trim();
-            if (!content) throw new Error('LLM returned empty response');
-            return content;
-        });
+        const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userPrompt },
+        ];
+        return traceModel(
+            this.model,
+            async (span) => {
+                const response = await this.client.chat.completions.create({
+                    model: this.model,
+                    temperature,
+                    messages,
+                });
+                const usage = modelUsage(response.usage);
+                if (usage) span?.setUsage(usage);
+                if (response.choices[0]?.finish_reason) span?.setModel({ finishReason: response.choices[0].finish_reason });
+                const content = response.choices[0]?.message?.content?.trim();
+                if (!content) throw new Error('LLM returned empty response');
+                span?.setOutput(response.choices[0]?.message);
+                if (response.id) span?.setModel({ providerRequestId: response.id });
+                return content;
+            },
+            { messages, temperature },
+            messages
+        );
     }
 
     isReasoningActive(requested: boolean): boolean {
@@ -66,7 +74,9 @@ export class LlmClient {
                     payload as unknown as OpenAI.Chat.Completions.ChatCompletionCreateParamsStreaming,
                     options.signal ? { signal: options.signal } : undefined
                 ) as unknown as Promise<AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>>,
-            options.signal
+            options.signal,
+            { messages, tools },
+            messages
         );
     }
 }

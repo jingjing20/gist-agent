@@ -1,4 +1,5 @@
 // Run after building. --real-model is explicit authorization to call the configured provider.
+const { randomUUID } = require('node:crypto');
 const { createRequire } = require('node:module');
 const path = require('node:path');
 const assert = require('node:assert/strict');
@@ -28,42 +29,48 @@ async function main() {
     let toolCalls = 0;
     let traceId;
     try {
-        const outcome = await telemetry.traceAgent(undefined, async (root) => {
-            traceId = root?.traceId;
-            return new AnalysisAgent().run({
-                messages,
-                turnMessages: [],
-                metrics,
-                capability: resolveModelCapability(process.env.OPENAI_MODEL || 'gpt-4o'),
-                context: { signal: controller.signal, assertWritable: async () => {}, emitter: { send() {} } },
-                tools: [
-                    {
-                        name: 'verify_fixture',
-                        definition: {
-                            type: 'function',
-                            function: {
-                                name: 'verify_fixture',
-                                description: 'Read a synthetic local fixture, value 42. No real database access.',
-                                parameters: { type: 'object', properties: {}, additionalProperties: false },
+        const outcome = await telemetry.traceAgent(
+            undefined,
+            async (root) => {
+                traceId = root?.traceId;
+                const result = await new AnalysisAgent().run({
+                    messages,
+                    turnMessages: [],
+                    metrics,
+                    capability: resolveModelCapability(process.env.OPENAI_MODEL || 'gpt-4o'),
+                    context: { signal: controller.signal, assertWritable: async () => {}, emitter: { send() {} } },
+                    tools: [
+                        {
+                            name: 'verify_fixture',
+                            definition: {
+                                type: 'function',
+                                function: {
+                                    name: 'verify_fixture',
+                                    description: 'Read a synthetic local fixture, value 42. No real database access.',
+                                    parameters: { type: 'object', properties: {}, additionalProperties: false },
+                                },
+                            },
+                            parseArguments: () => ({}),
+                            execute: async () => {
+                                toolCalls++;
+                                return { succeeded: true, blocks: [], toolResult: JSON.stringify({ value: 42, synthetic: true }) };
                             },
                         },
-                        parseArguments: () => ({}),
-                        execute: async () => {
-                            toolCalls++;
-                            return { succeeded: true, blocks: [], toolResult: JSON.stringify({ value: 42, synthetic: true }) };
-                        },
+                    ],
+                    stream: async (history, tools) => {
+                        if (metrics.llmCallCount > 4) throw new Error('Model call budget exceeded');
+                        return llm.streamWithTools(history, tools, { signal: controller.signal, reasoningEnabled: false });
                     },
-                ],
-                stream: async (history, tools) => {
-                    if (metrics.llmCallCount > 4) throw new Error('Model call budget exceeded');
-                    return llm.streamWithTools(history, tools, { signal: controller.signal, reasoningEnabled: false });
-                },
-                checkpoint: async () => {},
-                onFirstDelta: async () => {},
-                onContext() {},
-                onEvent() {},
-            });
-        });
+                    checkpoint: async () => {},
+                    onFirstDelta: async () => {},
+                    onContext() {},
+                    onEvent() {},
+                });
+                root?.setOutput(result);
+                return result;
+            },
+            { conversationId: randomUUID(), requestMessageId: randomUUID(), input: messages[1].content }
+        );
         assert.equal(outcome.status, 'complete', 'Synthetic analysis did not complete');
         assert.ok(toolCalls >= 1, 'Model did not call the synthetic tool');
         assert.ok(metrics.llmCallCount <= 4, 'Model call budget exceeded');
@@ -76,7 +83,7 @@ async function main() {
                 modelCalls: metrics.llmCallCount,
                 outcome: outcome.status,
                 accepted: telemetry.telemetryDiagnostics()?.accepted,
-                bodyCapture: false,
+                bodyCapture: process.env.AGENTSCOPE_CAPTURE_CONTENT === 'true',
             })
         );
     } finally {
