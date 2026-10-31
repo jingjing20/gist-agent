@@ -1,13 +1,12 @@
 <template>
     <section class="process" aria-label="分析过程">
-        <button class="process-summary" type="button" :aria-expanded="!collapsed" @click="collapsed = !collapsed">
+        <div v-if="mode === 'summary'" class="process-summary" role="status">
             <span class="summary-icon" :class="summaryTone"><i :class="summaryIcon"></i></span>
             <span class="summary-label">{{ summaryLabel }}</span>
             <span class="summary-meta">{{ summaryMeta }}</span>
-            <i class="fas fa-chevron-down toggle" :class="{ expanded: !collapsed }"></i>
-        </button>
+        </div>
 
-        <div v-if="!collapsed" class="activity-list">
+        <div v-else class="activity-list">
             <template v-for="activity in activities" :key="activity.id">
                 <button class="activity-pill" :class="`is-${activity.status}`" type="button" :aria-expanded="expanded.has(activity.id)" @click="toggle(activity.id)">
                     <span class="activity-icon"><i :class="iconFor(activity)"></i></span>
@@ -102,12 +101,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
-import type { AnalysisActivityDetailV1, AnalysisActivityV1, ArtifactColumnV1 } from '@gist/contracts';
+import { computed, ref } from 'vue';
+import type { AnalysisActivityV1, ArtifactColumnV1 } from '@gist/contracts';
 import { apiFetch } from '../../api';
 import { useChatStore } from '../../stores/chat';
 import type { MessageBlock } from '../../types';
-import { cloneAnalysisActivity } from '../../utils/analysis-activity.js';
 import SqlBlock from './SqlBlock.vue';
 import TableBlock from './TableBlock.vue';
 
@@ -120,25 +118,15 @@ interface ArtifactView {
     nextCursor: string | null;
 }
 
-const props = defineProps<{ blocks: MessageBlock[]; isStreaming: boolean; terminalStatus?: 'completed' | 'failed' | 'cancelled' }>();
+const props = defineProps<{ mode: 'summary' | 'inline'; blocks: MessageBlock[]; isStreaming: boolean; terminalStatus?: 'completed' | 'failed' | 'cancelled' }>();
 const chat = useChatStore();
-const collapsed = ref(true);
 const expanded = ref(new Set<string>());
 const resultOpen = ref(new Set<string>());
 const sqlOpen = ref(new Set<string>());
 const artifacts = ref<Record<string, ArtifactView>>({});
 const hasFormalResult = computed(() => props.blocks.some((block) => block.type === 'text' && !!block.analysis));
-// Keep tool details compact alongside the streamed narrative.
-// Step updates do not override the user's manual toggle.
-watch(
-    () => props.isStreaming,
-    (streaming) => {
-        collapsed.value = true;
-        if (!streaming) expanded.value = new Set();
-    }
-);
-
-const rawActivities = computed(() =>
+// Preserve each call's position; completion updates replace the same block in place.
+const activities = computed(() =>
     props.blocks
         .filter(
             (block): block is MessageBlock & { activity: AnalysisActivityV1 } =>
@@ -146,43 +134,6 @@ const rawActivities = computed(() =>
         )
         .map((block) => block.activity)
 );
-
-const mergeable = new Set<AnalysisActivityV1['kind']>(['inspect_catalog', 'inspect_memory', 'inspect_schema']);
-const activities = computed(() => {
-    const merged: AnalysisActivityV1[] = [];
-    for (const activity of rawActivities.value) {
-        const previous = merged.at(-1);
-        if (
-            previous &&
-            previous.kind === activity.kind &&
-            previous.groupId === activity.groupId &&
-            mergeable.has(activity.kind) &&
-            previous.status === 'completed' &&
-            activity.status === 'completed'
-        ) {
-            previous.subject = unique([...(previous.subject?.split('、') || []), ...(activity.subject?.split('、') || [])]).join('、');
-            previous.details = mergeDetails(previous.details, activity.details);
-            previous.durationMs = (previous.durationMs || 0) + (activity.durationMs || 0);
-            previous.completedAt = activity.completedAt;
-            continue;
-        }
-        merged.push(cloneAnalysisActivity(activity));
-    }
-    return merged;
-});
-
-function mergeDetails(left: AnalysisActivityDetailV1[], right: AnalysisActivityDetailV1[]): AnalysisActivityDetailV1[] {
-    const values = new Map<string, string[]>();
-    for (const item of [...left, ...right]) {
-        const next = Array.isArray(item.value) ? item.value : [item.value];
-        values.set(item.label, unique([...(values.get(item.label) || []), ...next]));
-    }
-    return [...values].map(([label, value]) => ({ label, value: value.length === 1 ? value[0] : value }));
-}
-
-function unique(values: string[]): string[] {
-    return [...new Set(values.filter(Boolean))];
-}
 
 function asList(value: string | string[]): string[] {
     return Array.isArray(value) ? value : [value];
@@ -306,12 +257,10 @@ const summaryIcon = computed(() => {
     align-items: center;
     gap: 8px;
     font: inherit;
-    cursor: pointer;
     transition:
         background 0.18s ease,
         border-color 0.18s ease;
 }
-.process-summary:hover,
 .activity-pill:hover {
     background: color-mix(in srgb, var(--da-text-muted) 14.000000000000002%, transparent);
     border-color: color-mix(in srgb, var(--da-text-muted) 25%, transparent);
@@ -396,6 +345,7 @@ const summaryIcon = computed(() => {
 .activity-pill {
     max-width: 100%;
     font-size: 12px;
+    cursor: pointer;
 }
 .activity-details {
     margin: -4px 0 0 10px;

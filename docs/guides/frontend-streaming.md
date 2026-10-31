@@ -27,7 +27,7 @@ flowchart TD
 | 输入 | [ChatInput.handleSubmit](../../apps/web/src/components/ChatInput.vue) | 本地文本、自动高度、禁止当前会话重复发送、停止按钮和深度思考开关 |
 | 状态 | [useChatStore](../../apps/web/src/stores/chat.ts) | conversations、activeConversationId、generations、connectionState；发送/取消/重试、事件应用和恢复 |
 | 网络 | [apiFetch](../../apps/web/src/api.ts) | `/api` 前缀、Bearer token、JSON Content-Type；401 清 token 并跳转登录 |
-| 展示 | [ChatMessageItem](../../apps/web/src/components/ChatMessageItem.vue) | 过程与正文分开、终态提示、重试按钮、文字播放协调和推荐问题展示条件 |
+| 展示 | [ChatMessageItem](../../apps/web/src/components/ChatMessageItem.vue) | 工具卡片与正文按事件顺序交错、顶部状态摘要、终态提示、重试按钮、文字播放协调和推荐问题展示条件 |
 
 每条 ChatMessage 有 content 和 blocks。用户消息显示 content；assistant 主要按 blocks 渲染。SSE 的 text_chunk 会合并到文字 block，前端没有同时把每个 chunk 拼到 message.content。最终 content 与历史 blocks 从消息 API 恢复。修改正文展示时，要核对 blocks 的实时聚合和历史载荷两条路径。
 
@@ -219,7 +219,7 @@ Store 设置 current.sequence=12、status=running；如果本地消息已经存�
 
 共享协议还保留 thinking、chart_loading 等兼容类型，Worker 类型另含 sql_chunk；这不代表当前主 Agent 会输出每一种。增加事件之前先确认活跃 producer，避免仅看到 union 类型就把它写成产品能力。
 
-`ChatMessageItem.visibleBlocks` 隐藏 thinking/reasoning；有分析流程时，将非 display 的 activity/log/sql/table 留在过程区，不在正文重复展示。已查询结果可从过程详情的“查看结果/SQL”打开，不必自动出现在最终回答中。AnalysisProcessBlock 还会合并同一模型轮内相邻已完成的目录/Memory/Schema 读取活动，并隐藏 inspect_evidence 类型，避免把协议事件数量当成 UI 展示步骤数量。
+`ChatMessageItem.visibleBlocks` 隐藏 thinking/reasoning 和内部 inspect_evidence 活动；有分析流程时，非 display 的 log/sql/table 不单独展示。文案、analysis_activity 卡片和显式展示的结果按原始 blocks 顺序交错渲染，实时输出、事件回放和历史恢复使用同一路径。工具完成时按 activity.id 原位更新卡片，不移动到消息末尾，也不跨文案合并调用。AnalysisProcessBlock 的 summary 模式只显示整体状态和调用计数，inline 模式在正文对应位置展示单次调用，可展开详情、查看结果或 SQL。卡片与后续内容同样等待前面的文字播放完成。
 
 ## 7. done、历史恢复与失败/取消是怎样协作的
 
@@ -301,7 +301,7 @@ ArtifactResult 打开“放大”或“依据”弹窗时保存 message-list 的
 | 修改目标 | 需要同时检查的代码与行为 |
 | --- | --- |
 | 新增事件或字段 | Worker SSEEvent、前端 types、Adapter.emit 持久聚合、Store.applyBlock、组件 props、Generation 事件和历史 blocks；只修改实时渲染不够 |
-| 修改过程展示 | activity.id 更新规则、活动完成/失败字段、AnalysisProcessBlock 合并/过滤规则；保留真实 SQL 和结果入口 |
+| 修改过程展示 | activity.id 原位更新规则、活动完成/失败字段、正文 blocks 顺序、AnalysisProcessBlock 摘要与内联模式、内部活动过滤；保留真实 SQL 和结果入口 |
 | 修改消息恢复 | startRealtime 注册任务、sync 对齐、history 的连续/终态判断、resync events/snapshot、fetchMessages 对象复用 |
 | 修改任务状态 UI | activeGeneration 的状态集合、done/error 映射、cancel_requested 按钮、failed/cancelled 重试；业务 outcome 单独显示 |
 | 修改表格分页 | Artifact API 参数限制、组件 cursor/revision/错误重试；翻页不能重查或悄悄改变证据范围 |

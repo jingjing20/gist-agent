@@ -16,9 +16,9 @@ Vue Router 使用 history 模式，公共页为登录、注册、忘记密码、
 
 API 请求前缀是 `/api`；`apiFetch` 加 Bearer，非 FormData body 默认 JSON；非 auth API 的 401 清除 token 并跳登录。路由保护只影响界面，数据权限仍由 API/Worker检查。
 
-## 结果与过程分离
+## 过程时间线与结果展示
 
-`AnalysisProcessBlock` 接收结构化 analysis_activity、阶段 log 与 SQL，用作过程详情。正文 text、显式 display table、chart、analysis 元数据和 Memory Notice 按发生顺序展示。
+`ChatMessageItem` 按原始 blocks 顺序交错展示正文 text、结构化 analysis_activity 工具卡片、显式 display table、chart、analysis 元数据和 Memory Notice。`AnalysisProcessBlock` 的 summary 模式在顶部显示整体状态与调用计数，inline 模式在调用发生的位置展示卡片及可展开的详情、SQL 和查询结果。同一次调用的状态原位更新，每次调用保留独立卡片；内部 inspect_evidence 和非 display 的 log/sql/table 不单独展示。
 
 - 原始 reasoning 不进入用户显示；ThinkingBlock 等旧组件/事件兼容类型的存在不证明当前运行时输出思维链。
 - MarkdownIt 关闭原始 HTML，前端文字播放与 SSE 到达速度解耦。done 可以先到，文字继续播放；同消息后续结果等待前面文字播放。

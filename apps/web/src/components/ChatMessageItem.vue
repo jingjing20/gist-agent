@@ -12,10 +12,12 @@
             </template>
             <template v-else>
                 <div class="assistant-content">
-                    <AnalysisProcessBlock v-if="hasAnalysisProcess" :blocks="msg.blocks" :is-streaming="isStreaming" :terminal-status="processTerminalStatus" />
-                    <template v-for="(block, i) in visibleBlocks" :key="i">
+                    <AnalysisProcessBlock v-if="hasAnalysisProcess" mode="summary" :blocks="msg.blocks" :is-streaming="isStreaming" :terminal-status="processTerminalStatus" />
+                    <template v-for="{ block, key } in visibleBlocks" :key="key">
                         <div class="stream-block">
+                            <AnalysisProcessBlock v-if="block.type === 'analysis_activity'" mode="inline" :blocks="[block]" :is-streaming="isStreaming" />
                             <component
+                                v-else
                                 :is="block.analysis ? AnalysisBlock : block.type === 'chart' || block.type === 'table' ? ArtifactResult : blockComponent(block.type)"
                                 v-bind="blockProps(block)"
                                 @select="sendSuggestion"
@@ -96,16 +98,25 @@ const analysisWorkflow = computed(() =>
 const hasAnalysisProcess = computed(() => props.isStreaming || analysisWorkflow.value);
 const hasAnalysisResult = computed(() => props.msg.blocks.some((block) => !!block.analysis));
 const reportCharts = computed(() => props.msg.blocks.filter((block) => block.type === 'chart' && !!block.chartData));
-const visibleBlocks = computed(() =>
-    props.msg.blocks.filter((block) => {
-        if (block.type === 'suggestions')
-            return isLatestMessage.value && !props.isStreaming && !props.msg.animateText && playingTextCount.value === 0 && generationStatus.value === 'completed';
-        if (block.type === 'thinking' || block.type === 'reasoning_chunk') return false;
-        if (analysisWorkflow.value && ['analysis_activity', 'log', 'sql', 'table'].includes(block.type) && !block.display) return false;
-        if (hasAnalysisResult.value && block.type === 'table' && !block.display) return false;
-        return true;
-    })
-);
+const visibleBlocks = computed(() => {
+    // Keep renderers stable across tool removal and replacement by a saved snapshot.
+    const occurrences = new Map<string, number>();
+    return props.msg.blocks
+        .filter((block) => {
+            if (block.type === 'suggestions')
+                return isLatestMessage.value && !props.isStreaming && !props.msg.animateText && playingTextCount.value === 0 && generationStatus.value === 'completed';
+            if (block.type === 'thinking' || block.type === 'reasoning_chunk') return false;
+            if (block.type === 'analysis_activity') return !!block.activity && block.activity.kind !== 'inspect_evidence';
+            if (analysisWorkflow.value && ['log', 'sql', 'table'].includes(block.type) && !block.display) return false;
+            if (hasAnalysisResult.value && block.type === 'table' && !block.display) return false;
+            return true;
+        })
+        .map((block) => {
+            const occurrence = occurrences.get(block.type) || 0;
+            occurrences.set(block.type, occurrence + 1);
+            return { block, key: block.activity ? `activity:${block.activity.id}` : `${block.type}:${occurrence}` };
+        });
+});
 
 const blockMap: Record<string, Component> = {
     sql: SqlBlock,
