@@ -26,12 +26,25 @@
                         <template v-for="item in activity.details" :key="item.label">
                             <dt>{{ item.label }}</dt>
                             <dd>
-                                <details v-if="item.label === '完整字段列表'">
-                                    <summary>查看 {{ Array.isArray(item.value) ? item.value.length : 1 }} 个字段</summary>
-                                    <div class="secondary-values">
-                                        <span v-for="value in asList(item.value)" :key="value" class="value-tag">{{ value }}</span>
-                                    </div>
-                                </details>
+                                <Dialog v-if="item.label === '完整字段列表'">
+                                    <DialogTrigger as-child>
+                                        <button type="button" class="fields-trigger">查看 {{ asList(item.value).length }} 个字段</button>
+                                    </DialogTrigger>
+                                    <DialogContent class="flex max-h-[85dvh] min-h-0 flex-col overflow-hidden sm:max-w-3xl">
+                                        <DialogHeader class="min-w-0 pr-8">
+                                            <DialogTitle>完整字段列表</DialogTitle>
+                                            <DialogDescription class="break-words"
+                                                >{{ activity.subject || '数据表' }} · 本次读取 {{ asList(item.value).length }} 个字段</DialogDescription
+                                            >
+                                        </DialogHeader>
+                                        <ol class="fields-list evidence-panel" aria-label="字段列表">
+                                            <li v-for="(value, index) in asList(item.value)" :key="index">
+                                                <span class="field-index" aria-hidden="true">{{ index + 1 }}</span>
+                                                <code>{{ value }}</code>
+                                            </li>
+                                        </ol>
+                                    </DialogContent>
+                                </Dialog>
                                 <template v-else-if="Array.isArray(item.value)">
                                     <span v-for="value in item.value" :key="value" class="value-tag">{{ value }}</span>
                                 </template>
@@ -49,50 +62,72 @@
                     <p v-else-if="activity.warning" class="warning">{{ activity.warning }}</p>
 
                     <div v-if="activity.query" class="evidence-actions">
-                        <button type="button" @click="toggleResult(activity)">
-                            <i class="fas fa-table"></i>
-                            {{ resultOpen.has(activity.id) ? '收起结果' : '查看结果' }}
-                        </button>
-                        <button type="button" @click="toggleSql(activity.id)">
-                            <i class="fas fa-code"></i>
-                            {{ sqlOpen.has(activity.id) ? '收起 SQL' : '查看 SQL' }}
-                        </button>
-                    </div>
-
-                    <div v-if="activity.query && resultOpen.has(activity.id)" class="nested-evidence">
-                        <p v-if="artifacts[activity.query.artifactId]?.error" role="alert">
-                            {{ artifacts[activity.query.artifactId]?.error }}
-                            <button type="button" @click="loadArtifact(activity, true)">重试</button>
-                        </p>
-                        <p v-else-if="artifacts[activity.query.artifactId]?.loading" class="muted">正在读取完整结果…</p>
-                        <template v-else-if="artifacts[activity.query.artifactId]?.metadata">
-                            <p class="loaded-count">
-                                已加载 {{ artifacts[activity.query.artifactId]?.rows.length }} / {{ artifacts[activity.query.artifactId]?.metadata?.returnedRowCount }} 行
-                            </p>
-                            <TableBlock
-                                :title="activity.subject || '查询结果'"
-                                :columns="artifacts[activity.query.artifactId]?.metadata?.columns.map((column) => column.name)"
-                                :rows="artifacts[activity.query.artifactId]?.rows"
-                                :row-count="artifacts[activity.query.artifactId]?.metadata?.returnedRowCount"
-                                :is-limited="artifacts[activity.query.artifactId]?.metadata?.isLimited"
-                                :max-display="1000"
-                            />
-                            <button
-                                v-if="artifacts[activity.query.artifactId]?.nextCursor"
-                                class="load-more"
-                                type="button"
-                                :disabled="artifacts[activity.query.artifactId]?.loadingMore"
-                                @click="loadMore(activity)"
-                            >
-                                {{ artifacts[activity.query.artifactId]?.loadingMore ? '正在加载…' : '加载更多结果' }}
-                            </button>
-                        </template>
-                    </div>
-
-                    <div v-if="activity.query && sqlOpen.has(activity.id)" class="nested-evidence">
-                        <p v-if="activity.query.adjusted" class="adjusted"><i class="fas fa-info-circle"></i> 实际执行 SQL 已经过安全限制或格式调整。</p>
-                        <SqlBlock title="实际执行 SQL" :content="activity.query.executedSql" />
-                        <SqlBlock v-if="activity.query.adjusted" title="原始 SQL" :content="activity.query.originalSql" />
+                        <Dialog>
+                            <DialogTrigger as-child>
+                                <button type="button" @click="loadArtifact(activity)"><i class="fas fa-table" aria-hidden="true"></i> 查看结果</button>
+                            </DialogTrigger>
+                            <DialogContent class="flex max-h-[85dvh] min-h-0 flex-col overflow-hidden sm:max-w-6xl">
+                                <DialogHeader class="min-w-0 pr-8">
+                                    <DialogTitle>查询结果</DialogTitle>
+                                    <DialogDescription class="break-words">{{ activity.subject || '查询数据' }}</DialogDescription>
+                                </DialogHeader>
+                                <div class="evidence-panel">
+                                    <p v-if="artifacts[activity.query.artifactId]?.error" role="alert">
+                                        {{ artifacts[activity.query.artifactId]?.error }}
+                                        <button type="button" @click="loadArtifact(activity, true)">重试</button>
+                                    </p>
+                                    <p v-if="artifacts[activity.query.artifactId]?.loading" class="muted">正在读取完整结果…</p>
+                                    <template v-else-if="artifacts[activity.query.artifactId]?.metadata">
+                                        <p v-if="!artifacts[activity.query.artifactId]?.rows.length" class="muted" role="status">查询结果为空。</p>
+                                        <p class="loaded-count">
+                                            已加载 {{ artifacts[activity.query.artifactId]?.rows.length }} /
+                                            {{ artifacts[activity.query.artifactId]?.metadata?.returnedRowCount }} 行
+                                        </p>
+                                        <TableBlock
+                                            :title="activity.subject || '查询结果'"
+                                            :columns="artifacts[activity.query.artifactId]?.metadata?.columns.map((column) => column.name)"
+                                            :rows="artifacts[activity.query.artifactId]?.rows"
+                                            :row-count="artifacts[activity.query.artifactId]?.metadata?.returnedRowCount"
+                                            :is-limited="artifacts[activity.query.artifactId]?.metadata?.isLimited"
+                                            :max-display="artifacts[activity.query.artifactId]?.rows.length"
+                                        />
+                                        <button
+                                            v-if="artifacts[activity.query.artifactId]?.nextCursor"
+                                            class="load-more"
+                                            type="button"
+                                            :disabled="artifacts[activity.query.artifactId]?.loadingMore"
+                                            @click="loadMore(activity)"
+                                        >
+                                            {{ artifacts[activity.query.artifactId]?.loadingMore ? '正在加载…' : '加载更多结果' }}
+                                        </button>
+                                    </template>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
+                        <Dialog>
+                            <DialogTrigger as-child>
+                                <button type="button"><i class="fas fa-code" aria-hidden="true"></i> 查看 SQL</button>
+                            </DialogTrigger>
+                            <DialogContent class="flex max-h-[85dvh] min-h-0 flex-col overflow-hidden sm:max-w-6xl">
+                                <DialogHeader class="min-w-0 pr-8">
+                                    <DialogTitle>查询 SQL</DialogTitle>
+                                    <DialogDescription class="break-words">{{ activity.subject || '查询数据' }}</DialogDescription>
+                                </DialogHeader>
+                                <TabsRoot default-value="executed" class="flex min-h-0 flex-col gap-4">
+                                    <TabsList v-if="activity.query.adjusted" class="sql-tabs" aria-label="SQL 版本">
+                                        <TabsTrigger value="executed">实际执行 SQL</TabsTrigger>
+                                        <TabsTrigger value="original">原始 SQL</TabsTrigger>
+                                    </TabsList>
+                                    <p v-if="activity.query.adjusted" class="sql-note">执行前系统会规范 SQL 并限制返回行数，可切换查看原始语句。</p>
+                                    <TabsContent value="executed" class="evidence-panel">
+                                        <SqlBlock title="实际执行 SQL" :content="activity.query.executedSql" />
+                                    </TabsContent>
+                                    <TabsContent v-if="activity.query.adjusted" value="original" class="evidence-panel">
+                                        <SqlBlock title="原始 SQL" :content="activity.query.originalSql" />
+                                    </TabsContent>
+                                </TabsRoot>
+                            </DialogContent>
+                        </Dialog>
                     </div>
                 </div>
             </template>
@@ -102,6 +137,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import type { AnalysisActivityV1, ArtifactColumnV1 } from '@gist/contracts';
 import { apiFetch } from '../../api';
 import { useChatStore } from '../../stores/chat';
@@ -121,8 +158,6 @@ interface ArtifactView {
 const props = defineProps<{ mode: 'summary' | 'inline'; blocks: MessageBlock[]; isStreaming: boolean; terminalStatus?: 'completed' | 'failed' | 'cancelled' }>();
 const chat = useChatStore();
 const expanded = ref(new Set<string>());
-const resultOpen = ref(new Set<string>());
-const sqlOpen = ref(new Set<string>());
 const artifacts = ref<Record<string, ArtifactView>>({});
 const hasFormalResult = computed(() => props.blocks.some((block) => block.type === 'text' && !!block.analysis));
 // Preserve each call's position; completion updates replace the same block in place.
@@ -148,18 +183,10 @@ function replaceSet(target: typeof expanded, id: string) {
 function toggle(id: string) {
     replaceSet(expanded, id);
 }
-function toggleSql(id: string) {
-    replaceSet(sqlOpen, id);
-}
-async function toggleResult(activity: AnalysisActivityV1) {
-    replaceSet(resultOpen, activity.id);
-    if (resultOpen.value.has(activity.id)) await loadArtifact(activity);
-}
-
 async function loadArtifact(activity: AnalysisActivityV1, force = false) {
     const query = activity.query;
     const conversationId = chat.activeConversationId;
-    if (!query || !conversationId || (!force && artifacts.value[query.artifactId]?.metadata)) return;
+    if (!query || !conversationId || (!force && (artifacts.value[query.artifactId]?.metadata || artifacts.value[query.artifactId]?.loading))) return;
     artifacts.value[query.artifactId] = { rows: [], nextCursor: null, loading: true };
     try {
         const suffix = `conversationId=${encodeURIComponent(conversationId)}`;
@@ -377,12 +404,49 @@ const summaryIcon = computed(() => {
     border-radius: 5px;
     background: color-mix(in srgb, var(--da-text-muted) 9%, transparent);
 }
-.detail-grid summary {
-    cursor: pointer;
+.fields-trigger {
+    appearance: none;
+    border: 1px solid var(--da-border);
+    border-radius: 6px;
+    padding: 4px 8px;
+    background: transparent;
     color: var(--da-text-main);
+    font: inherit;
+    cursor: pointer;
 }
-.secondary-values {
-    margin-top: 6px;
+.fields-trigger:hover {
+    border-color: var(--da-primary);
+}
+.fields-trigger:focus-visible {
+    outline: 2px solid var(--da-primary);
+    outline-offset: 2px;
+}
+.fields-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+.fields-list li {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--da-border);
+}
+.fields-list li:last-child {
+    border-bottom: 0;
+}
+.field-index {
+    min-width: 2ch;
+    flex-shrink: 0;
+    color: var(--da-text-muted);
+    font-variant-numeric: tabular-nums;
+}
+.fields-list code {
+    min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    color: var(--da-text-main);
 }
 .evidence-actions {
     display: flex;
@@ -403,15 +467,22 @@ const summaryIcon = computed(() => {
 .load-more:hover {
     border-color: var(--da-primary);
 }
-.nested-evidence {
-    margin-top: 10px;
+.evidence-panel {
+    min-height: 0;
+    overflow: auto;
+    overscroll-behavior: contain;
 }
-.nested-evidence :deep(.sql-block),
-.nested-evidence :deep(.table-block) {
-    box-shadow: none;
+.evidence-panel :deep(.sql-block) + :deep(.sql-block) {
+    margin-top: 12px;
 }
-.nested-evidence :deep(.sql-block) + :deep(.sql-block) {
-    margin-top: 8px;
+.evidence-panel :deep(.sql-code),
+.evidence-panel :deep(.table-wrapper) {
+    scrollbar-width: auto;
+}
+.evidence-panel :deep(.no-scrollbar)::-webkit-scrollbar {
+    display: block;
+    height: 8px;
+    width: 8px;
 }
 .load-more {
     margin-top: 8px;
@@ -420,8 +491,40 @@ const summaryIcon = computed(() => {
     margin: 0 0 6px;
     color: var(--da-text-muted);
 }
-.adjusted {
-    color: var(--status-warning);
+.sql-note {
+    margin: 0;
+    color: var(--da-text-muted);
+    font-size: 12px;
+}
+.sql-tabs {
+    display: flex;
+    flex-shrink: 0;
+    gap: 20px;
+    border-bottom: 1px solid var(--da-border);
+}
+.sql-tabs :deep(button) {
+    appearance: none;
+    margin: 0 0 -1px;
+    padding: 10px 4px;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: var(--da-text-muted);
+    font: inherit;
+    cursor: pointer;
+}
+.sql-tabs :deep(button:hover),
+.sql-tabs :deep(button[data-state='active']) {
+    color: var(--da-text-main);
+}
+.sql-tabs :deep(button[data-state='active']) {
+    border-bottom-color: var(--da-primary);
+}
+.sql-tabs :deep(button:focus-visible) {
+    outline: 2px solid var(--da-primary);
+    outline-offset: 2px;
 }
 @media (max-width: 640px) {
     .summary-meta {

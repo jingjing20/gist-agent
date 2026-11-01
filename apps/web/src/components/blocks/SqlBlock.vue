@@ -24,6 +24,7 @@
 import { computed, ref } from 'vue';
 import hljs from 'highlight.js/lib/core';
 import sql from 'highlight.js/lib/languages/sql';
+import { formatSql } from '../../lib/format-sql';
 
 hljs.registerLanguage('sql', sql);
 
@@ -31,14 +32,15 @@ const props = defineProps<{ content?: string; title?: string }>();
 const copied = ref(false);
 const isExpanded = ref(true);
 
+const formattedSQL = computed(() => formatSql(props.content));
 const highlightedSQL = computed(() => {
     if (!props.content) return '';
-    return hljs.highlight(props.content, { language: 'sql' }).value;
+    return hljs.highlight(formattedSQL.value, { language: 'sql' }).value;
 });
 
 function copySQL() {
     if (!props.content) return;
-    navigator.clipboard.writeText(props.content);
+    navigator.clipboard.writeText(formattedSQL.value);
     copied.value = true;
     setTimeout(() => {
         copied.value = false;
